@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsTestProject>true</IsTestProject>
+    <AssemblyName>Dotisan.SourceGenerators.Tests</AssemblyName>
+    <RootNamespace>Dotisan.SourceGenerators.Tests</RootNamespace>
+    <NoWarn>CA1707;CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="coverlet.collector" />
+    <ProjectReference Include="..\..\src\Dotisan.Core\Dotisan.Core.csproj" />
+    <ProjectReference Include="..\..\src\Dotisan.SourceGenerators\Dotisan.SourceGenerators.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>

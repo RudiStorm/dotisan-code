@@ -10,6 +10,7 @@ The repository contains focused projects for:
 - Dotisan.Core — project options, endpoint marker/manifest contracts, and shared CLI contracts.
 - Dotisan.AspNetCore — explicit endpoint mapping helpers built on Minimal APIs.
 - Dotisan.Generators — inspectable ASP.NET Core + Vue/Vite + SQLite golden template.
+- Dotisan.SourceGenerators — Roslyn-generated explicit endpoint registration, DI wiring, and manifest source.
 - Dotisan.TypeScript — initial nullable/optional C# contract type mapping.
 - Dotisan.Testing — reusable test helpers.
 
