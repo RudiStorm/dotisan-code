@@ -1,8 +1,17 @@
 using Microsoft.AspNetCore.Routing;
+using Dotisan.Core;
 
 namespace Dotisan.AspNetCore;
 
-public sealed record DotisanEndpointDefinition(string Id, Action<IEndpointRouteBuilder> Map);
+public sealed record DotisanEndpointDefinition(string Id, Action<IEndpointRouteBuilder> Map)
+{
+    public static DotisanEndpointDefinition For<TEndpoint>(Action<IEndpointRouteBuilder> map)
+        where TEndpoint : IDotisanEndpoint
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        return new DotisanEndpointDefinition(TEndpoint.Configure().Id, map);
+    }
+}
 
 public static class DotisanEndpointRouteBuilderExtensions
 {

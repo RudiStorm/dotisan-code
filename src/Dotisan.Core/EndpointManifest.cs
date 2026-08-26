@@ -21,9 +21,6 @@ public sealed record EndpointManifestEntry(
     bool Idempotency = false,
     string? RateLimit = null);
 
-public interface IDotisanEndpoint
-{
-}
 
 public sealed class EndpointManifest
 {
