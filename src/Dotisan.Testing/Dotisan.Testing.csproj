@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dotisan.Testing</AssemblyName>
+    <RootNamespace>Dotisan.Testing</RootNamespace>
+    <PackageId>Dotisan.Testing</PackageId>
+  </PropertyGroup>
+</Project>

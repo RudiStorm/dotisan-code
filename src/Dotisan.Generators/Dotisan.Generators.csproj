@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dotisan.Generators</AssemblyName>
+    <RootNamespace>Dotisan.Generators</RootNamespace>
+    <PackageId>Dotisan.Generators</PackageId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dotisan.Core\Dotisan.Core.csproj" />
+  </ItemGroup>
+</Project>

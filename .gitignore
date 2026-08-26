@@ -1,0 +1,20 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+## Node
+node_modules/
+dist/
+.vite/
+
+## Generated app data
+*.db
+*.db-shm
+*.db-wal
+
+## Test output
+TestResults/
+coverage/

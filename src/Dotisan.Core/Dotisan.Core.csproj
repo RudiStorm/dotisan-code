@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dotisan.Core</AssemblyName>
+    <RootNamespace>Dotisan.Core</RootNamespace>
+    <PackageId>Dotisan.Core</PackageId>
+  </PropertyGroup>
+</Project>
