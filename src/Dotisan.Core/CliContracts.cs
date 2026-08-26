@@ -19,7 +19,39 @@ public interface IPrompts
     ProjectOptions AskForProject(string name, string outputDirectory);
 }
 
-public sealed record CommandContext(IConsole Console, IPrompts Prompts, IProjectGenerator ProjectGenerator);
+public sealed record CommandContext(
+    IConsole Console,
+    IPrompts Prompts,
+    IProjectGenerator ProjectGenerator,
+    IDotisanServices? Services = null);
+
+public sealed record DotisanOperationResult(bool Success, string? ErrorMessage = null, int ExitCode = 0)
+{
+    public static DotisanOperationResult Succeeded(int exitCode = 0) => new(true, null, exitCode);
+
+    public static DotisanOperationResult Failed(string message, int exitCode = 1) => new(false, message, exitCode);
+}
+
+public interface IDotisanServices
+{
+    string WorkingDirectory { get; }
+    string? SolutionPath { get; }
+    string? ApiProjectPath { get; }
+    string? FrontendDirectory { get; }
+
+    Task<DotisanOperationResult> ScaffoldResourceAsync(string resourceName, CancellationToken cancellationToken);
+
+    Task<DotisanOperationResult> ScaffoldEndpointAsync(string endpointName, CancellationToken cancellationToken);
+
+    Task<DotisanOperationResult> RunAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory, IConsole console, CancellationToken cancellationToken);
+
+    Task<IDotisanProcess> StartAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory, IConsole console, CancellationToken cancellationToken);
+}
+
+public interface IDotisanProcess : IAsyncDisposable
+{
+    Task<int> Completion { get; }
+}
 
 public interface IDotisanCommand
 {

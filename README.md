@@ -2,14 +2,14 @@
 
 Dotisan is a batteries-included application framework for standard ASP.NET Core and Vue applications. The first implementation slice provides a testable CLI foundation and a deterministic golden template.
 
-## Current slice
+## v0.1.0 workflow
 
 The repository contains focused projects for:
 
-- Dotisan.Cli — command registration, help/version, prompts, console abstraction, exit codes, and dotisan new.
+- Dotisan.Cli — command registration, help/version, prompts, console abstraction, exit codes, project creation, scaffolding, migrations, builds, and development supervision.
 - Dotisan.Core — project options, endpoint marker/manifest contracts, and shared CLI contracts.
 - Dotisan.AspNetCore — explicit endpoint mapping helpers built on Minimal APIs.
-- Dotisan.Generators — inspectable ASP.NET Core + Vue/Vite + SQLite golden template.
+- Dotisan.Generators — inspectable ASP.NET Core + Vue/Vite + SQLite golden template and vertical resource/endpoint scaffolding.
 - Dotisan.SourceGenerators — Roslyn-generated explicit endpoint registration, DI wiring, and manifest source.
 - Dotisan.TypeScript — initial nullable/optional C# contract type mapping.
 - Dotisan.Testing — reusable test helpers.
@@ -31,6 +31,11 @@ Create a project without interactive input:
 ~~~powershell
 dotnet run --project src\Dotisan.Cli -- new MyApp --yes --output .\MyApp
 dotnet build .\MyApp\MyApp.sln
+
+cd .\MyApp
+dotisan make:resource Customer
+dotisan migrate
+dotisan dev
 ~~~
 
 For the interactive Quick wizard, omit --yes. It asks for SQLite/SQL Server/PostgreSQL/MySQL, authentication, registration policy, tenancy, and pnpm/npm. Press Enter to accept each default.
@@ -43,9 +48,11 @@ dotnet tool install --global Dotisan --add-source .\artifacts --version 0.1.0
 dotisan new MyApp
 ~~~
 
+`make:resource` creates an editable model, EF `DbSet`, list/create Minimal API endpoint, and explicit registration. It does not create migrations; use `dotisan migrate` only after reviewing and authoring migrations with normal `dotnet ef` tooling.
+
 ## Deliberately deferred commands
 
-make:resource, make:endpoint, migrate, dev, build, run, add, remove, and doctor are registered so the CLI can give explicit guidance. They currently return exit code 3 and explain the native .NET tooling to use while each feature is implemented.
+Authentication, authorization, tenancy, jobs, observability, integrations, UI CRUD generation, and production diagnostics remain subsequent feature specifications. `add`, `remove`, and `doctor` intentionally return a helpful exit code 3 until those specifications are implemented.
 
 ## Project direction
 

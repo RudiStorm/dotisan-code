@@ -51,6 +51,25 @@ dotnet build TodoApp.sln
 dotnet run --project src\TodoApp.Api
 ~~~
 
+Dotisan can run the API and frontend together from the project root:
+
+~~~powershell
+dotisan dev
+dotisan dev --lean
+dotisan build
+~~~
+
+## Create a resource
+
+~~~powershell
+dotisan make:resource TodoItem
+dotnet build TodoApp.sln
+dotnet ef migrations add AddTodoItem --project src\TodoApp.Api
+dotisan migrate
+~~~
+
+The scaffold is ordinary source code and remains yours to edit. `make:resource` never creates a migration automatically.
+
 In another terminal, install and run the Vue app:
 
 ~~~powershell
@@ -71,4 +90,4 @@ dotnet ef database update --project src\TodoApp.Api
 dotnet watch --project src\TodoApp.Api
 ~~~
 
-dotisan migrate, dotisan dev, and resource scaffolding are registered but intentionally report that they are not implemented yet in this first slice.
+`dotisan migrate` applies existing EF Core migrations. `dotisan migrate status` lists migrations. Migration authoring and rollback remain available through standard `dotnet ef` commands.

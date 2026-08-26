@@ -98,6 +98,7 @@ internal static class TemplateFiles
       </PropertyGroup>
       <ItemGroup>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
       </ItemGroup>
     </Project>
     """;
@@ -109,6 +110,7 @@ internal static class TemplateFiles
       </PropertyGroup>
       <ItemGroup>
         <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11" />
         <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
         <PackageVersion Include="xunit" Version="2.9.2" />
         <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
@@ -124,6 +126,16 @@ internal static class TemplateFiles
     ~~~powershell
     dotnet build {{name}}.sln
     dotnet run --project src\{{name}}.Api
+    dotnet ef migrations add InitialCreate --project src\{{name}}.Api
+    dotnet ef database update --project src\{{name}}.Api
+    ~~~
+
+    Create a vertical feature slice:
+
+    ~~~powershell
+    dotisan make:resource Customer
+    dotisan migrate
+    dotisan dev
     ~~~
 
     Frontend development:
@@ -134,7 +146,7 @@ internal static class TemplateFiles
     npm run dev
     ~~~
 
-    dotisan.config controls orchestration preferences only. Normal appsettings.json, environment variables, EF Core, and Vite configuration remain the source of truth for their respective concerns.
+    dotisan.config controls orchestration preferences only. Normal appsettings.json, environment variables, EF Core, and Vite configuration remain the source of truth for their respective concerns. Resource scaffolding creates source files but never creates migrations.
     """;
 
     private static string ApiProgram(string identifier) => $$"""
@@ -166,7 +178,7 @@ internal static class TemplateFiles
 
     namespace {{identifier}}.Api.Data;
 
-    public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options);
+    public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options);
     """;
 
     private static string EndpointExtensions(string identifier) => $$"""
@@ -178,7 +190,11 @@ internal static class TemplateFiles
     public static class DotisanEndpointExtensions
     {
         // Endpoint registration is intentionally explicit and inspectable.
-        public static IEndpointRouteBuilder MapDotisanEndpoints(this IEndpointRouteBuilder endpoints) => endpoints;
+        public static IEndpointRouteBuilder MapDotisanEndpoints(this IEndpointRouteBuilder endpoints)
+        {
+            // DOTISAN:ENDPOINTS
+            return endpoints;
+        }
     }
     """;
 

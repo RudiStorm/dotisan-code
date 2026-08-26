@@ -14,18 +14,19 @@ public sealed class DotisanApplication
         DotisanCommandRegistry registry,
         IConsole console,
         IPrompts prompts,
-        IProjectGenerator projectGenerator)
+        IProjectGenerator projectGenerator,
+        IDotisanServices? services = null)
     {
         this.registry = registry;
-        context = new CommandContext(console, prompts, projectGenerator);
+        context = new CommandContext(console, prompts, projectGenerator, services);
     }
 
-    public static DotisanApplication CreateDefault(IConsole? console = null)
+    public static DotisanApplication CreateDefault(IConsole? console = null, IDotisanServices? services = null)
     {
         var output = console ?? new SystemConsole();
         var registry = new DotisanCommandRegistry();
         var prompts = new DefaultPrompts(output);
-        var application = new DotisanApplication(registry, output, prompts, new GoldenTemplateGenerator());
+        var application = new DotisanApplication(registry, output, prompts, new GoldenTemplateGenerator(), services ?? new DefaultDotisanServices());
         application.RegisterBuiltIns();
         return application;
     }
@@ -67,9 +68,13 @@ public sealed class DotisanApplication
         registry.Register(new HelpCommand(registry));
         registry.Register(new NewCommand());
 
-        foreach (var command in new[] { "make:resource", "make:endpoint", "migrate", "dev", "build", "run", "add", "remove", "doctor" })
-        {
+        registry.Register(new MakeResourceCommand());
+        registry.Register(new MakeEndpointCommand());
+        registry.Register(new MigrateCommand());
+        registry.Register(new DevCommand());
+        registry.Register(new BuildCommand());
+        registry.Register(new RunCommand());
+        foreach (var command in new[] { "add", "remove", "doctor" })
             registry.Register(new NotImplementedCommand(command));
-        }
     }
 }

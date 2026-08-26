@@ -46,6 +46,9 @@ public sealed class SourceGeneratorTests
         Assert.Contains("ToManifestEntry(\"global::AEndpoint.Request\", \"global::AEndpoint.Response\")", generated);
         Assert.Contains("MapDotisanEndpoints(this IEndpointRouteBuilder endpoints)", generated);
         Assert.Contains("AddDotisanEndpointServices(this IServiceCollection services)", generated);
+        Assert.Contains("ManifestSchemaVersion", generated);
+        Assert.Contains("EndpointManifestJson", generated);
+        Assert.Contains("EndpointManifestSha256", generated);
         Assert.Contains("services.AddScoped<global::AEndpoint.Handler>();", generated);
         Assert.Contains("services.AddScoped<global::AEndpoint.Validator>();", generated);
         Assert.DoesNotContain("Assembly.Load", generated);

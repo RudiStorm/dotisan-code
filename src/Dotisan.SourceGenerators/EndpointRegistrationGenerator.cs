@@ -201,6 +201,10 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
             source.AppendLine("        };");
         }
 
+        source.AppendLine();
+        source.AppendLine("    public const int ManifestSchemaVersion = global::Dotisan.Core.EndpointManifest.SchemaVersion;");
+        source.AppendLine("    public static string EndpointManifestJson => new global::Dotisan.Core.EndpointManifest(EndpointManifest).ToJson();");
+        source.AppendLine("    public static string EndpointManifestSha256 => new global::Dotisan.Core.EndpointManifest(EndpointManifest).Sha256;");
         source.AppendLine("}");
         return source.ToString();
     }

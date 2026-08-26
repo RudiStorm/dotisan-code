@@ -44,6 +44,197 @@ internal sealed class NotImplementedCommand(string name) : IDotisanCommand
     }
 }
 
+internal abstract class WorkspaceCommand : IDotisanCommand
+{
+    public abstract string Name { get; }
+    public abstract string Description { get; }
+
+    public abstract Task<DotisanExitCode> ExecuteAsync(CommandContext context, IReadOnlyList<string> arguments, CancellationToken cancellationToken);
+
+    protected static DotisanExitCode Fail(IConsole console, string message, DotisanExitCode code = DotisanExitCode.GenerationError)
+    {
+        console.WriteError(message);
+        return code;
+    }
+
+    protected static bool TryGetServices(CommandContext context, out IDotisanServices services)
+    {
+        services = context.Services!;
+        return services is not null;
+    }
+}
+
+internal sealed class MakeResourceCommand : WorkspaceCommand
+{
+    public override string Name => "make:resource";
+    public override string Description => "Create a model and vertical CRUD endpoint slice.";
+
+    public override async Task<DotisanExitCode> ExecuteAsync(CommandContext context, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    {
+        if (arguments.Count != 1 || string.IsNullOrWhiteSpace(arguments[0]))
+            return Fail(context.Console, "Usage: dotisan make:resource <ResourceName>", DotisanExitCode.UsageError);
+        if (!TryGetServices(context, out var services))
+            return Fail(context.Console, "Workspace services are unavailable.");
+
+        var result = await services.ScaffoldResourceAsync(arguments[0], cancellationToken);
+        if (!result.Success)
+            return Fail(context.Console, result.ErrorMessage ?? "Resource scaffolding failed.");
+        context.Console.WriteLine($"Created {arguments[0]} resource files.");
+        return DotisanExitCode.Success;
+    }
+}
+
+internal sealed class MakeEndpointCommand : WorkspaceCommand
+{
+    public override string Name => "make:endpoint";
+    public override string Description => "Create a single-file vertical endpoint.";
+
+    public override async Task<DotisanExitCode> ExecuteAsync(CommandContext context, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    {
+        if (arguments.Count != 1 || string.IsNullOrWhiteSpace(arguments[0]))
+            return Fail(context.Console, "Usage: dotisan make:endpoint <EndpointName>", DotisanExitCode.UsageError);
+        if (!TryGetServices(context, out var services))
+            return Fail(context.Console, "Workspace services are unavailable.");
+
+        var result = await services.ScaffoldEndpointAsync(arguments[0], cancellationToken);
+        if (!result.Success)
+            return Fail(context.Console, result.ErrorMessage ?? "Endpoint scaffolding failed.");
+        context.Console.WriteLine($"Created {arguments[0]} endpoint.");
+        return DotisanExitCode.Success;
+    }
+}
+
+internal sealed class MigrateCommand : WorkspaceCommand
+{
+    public override string Name => "migrate";
+    public override string Description => "Apply committed EF Core migrations.";
+
+    public override async Task<DotisanExitCode> ExecuteAsync(CommandContext context, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    {
+        if (!TryGetServices(context, out var services))
+            return Fail(context.Console, "Workspace services are unavailable.");
+
+        var efArguments = new List<string> { "ef" };
+        if (arguments.SequenceEqual(["status"], StringComparer.OrdinalIgnoreCase))
+            efArguments.AddRange(["migrations", "list"]);
+        else if (arguments.Count == 0 || arguments.SequenceEqual(["--production"], StringComparer.OrdinalIgnoreCase))
+            efArguments.AddRange(["database", "update"]);
+        else
+            return Fail(context.Console, "Usage: dotisan migrate [status|--production]. Use 'dotnet ef' directly for migration authoring and rollback.", DotisanExitCode.UsageError);
+
+        if (services.ApiProjectPath is null)
+            return Fail(context.Console, "Could not find an API project. Run this command from a generated Dotisan project.");
+        efArguments.AddRange(["--project", services.ApiProjectPath]);
+
+        var result = await services.RunAsync("dotnet", efArguments, services.WorkingDirectory, context.Console, cancellationToken);
+        if (result.Success)
+            return DotisanExitCode.Success;
+        context.Console.WriteError(result.ErrorMessage ?? "EF Core migration command failed.");
+        context.Console.WriteError("If dotnet-ef is not installed, run 'dotnet tool install --global dotnet-ef' and retry.");
+        return DotisanExitCode.GenerationError;
+    }
+}
+
+internal sealed class BuildCommand : WorkspaceCommand
+{
+    public override string Name => "build";
+    public override string Description => "Build the API and Vue frontend.";
+
+    public override async Task<DotisanExitCode> ExecuteAsync(CommandContext context, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    {
+        var frontend = !arguments.Contains("--no-frontend", StringComparer.OrdinalIgnoreCase);
+        if (arguments.Any(argument => argument.StartsWith("--", StringComparison.Ordinal) && !argument.Equals("--no-frontend", StringComparison.OrdinalIgnoreCase)))
+            return Fail(context.Console, "Usage: dotisan build [--no-frontend].", DotisanExitCode.UsageError);
+        if (!TryGetServices(context, out var services))
+            return Fail(context.Console, "Workspace services are unavailable.");
+        if (services.SolutionPath is null)
+            return Fail(context.Console, "Could not find a solution. Run this command from a generated Dotisan project.");
+
+        var api = await services.RunAsync("dotnet", ["build", services.SolutionPath], services.WorkingDirectory, context.Console, cancellationToken);
+        if (!api.Success)
+            return Fail(context.Console, api.ErrorMessage ?? "API build failed.");
+        if (!frontend)
+            return DotisanExitCode.Success;
+
+        var packageManager = services is DefaultDotisanServices defaultServices ? defaultServices.PackageManager : "pnpm";
+        if (services.FrontendDirectory is null)
+            return Fail(context.Console, "Could not find the Vue frontend. Use --no-frontend to build the API only.");
+        var web = await services.RunAsync(packageManager, ["run", "build"], services.FrontendDirectory, context.Console, cancellationToken);
+        return web.Success ? DotisanExitCode.Success : Fail(context.Console, web.ErrorMessage ?? "Frontend build failed.");
+    }
+}
+
+internal sealed class RunCommand : WorkspaceCommand
+{
+    public override string Name => "run";
+    public override string Description => "Run the API using dotnet run.";
+
+    public override async Task<DotisanExitCode> ExecuteAsync(CommandContext context, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    {
+        if (arguments.Count > 0)
+            return Fail(context.Console, "Usage: dotisan run.", DotisanExitCode.UsageError);
+        if (!TryGetServices(context, out var services))
+            return Fail(context.Console, "Workspace services are unavailable.");
+        if (services.ApiProjectPath is null)
+            return Fail(context.Console, "Could not find an API project. Run this command from a generated Dotisan project.");
+        var result = await services.RunAsync("dotnet", ["run", "--project", services.ApiProjectPath], services.WorkingDirectory, context.Console, cancellationToken);
+        return result.Success ? DotisanExitCode.Success : Fail(context.Console, result.ErrorMessage ?? "API run failed.");
+    }
+}
+
+internal sealed class DevCommand : WorkspaceCommand
+{
+    public override string Name => "dev";
+    public override string Description => "Run the API and Vue development servers together.";
+
+    public override async Task<DotisanExitCode> ExecuteAsync(CommandContext context, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    {
+        if (arguments.Any(argument => argument.StartsWith("--", StringComparison.Ordinal) && argument is not "--lean" and not "--observability" and not "--environment"))
+            return Fail(context.Console, "Usage: dotisan dev [--lean] [--observability] [--environment <name>].", DotisanExitCode.UsageError);
+
+        var environment = "Development";
+        for (var index = 0; index < arguments.Count; index++)
+        {
+            if (arguments[index] == "--environment")
+            {
+                if (++index >= arguments.Count || string.IsNullOrWhiteSpace(arguments[index]))
+                    return Fail(context.Console, "--environment requires a value.", DotisanExitCode.UsageError);
+                environment = arguments[index];
+            }
+        }
+
+        if (!TryGetServices(context, out var services))
+            return Fail(context.Console, "Workspace services are unavailable.");
+        if (services.ApiProjectPath is null)
+            return Fail(context.Console, "Could not find an API project. Run this command from a generated Dotisan project.");
+
+        var processes = new List<IDotisanProcess>();
+        try
+        {
+            processes.Add(await services.StartAsync("dotnet", ["watch", "--project", services.ApiProjectPath, "run", "--", "--environment", environment], services.WorkingDirectory, context.Console, cancellationToken));
+            if (!arguments.Contains("--lean", StringComparer.OrdinalIgnoreCase))
+            {
+                if (services.FrontendDirectory is null)
+                    return Fail(context.Console, "Could not find the Vue frontend. Use --lean to run the API only.");
+                var packageManager = services is DefaultDotisanServices defaultServices ? defaultServices.PackageManager : "pnpm";
+                processes.Add(await services.StartAsync(packageManager, ["run", "dev"], services.FrontendDirectory, context.Console, cancellationToken));
+            }
+
+            await Task.WhenAny(processes.Select(process => process.Completion));
+            return DotisanExitCode.Success;
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return Fail(context.Console, $"Could not start development services: {exception.Message}");
+        }
+        finally
+        {
+            foreach (var process in processes)
+                await process.DisposeAsync();
+        }
+    }
+}
+
 internal sealed class NewCommand : IDotisanCommand
 {
     public string Name => "new";
@@ -65,6 +256,7 @@ internal sealed class NewCommand : IDotisanCommand
         var registration = RegistrationPolicy.Disabled;
         var multiTenancyEnabled = false;
         var packageManager = PackageManager.Pnpm;
+        var restore = true;
 
         for (var index = 1; index < arguments.Count; index++)
         {
@@ -118,6 +310,7 @@ internal sealed class NewCommand : IDotisanCommand
 
                     break;
                 case "--no-restore":
+                    restore = false;
                     break;
                 default:
                     return UsageError(context, $"Unknown option '{arguments[index]}'.");
@@ -151,6 +344,17 @@ internal sealed class NewCommand : IDotisanCommand
         }
 
         context.Console.WriteLine($"Created {options.Name} in {result.OutputDirectory}.");
+        if (restore && context.Services is not null)
+        {
+            var solutionPath = Path.Combine(result.OutputDirectory, $"{options.Name}.sln");
+            var restoreResult = await context.Services.RunAsync("dotnet", ["restore", solutionPath], result.OutputDirectory, context.Console, cancellationToken);
+            if (!restoreResult.Success)
+            {
+                context.Console.WriteError(restoreResult.ErrorMessage ?? "The generated project was created, but dotnet restore failed.");
+                context.Console.WriteError("You can retry with 'dotnet restore' from the generated project directory.");
+                return DotisanExitCode.GenerationError;
+            }
+        }
         context.Console.WriteLine($"Next: cd {Path.GetRelativePath(Directory.GetCurrentDirectory(), result.OutputDirectory)}");
         context.Console.WriteLine("Then run: dotnet build");
         return DotisanExitCode.Success;

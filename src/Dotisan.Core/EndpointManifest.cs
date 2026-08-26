@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Dotisan.Core;
 
@@ -24,6 +26,8 @@ public sealed record EndpointManifestEntry(
 
 public sealed class EndpointManifest
 {
+    public const int SchemaVersion = 1;
+
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -33,10 +37,17 @@ public sealed class EndpointManifest
 
     public EndpointManifest(IReadOnlyList<EndpointManifestEntry> endpoints)
     {
-        Endpoints = endpoints ?? throw new ArgumentNullException(nameof(endpoints));
+        ArgumentNullException.ThrowIfNull(endpoints);
+        Endpoints = endpoints
+            .OrderBy(endpoint => endpoint.Id, StringComparer.Ordinal)
+            .ThenBy(endpoint => endpoint.Method, StringComparer.Ordinal)
+            .ThenBy(endpoint => endpoint.Route, StringComparer.Ordinal)
+            .ToArray();
     }
 
     public IReadOnlyList<EndpointManifestEntry> Endpoints { get; }
 
     public string ToJson() => JsonSerializer.Serialize(Endpoints, JsonOptions);
+
+    public string Sha256 => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(ToJson()))).ToLowerInvariant();
 }
