@@ -87,6 +87,7 @@ public sealed class GoldenTemplateGeneratorTests
             var user = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Identity", "ApplicationUser.cs"));
             var authenticatedProgram = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Program.cs"));
             var plainProgram = await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Api", "Program.cs"));
+            var authenticatedReadme = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "README.md"));
 
             Assert.Contains("Microsoft.AspNetCore.Identity.EntityFrameworkCore", apiProject);
             Assert.Contains("Microsoft.AspNetCore.Mvc.Testing", testProject);
@@ -124,6 +125,10 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("tests/AuthApp.Api.Tests/AuthenticationEndpointTests.cs", authenticatedPaths);
             var authenticationTests = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "tests", "AuthApp.Api.Tests", "AuthenticationEndpointTests.cs"));
             Assert.Contains("WebApplicationFactory<Program>", authenticationTests);
+            Assert.Contains("--auth yes", authenticatedReadme);
+            Assert.Contains("InitialIdentity", authenticatedReadme);
+            Assert.Contains("dotisan migrate", authenticatedReadme);
+            Assert.Contains("does not create migrations", authenticatedReadme);
         }
         finally
         {

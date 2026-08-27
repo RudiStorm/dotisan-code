@@ -17,6 +17,14 @@ Multi-tenancy: No
 Package manager: pnpm
 ~~~
 
+Authentication is opt-in. To generate the v0.2 authentication slice non-interactively:
+
+~~~powershell
+dotnet run --project src\Dotisan.Cli -- new AuthApp --auth yes --registration public --yes --output .\AuthApp
+~~~
+
+This adds standard ASP.NET Core Identity with EF Core, cookie authentication, antiforgery protection, and explicit account endpoints. Registration can be `public`, `invite-only`, or `disabled`; invite-only and disabled projects return a clear `registration_unavailable` ProblemDetails response until an invitation workflow is added.
+
 For scripts and CI, use the non-interactive equivalent:
 
 ~~~powershell
@@ -91,3 +99,15 @@ dotnet watch --project src\TodoApp.Api
 ~~~
 
 `dotisan migrate` applies existing EF Core migrations. `dotisan migrate status` lists migrations. Migration authoring and rollback remain available through standard `dotnet ef` commands.
+
+## Authentication projects
+
+For an authenticated project, create and apply the initial Identity schema with standard EF Core tooling:
+
+~~~powershell
+dotnet ef migrations add InitialIdentity --project src\AuthApp.Api
+dotnet ef database update --project src\AuthApp.Api
+dotisan migrate
+~~~
+
+`dotisan migrate` applies existing migrations; it does not create migrations. Keep production secrets and data-protection keys outside source control, use HTTPS, and configure a durable key ring for multi-instance deployments through normal ASP.NET Core configuration. Password reset, email confirmation, MFA, external providers, roles, and permissions are intentionally deferred.
