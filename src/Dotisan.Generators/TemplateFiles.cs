@@ -474,6 +474,7 @@ internal static class TemplateFiles
     using System.Net;
     using System.Net.Http.Json;
     using {{identifier}}.Api.Data;
+    using Microsoft.AspNetCore.DataProtection;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.AspNetCore.Mvc.Testing;
     using Microsoft.Data.Sqlite;
@@ -530,6 +531,7 @@ internal static class TemplateFiles
             {
                 connection = new SqliteConnection("Data Source=:memory:");
                 connection.Open();
+                services.AddDataProtection().UseEphemeralDataProtectionProvider();
                 services.RemoveAll<DbContextOptions<AppDbContext>>();
                 services.AddDbContext<AppDbContext>(options => options.UseSqlite(connection));
 
