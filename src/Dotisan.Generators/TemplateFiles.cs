@@ -68,6 +68,8 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public)),
             new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Auditing/AuditEntry.cs", AuditEntry(identifier)),
+            new($"src/{options.Name}.Api/Auditing/IAuditWriter.cs", AuditWriterContract(identifier)),
+            new($"src/{options.Name}.Api/Auditing/AuditWriter.cs", AuditWriter(identifier)),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationUser.cs", ApplicationUser(identifier)) }
                 : Array.Empty<TemplateFile>()),
@@ -266,6 +268,7 @@ internal static class TemplateFiles
         : PlainApiProgram(identifier);
 
     private static string PlainApiProgram(string identifier) => $$"""
+    using {{identifier}}.Api.Auditing;
     using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Data;
     using {{identifier}}.Api.Infrastructure;
@@ -274,6 +277,7 @@ internal static class TemplateFiles
     builder.Services.AddProblemDetails();
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+    builder.Services.AddScoped<IAuditWriter, AuditWriter>();
 
     var app = builder.Build();
     app.UseExceptionHandler();
@@ -292,6 +296,7 @@ internal static class TemplateFiles
     private static string AuthenticatedApiProgram(string identifier, bool registrationEnabled) => $$"""
     using System.Security.Claims;
     using {{identifier}}.Api.Authorization;
+    using {{identifier}}.Api.Auditing;
     using {{identifier}}.Api.Data;
     using {{identifier}}.Api.Features.Account;
     using {{identifier}}.Api.Features.Authorization;
@@ -306,6 +311,7 @@ internal static class TemplateFiles
     builder.Services.AddProblemDetails();
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+    builder.Services.AddScoped<IAuditWriter, AuditWriter>();
     builder.Services.AddIdentityCore<ApplicationUser>(options =>
     {
         options.User.RequireUniqueEmail = true;
@@ -406,6 +412,68 @@ internal static class TemplateFiles
         public string? TraceId { get; set; }
         public string? CorrelationId { get; set; }
         public DateTimeOffset CreatedAt { get; set; }
+    }
+    """;
+
+    private static string AuditWriterContract(string identifier) => $$"""
+    using Microsoft.AspNetCore.Http;
+
+    namespace {{identifier}}.Api.Auditing;
+
+    public interface IAuditWriter
+    {
+        Task RecordAsync(
+            HttpContext httpContext,
+            string entityType,
+            string? entityId,
+            string action,
+            IReadOnlyDictionary<string, object?> changes,
+            CancellationToken cancellationToken);
+    }
+    """;
+
+    private static string AuditWriter(string identifier) => $$"""
+    using System.Diagnostics;
+    using System.Security.Claims;
+    using System.Text.Json;
+    using {{identifier}}.Api.Data;
+    using Microsoft.AspNetCore.Http;
+    using Microsoft.Extensions.Configuration;
+
+    namespace {{identifier}}.Api.Auditing;
+
+    public sealed class AuditWriter(AppDbContext db, IConfiguration configuration) : IAuditWriter
+    {
+        public async Task RecordAsync(
+            HttpContext httpContext,
+            string entityType,
+            string? entityId,
+            string action,
+            IReadOnlyDictionary<string, object?> changes,
+            CancellationToken cancellationToken)
+        {
+            if (!configuration.GetValue("Audit:Enabled", true))
+            {
+                return;
+            }
+
+            var correlationId = httpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault()
+                ?? httpContext.TraceIdentifier;
+            db.AuditEntries.Add(new AuditEntry
+            {
+                Id = Guid.NewGuid(),
+                ActorId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier),
+                TenantId = null,
+                EntityType = entityType,
+                EntityId = entityId,
+                Action = action,
+                Changes = JsonSerializer.Serialize(changes),
+                TraceId = Activity.Current?.TraceId.ToString(),
+                CorrelationId = correlationId,
+                CreatedAt = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
     """;
 

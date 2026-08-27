@@ -20,10 +20,21 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
             Assert.Contains("\"version\": \"0.3.0\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditEntry.cs")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "IAuditWriter.cs")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditWriter.cs")));
+            var auditWriter = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditWriter.cs"));
+            Assert.Contains("RecordAsync", auditWriter);
+            Assert.Contains("Activity.Current", auditWriter);
+            Assert.Contains("X-Correlation-ID", auditWriter);
+            Assert.Contains("TraceIdentifier", auditWriter);
+            Assert.Contains("ClaimTypes.NameIdentifier", auditWriter);
+            Assert.Contains("JsonSerializer.Serialize", auditWriter);
+            Assert.Contains("GetValue(\"Audit:Enabled\", true)", auditWriter);
             Assert.Contains("public sealed class AuditEntry", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditEntry.cs")));
             Assert.Contains("DbSet<AuditEntry> AuditEntries", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Data", "AppDbContext.cs")));
             Assert.Contains("\"Audit\":", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
             Assert.Contains("\"Enabled\": true", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
+            Assert.Contains("AddScoped<IAuditWriter, AuditWriter>", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.Contains("UseSqlite", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.Contains("Data Source=app.db", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
             Assert.Contains("profile: quick", await File.ReadAllTextAsync(Path.Combine(output, "dotisan.config")));
@@ -151,6 +162,8 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("RequireAuthorization(Permissions.ProfileView)", authorizationEndpoints);
             Assert.Contains("src/AuthApp.Api/Authorization/Permissions.cs", authenticatedPaths);
             Assert.Contains("src/AuthApp.Api/Auditing/AuditEntry.cs", authenticatedPaths);
+            Assert.Contains("src/AuthApp.Api/Auditing/IAuditWriter.cs", authenticatedPaths);
+            Assert.Contains("src/AuthApp.Api/Auditing/AuditWriter.cs", authenticatedPaths);
             Assert.DoesNotContain("src/PlainApp.Api/Authorization/Permissions.cs", plainPaths);
             var permissions = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Authorization", "Permissions.cs"));
             Assert.Contains("public const string ClaimType = \"permission\";", permissions);
@@ -170,6 +183,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("AddEntityFrameworkStores<AppDbContext>", authenticatedProgram);
             Assert.Contains("AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)", authenticatedProgram);
             Assert.Contains("AddAuthorization(options =>", authenticatedProgram);
+            Assert.Contains("AddScoped<IAuditWriter, AuditWriter>", authenticatedProgram);
             Assert.Contains("Permissions.All", authenticatedProgram);
             Assert.Contains("RequireClaim(Permissions.ClaimType, permission)", authenticatedProgram);
             Assert.Contains("UseAuthentication", authenticatedProgram);
