@@ -71,6 +71,9 @@ internal static class TemplateFiles
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationUser.cs", ApplicationUser(identifier)) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Authorization/Permissions.cs", Permissions(identifier)) }
+                : Array.Empty<TemplateFile>()),
+            ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Account/AccountEndpoints.cs", AccountEndpoints(identifier, options.Registration == RegistrationPolicy.Public)) }
                 : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier)),
@@ -134,6 +137,17 @@ internal static class TemplateFiles
     private static string ProjectReadme(string name, bool authenticationEnabled) => authenticationEnabled
         ? AuthenticatedProjectReadme(name)
         : PlainProjectReadme(name);
+
+    private static string Permissions(string identifier) => $$"""
+    namespace {{identifier}}.Api.Authorization;
+
+    public static class Permissions
+    {
+        public const string ClaimType = "permission";
+        public const string ProfileView = "profile.view";
+        public static IReadOnlyList<string> All { get; } = [ProfileView];
+    }
+    """;
 
     private static string PlainProjectReadme(string name) => $$"""
     # {{name}}

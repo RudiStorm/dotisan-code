@@ -5,6 +5,36 @@ namespace Dotisan.Core.Tests;
 public sealed class EndpointContractTests
 {
     [Fact]
+    public void Permission_requires_authorization()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => new EndpointOptions(
+            id: "customers.read",
+            feature: "Customers",
+            name: "ReadCustomers",
+            method: "GET",
+            route: "/api/customers",
+            permission: "customers.read"));
+
+        Assert.Equal("permission", exception.ParamName);
+    }
+
+    [Fact]
+    public void Authorized_endpoint_accepts_a_permission()
+    {
+        var options = new EndpointOptions(
+            id: "customers.read",
+            feature: "Customers",
+            name: "ReadCustomers",
+            method: "GET",
+            route: "/api/customers",
+            authorization: true,
+            permission: "customers.read");
+
+        Assert.True(options.Authorization);
+        Assert.Equal("customers.read", options.Permission);
+    }
+
+    [Fact]
     public async Task Endpoint_exposes_deterministic_metadata_and_di_friendly_handler()
     {
         var options = ReadOptions<CreateCustomer>();

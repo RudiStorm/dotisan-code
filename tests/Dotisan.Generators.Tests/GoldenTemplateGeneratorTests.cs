@@ -99,6 +99,12 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("public sealed class ApplicationUser : IdentityUser", user);
             Assert.DoesNotContain("src/PlainApp.Api/Identity/ApplicationUser.cs", plainPaths);
             Assert.Contains("src/AuthApp.Api/Features/Account/AccountEndpoints.cs", authenticatedPaths);
+            Assert.Contains("src/AuthApp.Api/Authorization/Permissions.cs", authenticatedPaths);
+            Assert.DoesNotContain("src/PlainApp.Api/Authorization/Permissions.cs", plainPaths);
+            var permissions = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Authorization", "Permissions.cs"));
+            Assert.Contains("public const string ClaimType = \"permission\";", permissions);
+            Assert.Contains("public const string ProfileView = \"profile.view\";", permissions);
+            Assert.Contains("IReadOnlyList<string> All", permissions);
             var accountEndpoints = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Features", "Account", "AccountEndpoints.cs"));
             Assert.Contains("MapAccountEndpoints", accountEndpoints);
             Assert.Contains("RegisterRequest", accountEndpoints);

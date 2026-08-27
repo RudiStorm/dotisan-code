@@ -23,8 +23,18 @@ public sealed class EndpointOptions
         Name = RequireValue(name, nameof(name));
         Method = RequireValue(method, nameof(method)).ToUpperInvariant();
         Route = RequireRoute(route);
+        if (authorization && string.IsNullOrWhiteSpace(permission))
+        {
+            throw new ArgumentException("Authorized endpoints must declare a permission.", nameof(permission));
+        }
+
+        if (!authorization && permission is not null)
+        {
+            throw new ArgumentException("Permissions can only be assigned to authorized endpoints.", nameof(permission));
+        }
+
         Authorization = authorization;
-        Permission = permission;
+        Permission = permission is null ? null : RequireValue(permission, nameof(permission));
         Version = version;
         Tags = (tags ?? []).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         Validation = validation;
