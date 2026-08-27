@@ -75,9 +75,11 @@ public sealed class DefaultDotisanServices : IDotisanServices
         root = Path.GetFullPath(workingDirectory ?? Directory.GetCurrentDirectory());
         workspace = DotisanWorkspaceLocator.Find(root);
         PackageManager = ReadPackageManager(workspace?.Root);
+        Database = ReadDatabaseProvider(workspace?.Root);
     }
 
     public string WorkingDirectory => workspace?.Root ?? root;
+    public DatabaseProvider Database { get; }
     public string? SolutionPath => workspace?.SolutionPath;
     public string? ApiProjectPath => workspace?.ApiProjectPath;
     public string? FrontendDirectory => workspace?.FrontendDirectory;
@@ -129,6 +131,30 @@ public sealed class DefaultDotisanServices : IDotisanServices
         }
 
         return OperatingSystem.IsWindows() ? $"{packageManager}.cmd" : packageManager;
+    }
+
+    private static DatabaseProvider ReadDatabaseProvider(string? projectRoot)
+    {
+        if (projectRoot is null)
+            return DatabaseProvider.SQLite;
+
+        var configPath = Path.Combine(projectRoot, "dotisan.config");
+        if (!File.Exists(configPath))
+            return DatabaseProvider.SQLite;
+
+        var value = File.ReadLines(configPath)
+            .Select(line => line.Trim())
+            .Where(line => line.StartsWith("database:", StringComparison.OrdinalIgnoreCase))
+            .Select(line => line["database:".Length..].Trim().ToLowerInvariant())
+            .FirstOrDefault();
+
+        return value switch
+        {
+            "sqlserver" => DatabaseProvider.SqlServer,
+            "postgresql" or "postgres" => DatabaseProvider.PostgreSQL,
+            "mysql" => DatabaseProvider.MySQL,
+            _ => DatabaseProvider.SQLite
+        };
     }
 }
 

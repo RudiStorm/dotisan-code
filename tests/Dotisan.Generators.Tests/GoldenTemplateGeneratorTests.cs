@@ -56,9 +56,9 @@ public sealed class GoldenTemplateGeneratorTests
 
     [Theory]
     [InlineData(DatabaseProvider.SQLite, "Microsoft.EntityFrameworkCore.Sqlite", "UseSqlite", "Data Source=app.db", "SQLite")]
-    [InlineData(DatabaseProvider.SqlServer, "Microsoft.EntityFrameworkCore.SqlServer", "UseSqlServer", "Server=localhost;Database=DataApp;Trusted_Connection=True;TrustServerCertificate=True", "SQL Server")]
+    [InlineData(DatabaseProvider.SqlServer, "Microsoft.EntityFrameworkCore.SqlServer", "UseSqlServer", "Server=localhost,1433;Database=DataApp;User Id=sa;Password=DotisanDev123!;TrustServerCertificate=True", "SQL Server")]
     [InlineData(DatabaseProvider.PostgreSQL, "Npgsql.EntityFrameworkCore.PostgreSQL", "UseNpgsql", "Host=localhost;Database=dataapp;Username=postgres;Password=postgres", "PostgreSQL")]
-    [InlineData(DatabaseProvider.MySQL, "Pomelo.EntityFrameworkCore.MySql", "UseMySql", "Server=localhost;Database=dataapp;User=root;Password=", "MySQL")]
+    [InlineData(DatabaseProvider.MySQL, "Pomelo.EntityFrameworkCore.MySql", "UseMySql", "Server=localhost;Database=dataapp;User=root;Password=root", "MySQL")]
     public async Task Generator_uses_the_selected_database_provider(
         DatabaseProvider provider,
         string package,
@@ -83,7 +83,32 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains(connectionString, appsettings);
             Assert.Contains($"EF Core {displayName}", readme);
             if (provider != DatabaseProvider.SQLite)
+            {
                 Assert.DoesNotContain("Microsoft.EntityFrameworkCore.Sqlite", apiProject);
+                var compose = await File.ReadAllTextAsync(Path.Combine(output, "compose.yaml"));
+                Assert.Contains("services:", compose);
+                Assert.Contains("database:", compose);
+                Assert.Contains(provider switch
+                {
+                    DatabaseProvider.SqlServer => "mcr.microsoft.com/mssql/server:2022-latest",
+                    DatabaseProvider.PostgreSQL => "postgres:16-alpine",
+                    DatabaseProvider.MySQL => "mysql:8.4",
+                    _ => throw new InvalidOperationException()
+                }, compose);
+                Assert.Contains(provider switch
+                {
+                    DatabaseProvider.SqlServer => "1433:1433",
+                    DatabaseProvider.PostgreSQL => "5432:5432",
+                    DatabaseProvider.MySQL => "3306:3306",
+                    _ => throw new InvalidOperationException()
+                }, compose);
+                Assert.Contains("healthcheck:", compose);
+                Assert.Contains("docker compose up -d --wait database", readme);
+            }
+            else
+            {
+                Assert.False(File.Exists(Path.Combine(output, "compose.yaml")));
+            }
         }
         finally
         {

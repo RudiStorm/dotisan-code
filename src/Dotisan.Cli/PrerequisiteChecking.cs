@@ -13,15 +13,21 @@ internal static class DefaultPrerequisiteChecker
 {
     public static async Task<PrerequisiteCheckResult> CheckAsync(
         PackageManager packageManager,
+        DatabaseProvider database,
         IDotisanServices services,
         CancellationToken cancellationToken)
     {
-        var checks = new[]
+        var checks = new List<ToolCheck>
         {
             new ToolCheck(".NET SDK", "dotnet", ["--version"], "Install the .NET 8 SDK from https://dotnet.microsoft.com/download/dotnet/8.0", "dotnet --version"),
             new ToolCheck("dotnet-ef", "dotnet", ["ef", "--version"], "dotnet tool install --global dotnet-ef", "dotnet ef --version"),
             CreatePackageManagerCheck(packageManager)
         };
+        if (database != DatabaseProvider.SQLite)
+        {
+            checks.Add(CreateDockerCheck());
+            checks.Add(CreateDockerDaemonCheck());
+        }
         var missing = new List<MissingPrerequisite>();
 
         foreach (var check in checks)
@@ -50,6 +56,20 @@ internal static class DefaultPrerequisiteChecker
         PackageManager.Npm => new("npm", PackageManagerCommand(packageManager), ["--version"], "Install Node.js LTS from https://nodejs.org/; npm is included.", "npm --version"),
         _ => new("pnpm", PackageManagerCommand(packageManager), ["--version"], "Install Node.js LTS from https://nodejs.org/, then run: npm install --global pnpm", "pnpm --version")
     };
+
+    private static ToolCheck CreateDockerCheck() => new(
+        "Docker",
+        "docker",
+        ["compose", "version"],
+        "Install Docker Desktop from https://docs.docker.com/get-docker/",
+        "docker compose version");
+
+    private static ToolCheck CreateDockerDaemonCheck() => new(
+        "Docker daemon",
+        "docker",
+        ["info", "--format", "{{.ServerVersion}}"],
+        "Start Docker Desktop and wait until the Docker Engine is running.",
+        "docker info");
 
     private sealed record ToolCheck(
         string Name,

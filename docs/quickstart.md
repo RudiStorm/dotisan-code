@@ -68,15 +68,15 @@ TodoApp/
 
 ## Database providers
 
-For SQL Server, PostgreSQL, or MySQL, start the database service before applying migrations. `dotisan new` checks local development tools but does not provision or start an external database server. Configure credentials with normal ASP.NET Core configuration or user secrets rather than committing them.
+For SQL Server, PostgreSQL, or MySQL, keep Docker Desktop running. `dotisan new` checks Docker and generates a provider-specific `compose.yaml`; `dotisan dev` starts the `database` service, waits for its health check, and stops the container on exit without deleting its named volume. You can start it manually with `docker compose up -d --wait database`. Configure credentials with normal ASP.NET Core configuration or user secrets rather than committing them. Production database hosting remains your deployment responsibility.
 
 The generated defaults are:
 
 ~~~text
 SQLite:     Data Source=app.db
-SQL Server: Server=localhost;Database=TodoApp;Trusted_Connection=True;TrustServerCertificate=True
+SQL Server: Server=localhost,1433;Database=TodoApp;User Id=sa;Password=DotisanDev123!;TrustServerCertificate=True
 PostgreSQL: Host=localhost;Database=todoapp;Username=postgres;Password=postgres
-MySQL:      Server=localhost;Database=todoapp;User=root;Password=
+MySQL:      Server=localhost;Database=todoapp;User=root;Password=root
 ~~~
 
 The API uses `UseSqlite`, `UseSqlServer`, `UseNpgsql`, or `UseMySql` according to the wizard choice. Author and apply migrations with the standard EF Core CLI:

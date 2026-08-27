@@ -178,6 +178,52 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task New_external_database_reports_missing_docker_with_install_guidance()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices { FailPrerequisite = "docker" };
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "dotisan-new-missing-docker-" + Guid.NewGuid().ToString("N"));
+
+        var exitCode = await app.RunAsync(["new", "TodoApp", "--yes", "--database", "postgresql", "--no-restore", "--output", outputDirectory]);
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Contains("Missing prerequisite: Docker", console.ErrorOutput);
+        Assert.Contains("https://docs.docker.com/get-docker/", console.ErrorOutput);
+        Assert.Contains("docker compose version", console.ErrorOutput);
+    }
+
+    [Fact]
+    public async Task New_external_database_reports_when_the_docker_daemon_is_not_running()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices { FailPrerequisite = "docker-daemon" };
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "dotisan-new-docker-daemon-" + Guid.NewGuid().ToString("N"));
+
+        var exitCode = await app.RunAsync(["new", "TodoApp", "--yes", "--database", "mysql", "--no-restore", "--output", outputDirectory]);
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Contains("Missing prerequisite: Docker daemon", console.ErrorOutput);
+        Assert.Contains("Start Docker Desktop", console.ErrorOutput);
+        Assert.Contains("docker info", console.ErrorOutput);
+    }
+
+    [Fact]
+    public async Task New_external_database_confirms_docker_readiness_when_checks_pass()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices();
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "dotisan-new-docker-ready-" + Guid.NewGuid().ToString("N"));
+
+        var exitCode = await app.RunAsync(["new", "TodoApp", "--yes", "--database", "sqlserver", "--no-restore", "--output", outputDirectory]);
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Contains("Docker daemon", console.Output);
+    }
+
+    [Fact]
     public async Task New_reports_frontend_install_failure_as_generation_error()
     {
         var console = new MemoryConsole();
@@ -244,6 +290,26 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task Dev_external_database_starts_compose_before_development_services_and_stops_it_on_exit()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices { Database = DatabaseProvider.PostgreSQL, BlockProcesses = true };
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        using var cancellation = new CancellationTokenSource();
+
+        var runTask = app.RunAsync(["dev"], cancellation.Token);
+        await services.BothProcessesStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        cancellation.Cancel();
+
+        var exitCode = await runTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Equal("docker", services.RunRequests[0].FileName);
+        Assert.Equal(["compose", "up", "-d", "--wait", "database"], services.RunRequests[0].Arguments);
+        Assert.Contains(services.RunRequests, request => request.FileName == "docker" && request.Arguments.SequenceEqual(["compose", "stop", "database"]));
+    }
+
+    [Fact]
     public void Npm_package_manager_uses_a_startable_command_on_windows()
     {
         var root = Path.Combine(Path.GetTempPath(), "dotisan-npm-command-" + Guid.NewGuid().ToString("N"));
@@ -298,6 +364,7 @@ public sealed class CliApplicationTests
     private sealed class RecordingServices : IDotisanServices
     {
         public string WorkingDirectory => "C:\\work";
+        public DatabaseProvider Database { get; init; } = DatabaseProvider.SQLite;
         public string? SolutionPath => "C:\\work\\App.sln";
         public string? ApiProjectPath => "C:\\work\\src\\App.Api\\App.Api.csproj";
         public string? FrontendDirectory => "C:\\work\\src\\App.Web";
@@ -331,6 +398,10 @@ public sealed class CliApplicationTests
                 return Task.FromResult(DotisanOperationResult.Failed("dotnet-ef is not installed."));
             if (FailPrerequisite == "npm" && arguments.SequenceEqual(["--version"]))
                 return Task.FromResult(DotisanOperationResult.Failed("npm is not installed."));
+            if (FailPrerequisite == "docker" && fileName == "docker" && arguments.SequenceEqual(["compose", "version"]))
+                return Task.FromResult(DotisanOperationResult.Failed("Docker is not installed."));
+            if (FailPrerequisite == "docker-daemon" && fileName == "docker" && arguments.SequenceEqual(["info", "--format", "{{.ServerVersion}}"]))
+                return Task.FromResult(DotisanOperationResult.Failed("Docker daemon is not running."));
             if (FailFrontendInstall && arguments.SequenceEqual(["install"], StringComparer.Ordinal))
                 return Task.FromResult(DotisanOperationResult.Failed("npm exited with code 1."));
             return Task.FromResult(DotisanOperationResult.Succeeded());

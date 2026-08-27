@@ -9,7 +9,7 @@ The repository contains focused projects for:
 - Dotisan.Cli — command registration, help/version, prompts, console abstraction, exit codes, project creation, scaffolding, migrations, builds, and development supervision.
 - Dotisan.Core — project options, endpoint marker/manifest contracts, and shared CLI contracts.
 - Dotisan.AspNetCore — explicit endpoint mapping helpers built on Minimal APIs.
-- Dotisan.Generators — inspectable ASP.NET Core + Vue/Vite + SQLite golden template and vertical resource/endpoint scaffolding.
+- Dotisan.Generators — inspectable ASP.NET Core + Vue/Vite golden template with configurable EF Core providers and vertical resource/endpoint scaffolding.
 - Dotisan.SourceGenerators — Roslyn-generated explicit endpoint registration, DI wiring, and manifest source.
 - Dotisan.TypeScript — initial nullable/optional C# contract type mapping.
 - Dotisan.Testing — reusable test helpers.
@@ -53,11 +53,11 @@ For the interactive Quick wizard, omit --yes. It asks for SQLite/SQL Server/Post
 
 SQLite is the default and uses `Data Source=app.db`, so a new project can run without a separate database service. The other wizard choices generate the matching EF Core provider package, `UseSqlServer`, `UseNpgsql`, or `UseMySql` registration, and a local development connection-string example:
 
-- SQL Server: `Server=localhost;Database=MyApp;Trusted_Connection=True;TrustServerCertificate=True`
+- SQL Server: `Server=localhost,1433;Database=MyApp;User Id=sa;Password=DotisanDev123!;TrustServerCertificate=True`
 - PostgreSQL: `Host=localhost;Database=myapp;Username=postgres;Password=postgres`
-- MySQL: `Server=localhost;Database=myapp;User=root;Password=`
+- MySQL: `Server=localhost;Database=myapp;User=root;Password=root`
 
-Start the selected database service and replace development credentials through normal ASP.NET Core configuration or user secrets before authoring and applying migrations. `dotisan new` does not provision a database server. Use standard EF Core tooling:
+For external providers, `dotisan new` generates a provider-specific `compose.yaml` with a health check and named data volume. Keep Docker Desktop running; `dotisan dev` starts the `database` service before the API and frontend, waits for readiness, and stops the container on exit without deleting the volume. You can start it manually with `docker compose up -d --wait database`. Replace development credentials through normal ASP.NET Core configuration or user secrets before authoring and applying migrations. Production database hosting remains your deployment responsibility. Use standard EF Core tooling:
 
 ~~~powershell
 dotnet ef migrations add InitialCreate --project src\MyApp.Api

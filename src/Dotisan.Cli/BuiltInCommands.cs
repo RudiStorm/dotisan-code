@@ -209,8 +209,27 @@ internal sealed class DevCommand : WorkspaceCommand
             return Fail(context.Console, "Could not find an API project. Run this command from a generated Dotisan project.");
 
         var processes = new List<IDotisanProcess>();
+        var databaseStarted = false;
         try
         {
+            if (services.Database != DatabaseProvider.SQLite)
+            {
+                var databaseResult = await services.RunAsync(
+                    "docker",
+                    ["compose", "up", "-d", "--wait", "database"],
+                    services.WorkingDirectory,
+                    context.Console,
+                    cancellationToken);
+                if (!databaseResult.Success)
+                {
+                    return Fail(
+                        context.Console,
+                        $"Could not start the {services.Database} database service with Docker Compose. Ensure Docker Desktop is installed and running, then retry. {databaseResult.ErrorMessage}");
+                }
+
+                databaseStarted = true;
+            }
+
             processes.Add(await services.StartAsync("dotnet", ["watch", "--project", services.ApiProjectPath, "run", "--", "--environment", environment], services.WorkingDirectory, context.Console, cancellationToken));
             if (!arguments.Contains("--lean", StringComparer.OrdinalIgnoreCase))
             {
@@ -238,6 +257,18 @@ internal sealed class DevCommand : WorkspaceCommand
         {
             foreach (var process in processes)
                 await process.DisposeAsync();
+
+            if (databaseStarted)
+            {
+                var stopResult = await services.RunAsync(
+                    "docker",
+                    ["compose", "stop", "database"],
+                    services.WorkingDirectory,
+                    context.Console,
+                    CancellationToken.None);
+                if (!stopResult.Success)
+                    context.Console.WriteError(stopResult.ErrorMessage ?? "Could not stop the Docker database service.");
+            }
         }
     }
 }
@@ -353,11 +384,14 @@ internal sealed class NewCommand : IDotisanCommand
         context.Console.WriteLine($"Created {options.Name} in {result.OutputDirectory}.");
         if (context.Services is not null)
         {
-            var prerequisiteResult = await DefaultPrerequisiteChecker.CheckAsync(options.PackageManager, context.Services, cancellationToken);
+            var prerequisiteResult = await DefaultPrerequisiteChecker.CheckAsync(options.PackageManager, options.Database, context.Services, cancellationToken);
             if (prerequisiteResult.Missing.Count == 0)
             {
                 var packageManagerName = options.PackageManager == PackageManager.Npm ? "npm" : "pnpm";
-                context.Console.WriteLine($"Prerequisite check passed: .NET SDK, dotnet-ef, and {packageManagerName} are installed.");
+                var databasePrerequisite = options.Database == DatabaseProvider.SQLite
+                    ? string.Empty
+                    : " Docker and the Docker daemon are ready.";
+                context.Console.WriteLine($"Prerequisite check passed: .NET SDK, dotnet-ef, and {packageManagerName} are installed.{databasePrerequisite}");
             }
             else
             {

@@ -64,6 +64,9 @@ internal static class TemplateFiles
                 workers: false
             """),
             new("Dockerfile", Dockerfile(options.Name)),
+            ..(options.Database == DatabaseProvider.SQLite
+                ? Array.Empty<TemplateFile>()
+                : new[] { new TemplateFile("compose.yaml", DatabaseCompose(options.Name, options.Database)) }),
             new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.Database, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public)),
             new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled)),
@@ -416,9 +419,9 @@ internal static class TemplateFiles
 
     private static string DatabaseSetup(string name, DatabaseProvider database) => database switch
     {
-        DatabaseProvider.SqlServer => $"This project uses EF Core SQL Server. The local default is `Server=localhost;Database={name};Trusted_Connection=True;TrustServerCertificate=True`. Start SQL Server and replace the connection string through standard ASP.NET Core configuration before running migrations. Dotisan does not provision or start the database service.",
-        DatabaseProvider.PostgreSQL => $"This project uses EF Core PostgreSQL. The local default is `Host=localhost;Database={name.ToLowerInvariant()};Username=postgres;Password=postgres`. Start PostgreSQL and replace the connection string and credentials through standard ASP.NET Core configuration before running migrations. Dotisan does not provision or start the database service.",
-        DatabaseProvider.MySQL => $"This project uses EF Core MySQL. The local default is `Server=localhost;Database={name.ToLowerInvariant()};User=root;Password=`. Start MySQL and replace the connection string and credentials through standard ASP.NET Core configuration before running migrations. Dotisan does not provision or start the database service.",
+        DatabaseProvider.SqlServer => $"This project uses EF Core SQL Server. The local default is `Server=localhost,1433;Database={name};User Id=sa;Password=DotisanDev123!;TrustServerCertificate=True`. The generated `compose.yaml` starts SQL Server with `dotisan dev` or `docker compose up -d --wait database`; replace the connection string and credentials through standard ASP.NET Core configuration before running migrations. `dotisan dev` stops the container on exit and preserves its named volume.",
+        DatabaseProvider.PostgreSQL => $"This project uses EF Core PostgreSQL. The local default is `Host=localhost;Database={name.ToLowerInvariant()};Username=postgres;Password=postgres`. The generated `compose.yaml` starts PostgreSQL with `dotisan dev` or `docker compose up -d --wait database`; replace the connection string and credentials through standard ASP.NET Core configuration before running migrations. `dotisan dev` stops the container on exit and preserves its named volume.",
+        DatabaseProvider.MySQL => $"This project uses EF Core MySQL. The local default is `Server=localhost;Database={name.ToLowerInvariant()};User=root;Password=root`. The generated `compose.yaml` starts MySQL with `dotisan dev` or `docker compose up -d --wait database`; replace the connection string and credentials through standard ASP.NET Core configuration before running migrations. `dotisan dev` stops the container on exit and preserves its named volume.",
         _ => "This project uses EF Core SQLite. SQLite is file-based and needs no separate database service; the default connection string is `Data Source=app.db`.",
     };
 
@@ -434,9 +437,9 @@ internal static class TemplateFiles
     {
         var connectionString = database switch
         {
-            DatabaseProvider.SqlServer => $"Server=localhost;Database={name};Trusted_Connection=True;TrustServerCertificate=True",
+            DatabaseProvider.SqlServer => $"Server=localhost,1433;Database={name};User Id=sa;Password=DotisanDev123!;TrustServerCertificate=True",
             DatabaseProvider.PostgreSQL => $"Host=localhost;Database={name.ToLowerInvariant()};Username=postgres;Password=postgres",
-            DatabaseProvider.MySQL => $"Server=localhost;Database={name.ToLowerInvariant()};User=root;Password=",
+            DatabaseProvider.MySQL => $"Server=localhost;Database={name.ToLowerInvariant()};User=root;Password=root",
             _ => "Data Source=app.db"
         };
 
@@ -457,6 +460,75 @@ internal static class TemplateFiles
           "AllowedHosts": "*"
         }
         """;
+    }
+
+    private static string DatabaseCompose(string name, DatabaseProvider database)
+    {
+        var databaseName = name.ToLowerInvariant();
+        var volumeName = $"{databaseName}-database-data";
+
+        return database switch
+        {
+            DatabaseProvider.SqlServer => $$"""
+            services:
+              database:
+                image: mcr.microsoft.com/mssql/server:2022-latest
+                environment:
+                  ACCEPT_EULA: "Y"
+                  MSSQL_SA_PASSWORD: "DotisanDev123!"
+                ports:
+                  - "1433:1433"
+                volumes:
+                  - {{volumeName}}:/var/opt/mssql
+                healthcheck:
+                  test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -C -U sa -P 'DotisanDev123!' -Q 'SELECT 1' || exit 1"]
+                  interval: 5s
+                  timeout: 5s
+                  retries: 20
+            volumes:
+              {{volumeName}}:
+            """,
+            DatabaseProvider.PostgreSQL => $$"""
+            services:
+              database:
+                image: postgres:16-alpine
+                environment:
+                  POSTGRES_DB: {{databaseName}}
+                  POSTGRES_USER: postgres
+                  POSTGRES_PASSWORD: postgres
+                ports:
+                  - "5432:5432"
+                volumes:
+                  - {{volumeName}}:/var/lib/postgresql/data
+                healthcheck:
+                  test: ["CMD-SHELL", "pg_isready -U postgres -d {{databaseName}}"]
+                  interval: 5s
+                  timeout: 5s
+                  retries: 20
+            volumes:
+              {{volumeName}}:
+            """,
+            DatabaseProvider.MySQL => $$"""
+            services:
+              database:
+                image: mysql:8.4
+                environment:
+                  MYSQL_ROOT_PASSWORD: root
+                  MYSQL_DATABASE: {{databaseName}}
+                ports:
+                  - "3306:3306"
+                volumes:
+                  - {{volumeName}}:/var/lib/mysql
+                healthcheck:
+                  test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+                  interval: 5s
+                  timeout: 5s
+                  retries: 20
+            volumes:
+              {{volumeName}}:
+            """,
+            _ => throw new ArgumentOutOfRangeException(nameof(database), database, "SQLite does not have an external database compose service.")
+        };
     }
 
     private static string DbContext(string identifier, bool authenticationEnabled) => authenticationEnabled

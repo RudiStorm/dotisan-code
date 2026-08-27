@@ -35,6 +35,7 @@ public sealed record DotisanOperationResult(bool Success, string? ErrorMessage =
 public interface IDotisanServices
 {
     string WorkingDirectory { get; }
+    DatabaseProvider Database { get; }
     string? SolutionPath { get; }
     string? ApiProjectPath { get; }
     string? FrontendDirectory { get; }
