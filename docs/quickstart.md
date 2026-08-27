@@ -101,6 +101,18 @@ dotnet watch --project src\TodoApp.Api
 
 `dotisan migrate` applies existing EF Core migrations. `dotisan migrate status` lists migrations. Migration authoring and rollback remain available through standard `dotnet ef` commands.
 
+## Audit foundation
+
+Generated projects include `Auditing/AuditEntry.cs`, `Auditing/IAuditWriter.cs`, and `Auditing/AuditWriter.cs`. Audit writes are enabled by default through standard ASP.NET Core configuration:
+
+~~~powershell
+dotnet ef migrations add InitialAudit --project src\TodoApp.Api
+dotnet ef database update --project src\TodoApp.Api
+$env:Audit__Enabled = "false" # optional local/deployment override
+~~~
+
+Generated resource operations and authenticated security operations record actor, tenant placeholder, timestamp, resource/resource ID, action, changed fields, trace ID, and correlation ID. User-written endpoints opt in by injecting `IAuditWriter`. Audit is persistence logging, not event sourcing, and no audit query/admin UI is generated.
+
 ## Authentication projects
 
 For an authenticated project, create and apply the initial Identity schema with standard EF Core tooling:

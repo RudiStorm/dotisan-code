@@ -185,6 +185,10 @@ internal static class TemplateFiles
 
     `dotisan new` installs frontend dependencies before reporting success. If the project was generated with `--no-restore`, run `npm install` or `pnpm install` before `npm run dev`.
 
+    ## Audit foundation
+
+    `Auditing/AuditEntry.cs`, `Auditing/IAuditWriter.cs`, and `Auditing/AuditWriter.cs` are ordinary application source. Audit is enabled by default through `Audit:Enabled`; use the standard `Audit__Enabled=false` override to disable writes. Author the schema with `dotnet ef migrations add InitialAudit --project src\{{name}}.Api` and apply it with `dotnet ef database update --project src\{{name}}.Api`. Generated resource operations record actor, tenant placeholder, action, changed fields, trace ID, and correlation ID. Audit is persistence logging, not event sourcing.
+
     dotisan.config controls orchestration preferences only. Normal appsettings.json, environment variables, EF Core, and Vite configuration remain the source of truth for their respective concerns. Resource scaffolding creates source files but never creates migrations.
     """;
 
@@ -239,6 +243,10 @@ internal static class TemplateFiles
     `Authorization/Permissions.cs` contains editable permission constants and the generated API registers one standard ASP.NET Core policy per entry. Generated endpoints use explicit `RequireAuthorization(...)` calls. Assign permissions as `permission` claims on standard `IdentityRole` instances with `RoleManager<IdentityRole>`; unauthenticated callers receive `401` and authenticated callers without a required claim receive `403`.
 
     The generated `/api/authorization/profile` endpoint demonstrates `profile.view`. `dotisan make:resource Customer` adds explicit `customers.view`, `customers.create`, `customers.update`, and `customers.delete` permissions and protects each generated CRUD operation.
+
+    ## Audit foundation
+
+    `Auditing/AuditEntry.cs`, `Auditing/IAuditWriter.cs`, and `Auditing/AuditWriter.cs` are ordinary application source. Audit is enabled by default through `Audit:Enabled`; use the standard `Audit__Enabled=false` override to disable writes. Author the schema with `dotnet ef migrations add InitialAudit --project src\{{name}}.Api` and apply it with `dotnet ef database update --project src\{{name}}.Api`. Generated authentication operations record actor, tenant placeholder, action, trace ID, correlation ID, and redacted changes. Audit is persistence logging, not event sourcing.
 
     `dotisan.config` controls orchestration preferences only. `appsettings.json`, environment variables, ASP.NET Core services, EF Core configuration, and Vite configuration remain the source of truth for their respective concerns.
     """;

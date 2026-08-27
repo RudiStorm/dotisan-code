@@ -38,6 +38,10 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("UseSqlite", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.Contains("Data Source=app.db", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
             Assert.Contains("profile: quick", await File.ReadAllTextAsync(Path.Combine(output, "dotisan.config")));
+            var readme = await File.ReadAllTextAsync(Path.Combine(output, "README.md"));
+            Assert.Contains("AuditEntry", readme);
+            Assert.Contains("Audit__Enabled", readme);
+            Assert.Contains("InitialAudit", readme);
         }
         finally
         {
@@ -234,6 +238,9 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("RequireAuthorization", authenticatedReadme);
             Assert.Contains("RoleManager<IdentityRole>", authenticatedReadme);
             Assert.Contains("403", authenticatedReadme);
+            Assert.Contains("IAuditWriter", authenticatedReadme);
+            Assert.Contains("Audit__Enabled", authenticatedReadme);
+            Assert.Contains("not event sourcing", authenticatedReadme);
         }
         finally
         {

@@ -1,6 +1,6 @@
 # Dotisan
 
-Dotisan is a batteries-included application framework for standard ASP.NET Core and Vue applications. The first implementation slice provides a testable CLI foundation and a deterministic golden template.
+Dotisan is a batteries-included application framework for standard ASP.NET Core and Vue applications. The v0.3.0 release provides a testable CLI foundation, authentication/authorization primitives, and a deterministic golden template.
 
 ## v0.3.0 workflow and v0.4 audit foundation
 
@@ -59,9 +59,11 @@ Authentication projects use normal ASP.NET Core Identity, cookie authentication,
 
 Authenticated projects also generate an explicit authorization foundation. Edit `src\<Name>.Api\Authorization\Permissions.cs` for code-defined permission names, use standard `IdentityRole` role claims with claim type `permission`, and protect generated endpoints with explicit `RequireAuthorization(...)` calls. The generated profile probe demonstrates `profile.view`; generated resources add `<Resource>View`, `<Resource>Create`, `<Resource>Update`, and `<Resource>Delete` permissions. API callers receive `401` when unauthenticated and `403` when authenticated without the required role claim.
 
+The v0.4 audit foundation generates an editable `AuditEntry` model and scoped `IAuditWriter` service for plain and authenticated projects. Auditing is enabled by default through standard `Audit:Enabled` configuration; set `Audit__Enabled=false` to disable writes. Generated resource and authentication operations record actor, resource, action, changed fields, trace ID, and correlation ID. Author the schema with `dotnet ef migrations add InitialAudit`; audit is persistence logging, not event sourcing.
+
 ## Deliberately deferred commands
 
-Admin authorization UI/API, tenancy, jobs, observability, integrations, UI CRUD generation, and production diagnostics remain subsequent feature specifications. Password reset, email confirmation, MFA, and external providers are not generated. Role and permission assignment remains ordinary application code using ASP.NET Core Identity; Dotisan does not add a runtime permission registry or admin surface. `add`, `remove`, and `doctor` intentionally return a helpful exit code 3 until those specifications are implemented.
+Admin authorization UI/API, tenancy, jobs, observability, integrations, UI CRUD generation, audit query UI/API, and production diagnostics remain subsequent feature specifications. Password reset, email confirmation, MFA, and external providers are not generated. Role and permission assignment remains ordinary application code using ASP.NET Core Identity; Dotisan does not add a runtime permission registry or admin surface. `add`, `remove`, and `doctor` intentionally return a helpful exit code 3 until those specifications are implemented.
 
 ## Project direction
 
