@@ -489,6 +489,7 @@ internal static class TemplateFiles
 
     private static string AccountEndpoints(string identifier, bool registrationEnabled) => $$"""
     using System.Security.Claims;
+    using {{identifier}}.Api.Auditing;
     using {{identifier}}.Api.Identity;
     using Microsoft.AspNetCore.Authentication.Cookies;
     using Microsoft.AspNetCore.Antiforgery;
@@ -505,9 +506,9 @@ internal static class TemplateFiles
         {
             var group = endpoints.MapGroup("/api/account");
             group.MapGet("/antiforgery", IssueAntiforgery).AllowAnonymous();
-            group.MapPost("/register", (RegisterRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager) => Register(request, users, signInManager, registrationEnabled)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
-            group.MapPost("/login", (LoginRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager) => Login(request, users, signInManager)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
-            group.MapPost("/logout", (SignInManager<ApplicationUser> signInManager) => Logout(signInManager)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/register", (RegisterRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) => Register(request, users, signInManager, audit, httpContext, registrationEnabled, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/login", (LoginRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) => Login(request, users, signInManager, audit, httpContext, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/logout", (SignInManager<ApplicationUser> signInManager, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) => Logout(signInManager, audit, httpContext, cancellationToken)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
             group.MapGet("/me", (ClaimsPrincipal user) => Me(user)).RequireAuthorization();
             return endpoints;
         }
@@ -518,10 +519,11 @@ internal static class TemplateFiles
             return Results.Ok(new { token = tokens.RequestToken });
         }
 
-        private static async Task<IResult> Register(RegisterRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, bool registrationEnabled)
+        private static async Task<IResult> Register(RegisterRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, IAuditWriter audit, HttpContext httpContext, bool registrationEnabled, CancellationToken cancellationToken)
         {
             if (!registrationEnabled)
             {
+                await audit.RecordAsync(httpContext, "Security", null, "security.registration.denied", new Dictionary<string, object?>(), cancellationToken);
                 return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Registration is unavailable.", extensions: new Dictionary<string, object?> { ["code"] = "registration_unavailable" });
             }
 
@@ -537,27 +539,35 @@ internal static class TemplateFiles
 
             signInManager.AuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
             await signInManager.SignInAsync(user, isPersistent: false);
+            await audit.RecordAsync(httpContext, "Security", user.Id, "security.registered", new Dictionary<string, object?>(), cancellationToken);
             return Results.Ok(new CurrentUserResponse(user.Id, user.Email!));
         }
 
-        private static async Task<IResult> Login(LoginRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager)
+        private static async Task<IResult> Login(LoginRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, IAuditWriter audit, HttpContext httpContext, CancellationToken cancellationToken)
         {
             var user = await users.FindByEmailAsync(request.Email);
             if (user is null)
             {
+                await audit.RecordAsync(httpContext, "Security", null, "security.login.failed", new Dictionary<string, object?>(), cancellationToken);
                 return Results.Unauthorized();
             }
 
             signInManager.AuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
             var result = await signInManager.PasswordSignInAsync(user, request.Password, request.RememberMe, lockoutOnFailure: true);
-            return result.Succeeded
-                ? Results.Ok(new CurrentUserResponse(user.Id, user.Email!))
-                : Results.Unauthorized();
+            if (!result.Succeeded)
+            {
+                await audit.RecordAsync(httpContext, "Security", user.Id, "security.login.failed", new Dictionary<string, object?>(), cancellationToken);
+                return Results.Unauthorized();
+            }
+
+            await audit.RecordAsync(httpContext, "Security", user.Id, "security.login.succeeded", new Dictionary<string, object?>(), cancellationToken);
+            return Results.Ok(new CurrentUserResponse(user.Id, user.Email!));
         }
 
-        private static async Task<IResult> Logout(SignInManager<ApplicationUser> signInManager)
+        private static async Task<IResult> Logout(SignInManager<ApplicationUser> signInManager, IAuditWriter audit, HttpContext httpContext, CancellationToken cancellationToken)
         {
             signInManager.AuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+            await audit.RecordAsync(httpContext, "Security", null, "security.logout", new Dictionary<string, object?>(), cancellationToken);
             await signInManager.SignOutAsync();
             return Results.NoContent();
         }

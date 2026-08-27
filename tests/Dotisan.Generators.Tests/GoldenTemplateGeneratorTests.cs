@@ -177,6 +177,12 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("PasswordSignInAsync", accountEndpoints);
             Assert.Contains("UserManager<ApplicationUser>", accountEndpoints);
             Assert.Contains("AuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme", accountEndpoints);
+            Assert.Contains("IAuditWriter", accountEndpoints);
+            Assert.Contains("security.registered", accountEndpoints);
+            Assert.Contains("security.registration.denied", accountEndpoints);
+            Assert.Contains("security.login.succeeded", accountEndpoints);
+            Assert.Contains("security.login.failed", accountEndpoints);
+            Assert.Contains("security.logout", accountEndpoints);
             Assert.DoesNotContain("AccountEndpoints.cs", plainPaths);
             Assert.Contains("AddIdentityCore<ApplicationUser>", authenticatedProgram);
             Assert.Contains("AddRoles<IdentityRole>()", authenticatedProgram);
