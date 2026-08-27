@@ -59,4 +59,36 @@ public sealed class GoldenTemplateGeneratorTests
             }
         }
     }
+
+    [Fact]
+    public async Task Authentication_dependencies_are_opt_in()
+    {
+        var authenticatedOutput = Path.Combine(Path.GetTempPath(), "dotisan-auth-test-" + Guid.NewGuid().ToString("N"));
+        var plainOutput = Path.Combine(Path.GetTempPath(), "dotisan-plain-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var authenticated = await new GoldenTemplateGenerator().GenerateAsync(
+                ProjectOptions.Quick("AuthApp", authenticatedOutput) with { AuthenticationEnabled = true }, CancellationToken.None);
+            var plain = await new GoldenTemplateGenerator().GenerateAsync(
+                ProjectOptions.Quick("PlainApp", plainOutput), CancellationToken.None);
+
+            Assert.True(authenticated.Success, authenticated.ErrorMessage);
+            Assert.True(plain.Success, plain.ErrorMessage);
+            var apiProject = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "AuthApp.Api.csproj"));
+            var testProject = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "tests", "AuthApp.Api.Tests", "AuthApp.Api.Tests.csproj"));
+            var plainApiProject = await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Api", "PlainApp.Api.csproj"));
+
+            Assert.Contains("Microsoft.AspNetCore.Identity.EntityFrameworkCore", apiProject);
+            Assert.Contains("Microsoft.AspNetCore.Mvc.Testing", testProject);
+            Assert.Contains("Microsoft.Data.Sqlite", testProject);
+            Assert.DoesNotContain("Microsoft.AspNetCore.Identity.EntityFrameworkCore", plainApiProject);
+        }
+        finally
+        {
+            if (Directory.Exists(authenticatedOutput))
+                Directory.Delete(authenticatedOutput, recursive: true);
+            if (Directory.Exists(plainOutput))
+                Directory.Delete(plainOutput, recursive: true);
+        }
+    }
 }

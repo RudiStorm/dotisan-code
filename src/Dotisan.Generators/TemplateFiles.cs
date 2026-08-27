@@ -64,7 +64,7 @@ internal static class TemplateFiles
                 workers: false
             """),
             new("Dockerfile", Dockerfile(options.Name)),
-            new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name)),
+            new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier)),
             new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier)),
             new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier)),
@@ -81,14 +81,14 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/src/App.vue", AppVue(options.Name)),
             new($"src/{options.Name}.Web/src/style.css", StyleCss()),
             new($"src/{options.Name}.Web/src/generated/.gitkeep", string.Empty),
-            new($"tests/{options.Name}.Api.Tests/{options.Name}.Api.Tests.csproj", ApiTestsProject(options.Name)),
+            new($"tests/{options.Name}.Api.Tests/{options.Name}.Api.Tests.csproj", ApiTestsProject(options.Name, options.AuthenticationEnabled)),
             new($"tests/{options.Name}.Api.Tests/HealthEndpointTests.cs", ApiTests(identifier)),
             new($"tests/{options.Name}.Api.Tests/Usings.cs", "global using Xunit;\n"),
             new($"{options.Name}.sln", Solution(options.Name))
         ];
     }
 
-    private static string ApiProject(string name) => $$"""
+    private static string ApiProject(string name, bool authenticationEnabled) => $$"""
     <Project Sdk="Microsoft.NET.Sdk.Web">
       <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
@@ -99,6 +99,7 @@ internal static class TemplateFiles
       <ItemGroup>
         <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+        {{(authenticationEnabled ? "<PackageReference Include=\"Microsoft.AspNetCore.Identity.EntityFrameworkCore\" />" : string.Empty)}}
       </ItemGroup>
     </Project>
     """;
@@ -111,6 +112,9 @@ internal static class TemplateFiles
       <ItemGroup>
         <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
         <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11" />
+        <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.11" />
+        <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.11" />
+        <PackageVersion Include="Microsoft.Data.Sqlite" Version="8.0.11" />
         <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
         <PackageVersion Include="xunit" Version="2.9.2" />
         <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
@@ -198,7 +202,7 @@ internal static class TemplateFiles
     }
     """;
 
-    private static string ApiTestsProject(string name) => $$"""
+    private static string ApiTestsProject(string name, bool authenticationEnabled) => $$"""
     <Project Sdk="Microsoft.NET.Sdk">
       <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
@@ -212,6 +216,7 @@ internal static class TemplateFiles
         <PackageReference Include="Microsoft.NET.Test.Sdk" />
         <PackageReference Include="xunit" />
         <PackageReference Include="xunit.runner.visualstudio" />
+        {{(authenticationEnabled ? "<PackageReference Include=\"Microsoft.AspNetCore.Mvc.Testing\" />\n        <PackageReference Include=\"Microsoft.Data.Sqlite\" />" : string.Empty)}}
         <ProjectReference Include="..\\..\\src\\{{name}}.Api\\{{name}}.Api.csproj" />
       </ItemGroup>
     </Project>
