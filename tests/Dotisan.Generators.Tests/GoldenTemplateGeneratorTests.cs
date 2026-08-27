@@ -222,6 +222,11 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("Permissions.ProfileView", authenticationTests);
             Assert.Contains("HttpStatusCode.Forbidden", authenticationTests);
             Assert.Contains("/api/authorization/profile", authenticationTests);
+            Assert.Contains("ReadAuditEntriesAsync", authenticationTests);
+            Assert.Contains("security.login.succeeded", authenticationTests);
+            Assert.Contains("X-Correlation-ID", authenticationTests);
+            Assert.Contains("TraceId", authenticationTests);
+            Assert.Contains("Audit:Enabled", authenticationTests);
             Assert.Contains("--auth yes", authenticatedReadme);
             Assert.Contains("InitialIdentity", authenticatedReadme);
             Assert.Contains("dotisan migrate", authenticatedReadme);

@@ -642,6 +642,7 @@ internal static class TemplateFiles
     using System.Net;
     using System.Net.Http.Json;
     using {{identifier}}.Api.Authorization;
+    using {{identifier}}.Api.Auditing;
     using {{identifier}}.Api.Data;
     using {{identifier}}.Api.Identity;
     using Microsoft.AspNetCore.DataProtection;
@@ -700,6 +701,56 @@ internal static class TemplateFiles
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
 
+        [Fact]
+        public async Task Successful_login_writes_actor_trace_and_correlation()
+        {
+            var email = $"audit-login-{Guid.NewGuid():N}@example.com";
+            await factory.SeedUserAsync(email, grantProfilePermission: false);
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+            var antiforgery = await GetAntiforgeryToken(client);
+            using var login = new HttpRequestMessage(HttpMethod.Post, "/api/account/login");
+            login.Headers.Add("X-XSRF-TOKEN", antiforgery);
+            login.Headers.Add("X-Correlation-ID", "correlation-test");
+            login.Content = JsonContent.Create(new { email, password = "Password1!", rememberMe = false });
+
+            Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(login)).StatusCode);
+            var entry = (await factory.ReadAuditEntriesAsync()).Single(item => item.Action == "security.login.succeeded" && item.CorrelationId == "correlation-test");
+            Assert.Equal("Security", entry.EntityType);
+            Assert.False(string.IsNullOrWhiteSpace(entry.ActorId));
+            Assert.False(string.IsNullOrWhiteSpace(entry.TraceId));
+        }
+
+        [Fact]
+        public async Task Failed_login_is_audited_without_credentials()
+        {
+            var correlationId = $"failed-{Guid.NewGuid():N}";
+            using var client = factory.CreateClient();
+            var antiforgery = await GetAntiforgeryToken(client);
+            using var login = new HttpRequestMessage(HttpMethod.Post, "/api/account/login");
+            login.Headers.Add("X-XSRF-TOKEN", antiforgery);
+            login.Headers.Add("X-Correlation-ID", correlationId);
+            login.Content = JsonContent.Create(new { email = "missing-audit@example.com", password = "do-not-store-this", rememberMe = false });
+
+            Assert.Equal(HttpStatusCode.Unauthorized, (await client.SendAsync(login)).StatusCode);
+            var entry = (await factory.ReadAuditEntriesAsync()).Single(item => item.Action == "security.login.failed" && item.CorrelationId == correlationId);
+            Assert.DoesNotContain("do-not-store-this", entry.Changes, StringComparison.Ordinal);
+            Assert.DoesNotContain("missing-audit@example.com", entry.Changes, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task Disabled_audit_configuration_skips_writes()
+        {
+            using var disabledFactory = new AuthenticationApplicationFactory { AuditEnabled = false };
+            using var client = disabledFactory.CreateClient();
+            var antiforgery = await GetAntiforgeryToken(client);
+            using var login = new HttpRequestMessage(HttpMethod.Post, "/api/account/login");
+            login.Headers.Add("X-XSRF-TOKEN", antiforgery);
+            login.Content = JsonContent.Create(new { email = "disabled-audit@example.com", password = "do-not-store-this", rememberMe = false });
+
+            Assert.Equal(HttpStatusCode.Unauthorized, (await client.SendAsync(login)).StatusCode);
+            Assert.Empty(await disabledFactory.ReadAuditEntriesAsync());
+        }
+
         {{(registrationPolicy == RegistrationPolicy.Public ? PublicAuthenticationTests() : RestrictedRegistrationTest())}}
 
         private static async Task<string> GetAntiforgeryToken(HttpClient client)
@@ -727,10 +778,12 @@ internal static class TemplateFiles
     public sealed class AuthenticationApplicationFactory : WebApplicationFactory<Program>
     {
         private SqliteConnection? connection;
+        public bool AuditEnabled { get; set; } = true;
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");
+            builder.UseSetting("Audit:Enabled", AuditEnabled.ToString());
             builder.ConfigureLogging(logging => logging.ClearProviders().AddConsole());
             builder.ConfigureServices(services =>
             {
@@ -744,6 +797,15 @@ internal static class TemplateFiles
                 using var scope = provider.CreateScope();
                 scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureCreated();
             });
+        }
+
+        public async Task<IReadOnlyList<AuditEntry>> ReadAuditEntriesAsync()
+        {
+            using var scope = Services.CreateScope();
+            var entries = await scope.ServiceProvider.GetRequiredService<AppDbContext>().AuditEntries
+                .AsNoTracking()
+                .ToListAsync();
+            return entries.OrderBy(entry => entry.CreatedAt).ToArray();
         }
 
         public async Task SeedUserAsync(string email, bool grantProfilePermission)
