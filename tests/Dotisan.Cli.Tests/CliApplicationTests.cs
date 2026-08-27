@@ -310,6 +310,24 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task Dev_cancellation_during_database_start_still_stops_the_database_container()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices { Database = DatabaseProvider.PostgreSQL, BlockDatabaseStart = true };
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        using var cancellation = new CancellationTokenSource();
+
+        var runTask = app.RunAsync(["dev"], cancellation.Token);
+        await services.DatabaseStartRequested.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        cancellation.Cancel();
+
+        var exitCode = await runTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Contains(services.RunRequests, request => request.FileName == "docker" && request.Arguments.SequenceEqual(["compose", "stop", "database"]));
+    }
+
+    [Fact]
     public void Npm_package_manager_uses_a_startable_command_on_windows()
     {
         var root = Path.Combine(Path.GetTempPath(), "dotisan-npm-command-" + Guid.NewGuid().ToString("N"));
@@ -375,8 +393,10 @@ public sealed class CliApplicationTests
         public bool FailFrontendInstall { get; init; }
         public string? FailPrerequisite { get; init; }
         public bool BlockProcesses { get; init; }
+        public bool BlockDatabaseStart { get; init; }
         public List<BlockingProcess> BlockingProcesses { get; } = [];
         public TaskCompletionSource BothProcessesStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public TaskCompletionSource DatabaseStartRequested { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public string? StartFileName { get; private set; }
         public IReadOnlyList<string> StartArguments { get; private set; } = [];
 
@@ -389,22 +409,34 @@ public sealed class CliApplicationTests
         public Task<DotisanOperationResult> ScaffoldEndpointAsync(string endpointName, CancellationToken cancellationToken) =>
             Task.FromResult(DotisanOperationResult.Succeeded());
 
-        public Task<DotisanOperationResult> RunAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory, IConsole console, CancellationToken cancellationToken)
+        public async Task<DotisanOperationResult> RunAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory, IConsole console, CancellationToken cancellationToken)
         {
             FileName = fileName;
             Arguments = arguments;
             RunRequests.Add((fileName, arguments, workingDirectory));
+            if (BlockDatabaseStart && fileName == "docker" && arguments.SequenceEqual(["compose", "up", "-d", "--wait", "database"]))
+            {
+                DatabaseStartRequested.TrySetResult();
+                try
+                {
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    return DotisanOperationResult.Failed("Database startup was cancelled.");
+                }
+            }
             if (FailPrerequisite == "dotnet-ef" && fileName == "dotnet" && arguments.SequenceEqual(["ef", "--version"]))
-                return Task.FromResult(DotisanOperationResult.Failed("dotnet-ef is not installed."));
+                return DotisanOperationResult.Failed("dotnet-ef is not installed.");
             if (FailPrerequisite == "npm" && arguments.SequenceEqual(["--version"]))
-                return Task.FromResult(DotisanOperationResult.Failed("npm is not installed."));
+                return DotisanOperationResult.Failed("npm is not installed.");
             if (FailPrerequisite == "docker" && fileName == "docker" && arguments.SequenceEqual(["compose", "version"]))
-                return Task.FromResult(DotisanOperationResult.Failed("Docker is not installed."));
+                return DotisanOperationResult.Failed("Docker is not installed.");
             if (FailPrerequisite == "docker-daemon" && fileName == "docker" && arguments.SequenceEqual(["info", "--format", "{{.ServerVersion}}"]))
-                return Task.FromResult(DotisanOperationResult.Failed("Docker daemon is not running."));
+                return DotisanOperationResult.Failed("Docker daemon is not running.");
             if (FailFrontendInstall && arguments.SequenceEqual(["install"], StringComparer.Ordinal))
-                return Task.FromResult(DotisanOperationResult.Failed("npm exited with code 1."));
-            return Task.FromResult(DotisanOperationResult.Succeeded());
+                return DotisanOperationResult.Failed("npm exited with code 1.");
+            return DotisanOperationResult.Succeeded();
         }
 
         public Task<IDotisanProcess> StartAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory, IConsole console, CancellationToken cancellationToken)

@@ -209,11 +209,13 @@ internal sealed class DevCommand : WorkspaceCommand
             return Fail(context.Console, "Could not find an API project. Run this command from a generated Dotisan project.");
 
         var processes = new List<IDotisanProcess>();
+        var databaseStartAttempted = false;
         var databaseStarted = false;
         try
         {
             if (services.Database != DatabaseProvider.SQLite)
             {
+                databaseStartAttempted = true;
                 var databaseResult = await services.RunAsync(
                     "docker",
                     ["compose", "up", "-d", "--wait", "database"],
@@ -222,6 +224,12 @@ internal sealed class DevCommand : WorkspaceCommand
                     cancellationToken);
                 if (!databaseResult.Success)
                 {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        context.Console.WriteLine("Stopping development services...");
+                        return DotisanExitCode.Success;
+                    }
+
                     return Fail(
                         context.Console,
                         $"Could not start the {services.Database} database service with Docker Compose. Ensure Docker Desktop is installed and running, then retry. {databaseResult.ErrorMessage}");
@@ -249,6 +257,11 @@ internal sealed class DevCommand : WorkspaceCommand
 
             return DotisanExitCode.Success;
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            context.Console.WriteLine("Stopping development services...");
+            return DotisanExitCode.Success;
+        }
         catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
         {
             return Fail(context.Console, $"Could not start development services: {exception.Message}");
@@ -258,7 +271,7 @@ internal sealed class DevCommand : WorkspaceCommand
             foreach (var process in processes)
                 await process.DisposeAsync();
 
-            if (databaseStarted)
+            if (databaseStarted || (databaseStartAttempted && cancellationToken.IsCancellationRequested))
             {
                 var stopResult = await services.RunAsync(
                     "docker",
