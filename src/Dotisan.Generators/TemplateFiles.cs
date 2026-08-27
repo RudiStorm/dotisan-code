@@ -67,6 +67,7 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public)),
             new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled)),
+            new($"src/{options.Name}.Api/Auditing/AuditEntry.cs", AuditEntry(identifier)),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationUser.cs", ApplicationUser(identifier)) }
                 : Array.Empty<TemplateFile>()),
@@ -80,7 +81,7 @@ internal static class TemplateFiles
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Authorization/AuthorizationEndpoints.cs", AuthorizationEndpoints(identifier)) }
                 : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier)),
-            new($"src/{options.Name}.Api/appsettings.json", "{\n  \"ConnectionStrings\": {\n    \"DefaultConnection\": \"Data Source=app.db\"\n  },\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\",\n      \"Microsoft.AspNetCore\": \"Warning\"\n    }\n  },\n  \"AllowedHosts\": \"*\"\n}\n"),
+            new($"src/{options.Name}.Api/appsettings.json", "{\n  \"ConnectionStrings\": {\n    \"DefaultConnection\": \"Data Source=app.db\"\n  },\n  \"Audit\": {\n    \"Enabled\": true\n  },\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\",\n      \"Microsoft.AspNetCore\": \"Warning\"\n    }\n  },\n  \"AllowedHosts\": \"*\"\n}\n"),
             new($"src/{options.Name}.Api/appsettings.Development.json", "{\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\",\n      \"Microsoft.AspNetCore\": \"Information\"\n    }\n  }\n}\n"),
             new($"src/{options.Name}.Web/package.json", packageJson),
             new($"src/{options.Name}.Web/index.html", WebIndex(options.Name)),
@@ -365,21 +366,47 @@ internal static class TemplateFiles
         : PlainDbContext(identifier);
 
     private static string PlainDbContext(string identifier) => $$"""
+    using {{identifier}}.Api.Auditing;
     using Microsoft.EntityFrameworkCore;
 
     namespace {{identifier}}.Api.Data;
 
-    public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options);
+    public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+    {
+        public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+    }
     """;
 
     private static string IdentityDbContext(string identifier) => $$"""
+    using {{identifier}}.Api.Auditing;
     using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Identity;
 
     namespace {{identifier}}.Api.Data;
 
-    public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser>(options);
+    public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser>(options)
+    {
+        public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+    }
+    """;
+
+    private static string AuditEntry(string identifier) => $$"""
+    namespace {{identifier}}.Api.Auditing;
+
+    public sealed class AuditEntry
+    {
+        public Guid Id { get; set; }
+        public string? ActorId { get; set; }
+        public string? TenantId { get; set; }
+        public string EntityType { get; set; } = string.Empty;
+        public string? EntityId { get; set; }
+        public string Action { get; set; } = string.Empty;
+        public string Changes { get; set; } = "{}";
+        public string? TraceId { get; set; }
+        public string? CorrelationId { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+    }
     """;
 
     private static string ApplicationUser(string identifier) => $$"""

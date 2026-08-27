@@ -19,6 +19,11 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
             Assert.Contains("\"version\": \"0.3.0\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditEntry.cs")));
+            Assert.Contains("public sealed class AuditEntry", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditEntry.cs")));
+            Assert.Contains("DbSet<AuditEntry> AuditEntries", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Data", "AppDbContext.cs")));
+            Assert.Contains("\"Audit\":", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
+            Assert.Contains("\"Enabled\": true", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
             Assert.Contains("UseSqlite", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.Contains("Data Source=app.db", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
             Assert.Contains("profile: quick", await File.ReadAllTextAsync(Path.Combine(output, "dotisan.config")));
@@ -145,6 +150,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("MapGet(\"/api/authorization/profile\"", authorizationEndpoints);
             Assert.Contains("RequireAuthorization(Permissions.ProfileView)", authorizationEndpoints);
             Assert.Contains("src/AuthApp.Api/Authorization/Permissions.cs", authenticatedPaths);
+            Assert.Contains("src/AuthApp.Api/Auditing/AuditEntry.cs", authenticatedPaths);
             Assert.DoesNotContain("src/PlainApp.Api/Authorization/Permissions.cs", plainPaths);
             var permissions = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Authorization", "Permissions.cs"));
             Assert.Contains("public const string ClaimType = \"permission\";", permissions);
