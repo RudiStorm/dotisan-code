@@ -66,7 +66,10 @@ internal static class TemplateFiles
             new("Dockerfile", Dockerfile(options.Name)),
             new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier)),
-            new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier)),
+            new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled)),
+            ..(options.AuthenticationEnabled
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationUser.cs", ApplicationUser(identifier)) }
+                : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier)),
             new($"src/{options.Name}.Api/appsettings.json", "{\n  \"ConnectionStrings\": {\n    \"DefaultConnection\": \"Data Source=app.db\"\n  },\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\",\n      \"Microsoft.AspNetCore\": \"Warning\"\n    }\n  },\n  \"AllowedHosts\": \"*\"\n}\n"),
             new($"src/{options.Name}.Api/appsettings.Development.json", "{\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\",\n      \"Microsoft.AspNetCore\": \"Information\"\n    }\n  }\n}\n"),
@@ -177,12 +180,36 @@ internal static class TemplateFiles
     public partial class Program { }
     """;
 
-    private static string DbContext(string identifier) => $$"""
+    private static string DbContext(string identifier, bool authenticationEnabled) => authenticationEnabled
+        ? IdentityDbContext(identifier)
+        : PlainDbContext(identifier);
+
+    private static string PlainDbContext(string identifier) => $$"""
     using Microsoft.EntityFrameworkCore;
 
     namespace {{identifier}}.Api.Data;
 
     public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options);
+    """;
+
+    private static string IdentityDbContext(string identifier) => $$"""
+    using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore;
+    using {{identifier}}.Api.Identity;
+
+    namespace {{identifier}}.Api.Data;
+
+    public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser>(options);
+    """;
+
+    private static string ApplicationUser(string identifier) => $$"""
+    using Microsoft.AspNetCore.Identity;
+
+    namespace {{identifier}}.Api.Identity;
+
+    public sealed class ApplicationUser : IdentityUser
+    {
+    }
     """;
 
     private static string EndpointExtensions(string identifier) => $$"""

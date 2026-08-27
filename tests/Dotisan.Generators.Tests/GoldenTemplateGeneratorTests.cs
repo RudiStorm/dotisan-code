@@ -77,11 +77,23 @@ public sealed class GoldenTemplateGeneratorTests
             var apiProject = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "AuthApp.Api.csproj"));
             var testProject = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "tests", "AuthApp.Api.Tests", "AuthApp.Api.Tests.csproj"));
             var plainApiProject = await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Api", "PlainApp.Api.csproj"));
+            var authenticatedPaths = Directory.GetFiles(authenticatedOutput, "*", SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(authenticatedOutput, path).Replace(Path.DirectorySeparatorChar, '/'))
+                .ToArray();
+            var plainPaths = Directory.GetFiles(plainOutput, "*", SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(plainOutput, path).Replace(Path.DirectorySeparatorChar, '/'))
+                .ToArray();
+            var dbContext = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Data", "AppDbContext.cs"));
+            var user = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Identity", "ApplicationUser.cs"));
 
             Assert.Contains("Microsoft.AspNetCore.Identity.EntityFrameworkCore", apiProject);
             Assert.Contains("Microsoft.AspNetCore.Mvc.Testing", testProject);
             Assert.Contains("Microsoft.Data.Sqlite", testProject);
             Assert.DoesNotContain("Microsoft.AspNetCore.Identity.EntityFrameworkCore", plainApiProject);
+            Assert.Contains("src/AuthApp.Api/Identity/ApplicationUser.cs", authenticatedPaths);
+            Assert.Contains("IdentityDbContext<ApplicationUser>", dbContext);
+            Assert.Contains("public sealed class ApplicationUser : IdentityUser", user);
+            Assert.DoesNotContain("src/PlainApp.Api/Identity/ApplicationUser.cs", plainPaths);
         }
         finally
         {
