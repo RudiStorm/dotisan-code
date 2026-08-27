@@ -231,6 +231,12 @@ internal static class TemplateFiles
 
     `dotisan new` installs frontend dependencies before reporting success. If the project was generated with `--no-restore`, run `npm install` or `pnpm install` before `npm run dev`.
 
+    ## Authorization
+
+    `Authorization/Permissions.cs` contains editable permission constants and the generated API registers one standard ASP.NET Core policy per entry. Generated endpoints use explicit `RequireAuthorization(...)` calls. Assign permissions as `permission` claims on standard `IdentityRole` instances with `RoleManager<IdentityRole>`; unauthenticated callers receive `401` and authenticated callers without a required claim receive `403`.
+
+    The generated `/api/authorization/profile` endpoint demonstrates `profile.view`. `dotisan make:resource Customer` adds explicit `customers.view`, `customers.create`, `customers.update`, and `customers.delete` permissions and protects each generated CRUD operation.
+
     `dotisan.config` controls orchestration preferences only. `appsettings.json`, environment variables, ASP.NET Core services, EF Core configuration, and Vite configuration remain the source of truth for their respective concerns.
     """;
 

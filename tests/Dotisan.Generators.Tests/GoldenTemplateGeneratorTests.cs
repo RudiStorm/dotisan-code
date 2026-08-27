@@ -186,6 +186,9 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("InitialIdentity", authenticatedReadme);
             Assert.Contains("dotisan migrate", authenticatedReadme);
             Assert.Contains("does not create migrations", authenticatedReadme);
+            Assert.Contains("RequireAuthorization", authenticatedReadme);
+            Assert.Contains("RoleManager<IdentityRole>", authenticatedReadme);
+            Assert.Contains("403", authenticatedReadme);
         }
         finally
         {

@@ -23,7 +23,7 @@ Authentication is opt-in. To generate the v0.2.0 authentication slice non-intera
 dotnet run --project src\Dotisan.Cli -- new AuthApp --auth yes --registration public --yes --output .\AuthApp
 ~~~
 
-This adds standard ASP.NET Core Identity with EF Core, cookie authentication, antiforgery protection, and explicit account endpoints. Registration can be `public`, `invite-only`, or `disabled`; invite-only and disabled projects return a clear `registration_unavailable` ProblemDetails response until an invitation workflow is added.
+This adds standard ASP.NET Core Identity with EF Core, cookie authentication, antiforgery protection, and explicit account endpoints. Registration can be `public`, `invite-only`, or `disabled`; invite-only and disabled projects return a clear `registration_unavailable` ProblemDetails response until an invitation workflow is added. Authenticated projects also generate `Authorization/Permissions.cs`, a protected `/api/authorization/profile` probe, and explicit policy registration from standard ASP.NET Core authorization.
 
 For scripts and CI, use the non-interactive equivalent:
 
@@ -111,4 +111,4 @@ dotnet ef database update --project src\AuthApp.Api
 dotisan migrate
 ~~~
 
-`dotisan migrate` applies existing migrations; it does not create migrations. Keep production secrets and data-protection keys outside source control, use HTTPS, and configure a durable key ring for multi-instance deployments through normal ASP.NET Core configuration. Password reset, email confirmation, MFA, external providers, roles, and permissions are intentionally deferred.
+`dotisan migrate` applies existing migrations; it does not create migrations. Keep production secrets and data-protection keys outside source control, use HTTPS, and configure a durable key ring for multi-instance deployments through normal ASP.NET Core configuration. Password reset, email confirmation, MFA, and external providers remain deferred. Edit `src\AuthApp.Api\Authorization\Permissions.cs` for permission constants; assign those permission claims to standard `IdentityRole` instances with `RoleManager<IdentityRole>`. Protected APIs return `401` without a session and `403` without the required `permission` role claim.
