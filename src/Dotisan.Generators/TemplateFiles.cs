@@ -148,6 +148,7 @@ internal static class TemplateFiles
     {
         public const string ClaimType = "permission";
         public const string ProfileView = "profile.view";
+        // DOTISAN:RESOURCE_PERMISSIONS
         public static IReadOnlyList<string> All { get; } = [ProfileView];
     }
     """;
@@ -367,7 +368,7 @@ internal static class TemplateFiles
 
     namespace {{identifier}}.Api.Data;
 
-    public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser>(options);
+    public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser>(options);
     """;
 
     private static string ApplicationUser(string identifier) => $$"""

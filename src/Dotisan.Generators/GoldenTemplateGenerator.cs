@@ -58,6 +58,9 @@ public sealed record ScaffoldingResult(bool Success, string? ErrorMessage)
 
 public sealed class ResourceScaffolder
 {
+    private static readonly string[] ResourceActions = ["View", "Create", "Update", "Delete"];
+    private static readonly string[] BasePermissions = ["ProfileView"];
+
     public static async Task<ScaffoldingResult> ScaffoldAsync(string projectDirectory, string resourceName, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(resourceName) || !IsIdentifier(resourceName))
@@ -88,6 +91,8 @@ public sealed class ResourceScaffolder
         var endpointPath = Path.Combine(featureDirectory, $"{resourceName}Endpoints.cs");
         var dbSetPath = Path.Combine(apiDirectory, "Data", $"{resourceName}DbSet.cs");
         var extensionPath = Path.Combine(apiDirectory, "Infrastructure", "DotisanEndpointExtensions.cs");
+        var authenticationEnabled = await IsAuthenticationEnabledAsync(root, cancellationToken);
+        var permissionsPath = Path.Combine(apiDirectory, "Authorization", "Permissions.cs");
 
         if (new[] { modelPath, endpointPath, dbSetPath }.Any(File.Exists))
         {
@@ -97,6 +102,17 @@ public sealed class ResourceScaffolder
         if (!File.Exists(extensionPath))
         {
             return ScaffoldingResult.Failed("The generated endpoint extension was not found; the project may not be a supported Dotisan application.");
+        }
+
+        string? permissions = null;
+        if (authenticationEnabled)
+        {
+            if (!File.Exists(permissionsPath))
+            {
+                return ScaffoldingResult.Failed("The generated authorization permission contract was not found; the project may not be a supported authenticated Dotisan application.");
+            }
+
+            permissions = await File.ReadAllTextAsync(permissionsPath, cancellationToken);
         }
 
         var extension = await File.ReadAllTextAsync(extensionPath, cancellationToken);
@@ -109,8 +125,13 @@ public sealed class ResourceScaffolder
 
         Directory.CreateDirectory(featureDirectory);
         await File.WriteAllTextAsync(modelPath, Model(identifier, resourceName, featureName), cancellationToken);
-        await File.WriteAllTextAsync(endpointPath, Endpoint(identifier, resourceName, featureName), cancellationToken);
+        await File.WriteAllTextAsync(endpointPath, Endpoint(identifier, resourceName, featureName, authenticationEnabled), cancellationToken);
         await File.WriteAllTextAsync(dbSetPath, DbSet(identifier, resourceName, featureName), cancellationToken);
+        if (authenticationEnabled)
+        {
+            await File.WriteAllTextAsync(permissionsPath, AddResourcePermissions(permissions!, featureName), cancellationToken);
+        }
+
         var lineEnd = extension.IndexOf('\n', markerIndex);
         lineEnd = lineEnd < 0 ? extension.Length : lineEnd;
         var registration = $"\n        global::{identifier}.Api.Features.{featureName}.{resourceName}Endpoints.Map{resourceName}Endpoints(endpoints);";
@@ -139,8 +160,9 @@ public sealed class ResourceScaffolder
     }
     """;
 
-    private static string Endpoint(string identifier, string resourceName, string featureName) => $$"""
+    private static string Endpoint(string identifier, string resourceName, string featureName, bool authenticationEnabled) => $$"""
     using {{identifier}}.Api.Data;
+    {{(authenticationEnabled ? $"using {identifier}.Api.Authorization;" : string.Empty)}}
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Routing;
     using Microsoft.EntityFrameworkCore;
@@ -151,10 +173,11 @@ public sealed class ResourceScaffolder
     {
         public static void Map{{resourceName}}Endpoints(IEndpointRouteBuilder endpoints)
         {
-            endpoints.MapGet("/api/{{featureName.ToLowerInvariant()}}", async (AppDbContext db, CancellationToken cancellationToken) =>
+            var collection = endpoints.MapGet("/api/{{featureName.ToLowerInvariant()}}", async (AppDbContext db, CancellationToken cancellationToken) =>
                 await db.{{featureName}}.AsNoTracking().ToListAsync(cancellationToken));
+            {{(authenticationEnabled ? "collection.RequireAuthorization(Permissions." + featureName + "View);" : string.Empty)}}
 
-            endpoints.MapPost("/api/{{featureName.ToLowerInvariant()}}", async (Create{{resourceName}}Request request, AppDbContext db, CancellationToken cancellationToken) =>
+            var create = endpoints.MapPost("/api/{{featureName.ToLowerInvariant()}}", async (Create{{resourceName}}Request request, AppDbContext db, CancellationToken cancellationToken) =>
             {
                 if (string.IsNullOrWhiteSpace(request.Name))
                 {
@@ -166,11 +189,97 @@ public sealed class ResourceScaffolder
                 await db.SaveChangesAsync(cancellationToken);
                 return Results.Created($"/api/{{featureName.ToLowerInvariant()}}/{entity.Id}", entity);
             });
+            {{(authenticationEnabled ? "create.RequireAuthorization(Permissions." + featureName + "Create);" : string.Empty)}}
+
+            {{(authenticationEnabled ? $$"""
+            var read = endpoints.MapGet("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, AppDbContext db, CancellationToken cancellationToken) =>
+            {
+                var entity = await db.{{featureName}}.AsNoTracking().FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+                return entity is null ? Results.NotFound() : Results.Ok(entity);
+            });
+            read.RequireAuthorization(Permissions.{{featureName}}View);
+
+            var update = endpoints.MapPut("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, Update{{resourceName}}Request request, AppDbContext db, CancellationToken cancellationToken) =>
+            {
+                if (string.IsNullOrWhiteSpace(request.Name))
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]> { [nameof(request.Name)] = ["Name is required."] });
+                }
+
+                var entity = await db.{{featureName}}.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+                if (entity is null)
+                {
+                    return Results.NotFound();
+                }
+
+                entity.Name = request.Name.Trim();
+                await db.SaveChangesAsync(cancellationToken);
+                return Results.Ok(entity);
+            });
+            update.RequireAuthorization(Permissions.{{featureName}}Update);
+
+            var delete = endpoints.MapDelete("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, AppDbContext db, CancellationToken cancellationToken) =>
+            {
+                var entity = await db.{{featureName}}.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+                if (entity is null)
+                {
+                    return Results.NotFound();
+                }
+
+                db.{{featureName}}.Remove(entity);
+                await db.SaveChangesAsync(cancellationToken);
+                return Results.NoContent();
+            });
+            delete.RequireAuthorization(Permissions.{{featureName}}Delete);
+            """ : string.Empty)}}
         }
 
         public sealed record Create{{resourceName}}Request(string Name);
+        {{(authenticationEnabled ? "public sealed record Update" + resourceName + "Request(string Name);" : string.Empty)}}
     }
     """;
+
+    private static string AddResourcePermissions(string permissions, string featureName)
+    {
+        const string marker = "    // DOTISAN:RESOURCE_PERMISSIONS";
+        const string allPrefix = "    public static IReadOnlyList<string> All { get; } = [";
+        var markerIndex = permissions.IndexOf(marker, StringComparison.Ordinal);
+        var allStart = permissions.IndexOf(allPrefix, StringComparison.Ordinal);
+        if (markerIndex < 0 || allStart < 0)
+        {
+            throw new InvalidOperationException("The generated permission contract is missing its resource permission marker.");
+        }
+
+        var allEnd = permissions.IndexOf("];", allStart, StringComparison.Ordinal);
+        if (allEnd < 0)
+        {
+            throw new InvalidOperationException("The generated permission contract has an invalid permission list.");
+        }
+
+        var permissionPrefix = featureName.ToLowerInvariant();
+        var constantPrefix = featureName;
+        var permissionsToAdd = ResourceActions
+            .Select(action => $"    public const string {constantPrefix}{action} = \"{permissionPrefix}.{action.ToLowerInvariant()}\";")
+            .ToArray();
+        var updated = permissions.Insert(markerIndex, string.Join(Environment.NewLine, permissionsToAdd) + Environment.NewLine);
+        var updatedAllStart = updated.IndexOf(allPrefix, StringComparison.Ordinal);
+        var updatedAllEnd = updated.IndexOf("];", updatedAllStart, StringComparison.Ordinal);
+        var names = string.Join(", ", BasePermissions.Concat(permissionsToAdd.Select(line => line[(line.IndexOf("string ", StringComparison.Ordinal) + 7)..line.IndexOf(" =", StringComparison.Ordinal)])));
+        return updated.Remove(updatedAllStart, updatedAllEnd + 2 - updatedAllStart)
+            .Insert(updatedAllStart, $"{allPrefix}{names}];");
+    }
+
+    private static async Task<bool> IsAuthenticationEnabledAsync(string root, CancellationToken cancellationToken)
+    {
+        var configPath = Path.Combine(root, "dotisan.config");
+        if (!File.Exists(configPath))
+        {
+            return false;
+        }
+
+        var lines = await File.ReadAllLinesAsync(configPath, cancellationToken);
+        return lines.Any(line => line.Trim().Equals("authentication: enabled", StringComparison.OrdinalIgnoreCase));
+    }
 
     private static string DbSet(string identifier, string resourceName, string featureName) => $$"""
     using Microsoft.EntityFrameworkCore;

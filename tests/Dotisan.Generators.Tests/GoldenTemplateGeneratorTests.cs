@@ -50,6 +50,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(File.Exists(Path.Combine(featureDirectory, "CustomerEndpoints.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Data", "CustomerDbSet.cs")));
             Assert.Contains("MapCustomerEndpoints", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Infrastructure", "DotisanEndpointExtensions.cs")));
+            Assert.DoesNotContain("RequireAuthorization", await File.ReadAllTextAsync(Path.Combine(featureDirectory, "CustomerEndpoints.cs")));
             Assert.False(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Migrations", "CustomerMigration.cs")));
         }
         finally
@@ -58,6 +59,39 @@ public sealed class GoldenTemplateGeneratorTests
             {
                 Directory.Delete(output, recursive: true);
             }
+        }
+    }
+
+    [Fact]
+    public async Task Authenticated_resource_scaffolder_generates_crud_permissions_and_policies()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-auth-resource-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var generated = await new GoldenTemplateGenerator().GenerateAsync(
+                ProjectOptions.Quick("AuthApp", output) with { AuthenticationEnabled = true }, CancellationToken.None);
+            Assert.True(generated.Success, generated.ErrorMessage);
+
+            var result = await ResourceScaffolder.ScaffoldAsync(output, "Customer", CancellationToken.None);
+
+            Assert.True(result.Success, result.ErrorMessage);
+            var permissions = await File.ReadAllTextAsync(Path.Combine(output, "src", "AuthApp.Api", "Authorization", "Permissions.cs"));
+            var endpoints = await File.ReadAllTextAsync(Path.Combine(output, "src", "AuthApp.Api", "Features", "Customers", "CustomerEndpoints.cs"));
+            Assert.Contains("CustomersView = \"customers.view\"", permissions);
+            Assert.Contains("CustomersCreate = \"customers.create\"", permissions);
+            Assert.Contains("CustomersUpdate = \"customers.update\"", permissions);
+            Assert.Contains("CustomersDelete = \"customers.delete\"", permissions);
+            Assert.Contains("Permissions.CustomersView", endpoints);
+            Assert.Contains("Permissions.CustomersCreate", endpoints);
+            Assert.Contains("Permissions.CustomersUpdate", endpoints);
+            Assert.Contains("Permissions.CustomersDelete", endpoints);
+            Assert.Contains("MapPut", endpoints);
+            Assert.Contains("MapDelete", endpoints);
+        }
+        finally
+        {
+            if (Directory.Exists(output))
+                Directory.Delete(output, recursive: true);
         }
     }
 
@@ -96,6 +130,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.DoesNotContain("Microsoft.AspNetCore.Identity.EntityFrameworkCore", plainApiProject);
             Assert.Contains("src/AuthApp.Api/Identity/ApplicationUser.cs", authenticatedPaths);
             Assert.Contains("IdentityDbContext<ApplicationUser>", dbContext);
+            Assert.Contains("public sealed partial class AppDbContext", dbContext);
             Assert.Contains("public sealed class ApplicationUser : IdentityUser", user);
             Assert.DoesNotContain("src/PlainApp.Api/Identity/ApplicationUser.cs", plainPaths);
             Assert.Contains("src/AuthApp.Api/Features/Account/AccountEndpoints.cs", authenticatedPaths);
