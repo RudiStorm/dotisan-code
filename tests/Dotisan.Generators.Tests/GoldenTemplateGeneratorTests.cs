@@ -177,6 +177,11 @@ public sealed class GoldenTemplateGeneratorTests
             var authenticationTests = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "tests", "AuthApp.Api.Tests", "AuthenticationEndpointTests.cs"));
             Assert.Contains("WebApplicationFactory<Program>", authenticationTests);
             Assert.Contains("UseEphemeralDataProtectionProvider", authenticationTests);
+            Assert.Contains("RoleManager<IdentityRole>", authenticationTests);
+            Assert.Contains("AddClaimAsync", authenticationTests);
+            Assert.Contains("Permissions.ProfileView", authenticationTests);
+            Assert.Contains("HttpStatusCode.Forbidden", authenticationTests);
+            Assert.Contains("/api/authorization/profile", authenticationTests);
             Assert.Contains("--auth yes", authenticatedReadme);
             Assert.Contains("InitialIdentity", authenticatedReadme);
             Assert.Contains("dotisan migrate", authenticatedReadme);

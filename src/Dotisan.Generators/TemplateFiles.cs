@@ -319,6 +319,11 @@ internal static class TemplateFiles
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                 return Task.CompletedTask;
             };
+            options.Events.OnRedirectToAccessDenied = context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                return Task.CompletedTask;
+            };
         });
     builder.Services.AddAuthorization(options =>
     {
@@ -522,9 +527,12 @@ internal static class TemplateFiles
     """;
 
     private static string AuthenticationTests(string identifier, RegistrationPolicy registrationPolicy) => $$"""
+    using System.Security.Claims;
     using System.Net;
     using System.Net.Http.Json;
+    using {{identifier}}.Api.Authorization;
     using {{identifier}}.Api.Data;
+    using {{identifier}}.Api.Identity;
     using Microsoft.AspNetCore.DataProtection;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.AspNetCore.Mvc.Testing;
@@ -533,6 +541,7 @@ internal static class TemplateFiles
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.DependencyInjection.Extensions;
     using Microsoft.Extensions.Logging;
+    using Microsoft.AspNetCore.Identity;
 
     namespace {{identifier}}.Api.Tests;
 
@@ -544,6 +553,27 @@ internal static class TemplateFiles
             using var client = factory.CreateClient();
             var response = await client.GetAsync("/api/account/me");
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Profile_requires_authentication_and_permission()
+        {
+            using var anonymousClient = factory.CreateClient();
+            Assert.Equal(HttpStatusCode.Unauthorized, (await anonymousClient.GetAsync("/api/authorization/profile")).StatusCode);
+
+            using var client = await SignInAsync($"no-permission-{Guid.NewGuid():N}@example.com");
+            Assert.Equal(HttpStatusCode.Forbidden, (await client.GetAsync("/api/authorization/profile")).StatusCode);
+        }
+
+        [Fact]
+        public async Task Role_permission_allows_profile()
+        {
+            using var client = await SignInAsync($"permission-{Guid.NewGuid():N}@example.com", grantProfilePermission: true);
+
+            var response = await client.GetAsync("/api/authorization/profile");
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            Assert.Contains(Permissions.ProfileView, await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
         }
 
         [Fact]
@@ -565,6 +595,19 @@ internal static class TemplateFiles
         {
             var response = await client.GetFromJsonAsync<AntiforgeryResponse>("/api/account/antiforgery");
             return response?.Token ?? throw new InvalidOperationException("The generated antiforgery endpoint returned no token.");
+        }
+
+        private async Task<HttpClient> SignInAsync(string email, bool grantProfilePermission = false)
+        {
+            await factory.SeedUserAsync(email, grantProfilePermission);
+            var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+            var antiforgery = await GetAntiforgeryToken(client);
+            using var login = new HttpRequestMessage(HttpMethod.Post, "/api/account/login");
+            login.Headers.Add("X-XSRF-TOKEN", antiforgery);
+            login.Content = JsonContent.Create(new { email, password = "Password1!", rememberMe = false });
+            var response = await client.SendAsync(login);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            return client;
         }
 
         private sealed record AntiforgeryResponse(string Token);
@@ -590,6 +633,43 @@ internal static class TemplateFiles
                 using var scope = provider.CreateScope();
                 scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureCreated();
             });
+        }
+
+        public async Task SeedUserAsync(string email, bool grantProfilePermission)
+        {
+            using var scope = Services.CreateScope();
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+            var user = new ApplicationUser { UserName = email, Email = email };
+            var result = await users.CreateAsync(user, "Password1!");
+            if (!result.Succeeded)
+            {
+                throw new InvalidOperationException(string.Join("; ", result.Errors.Select(error => error.Description)));
+            }
+
+            if (!grantProfilePermission)
+            {
+                return;
+            }
+
+            var role = new IdentityRole($"AuthorizationTesters-{Guid.NewGuid():N}");
+            var roleResult = await roles.CreateAsync(role);
+            if (!roleResult.Succeeded)
+            {
+                throw new InvalidOperationException(string.Join("; ", roleResult.Errors.Select(error => error.Description)));
+            }
+
+            var claimResult = await roles.AddClaimAsync(role, new Claim(Permissions.ClaimType, Permissions.ProfileView));
+            if (!claimResult.Succeeded)
+            {
+                throw new InvalidOperationException(string.Join("; ", claimResult.Errors.Select(error => error.Description)));
+            }
+
+            var membershipResult = await users.AddToRoleAsync(user, role.Name!);
+            if (!membershipResult.Succeeded)
+            {
+                throw new InvalidOperationException(string.Join("; ", membershipResult.Errors.Select(error => error.Description)));
+            }
         }
 
         protected override void Dispose(bool disposing)
