@@ -46,7 +46,7 @@ internal static class TemplateFiles
             new("global.json", "{\n  \"sdk\": {\n    \"version\": \"8.0.100\",\n    \"rollForward\": \"latestMajor\"\n  }\n}\n"),
             new(".node-version", "22\n"),
             new("Directory.Packages.props", PackageVersions()),
-            new("README.md", ProjectReadme(options.Name, options.AuthenticationEnabled)),
+            new("README.md", ProjectReadme(options.Name, options.Database, options.AuthenticationEnabled)),
             new("dotisan.config", $$"""
             version: 1
             profile: quick
@@ -64,8 +64,8 @@ internal static class TemplateFiles
                 workers: false
             """),
             new("Dockerfile", Dockerfile(options.Name)),
-            new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.AuthenticationEnabled)),
-            new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public)),
+            new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.Database, options.AuthenticationEnabled)),
+            new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public)),
             new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Auditing/AuditEntry.cs", AuditEntry(identifier)),
             new($"src/{options.Name}.Api/Auditing/IAuditWriter.cs", AuditWriterContract(identifier)),
@@ -83,7 +83,7 @@ internal static class TemplateFiles
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Authorization/AuthorizationEndpoints.cs", AuthorizationEndpoints(identifier)) }
                 : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier)),
-            new($"src/{options.Name}.Api/appsettings.json", "{\n  \"ConnectionStrings\": {\n    \"DefaultConnection\": \"Data Source=app.db\"\n  },\n  \"Audit\": {\n    \"Enabled\": true\n  },\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\",\n      \"Microsoft.AspNetCore\": \"Warning\"\n    }\n  },\n  \"AllowedHosts\": \"*\"\n}\n"),
+            new($"src/{options.Name}.Api/appsettings.json", AppSettings(options.Name, options.Database)),
             new($"src/{options.Name}.Api/appsettings.Development.json", "{\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\",\n      \"Microsoft.AspNetCore\": \"Information\"\n    }\n  }\n}\n"),
             new($"src/{options.Name}.Web/package.json", packageJson),
             new($"src/{options.Name}.Web/index.html", WebIndex(options.Name)),
@@ -106,7 +106,7 @@ internal static class TemplateFiles
         ];
     }
 
-    private static string ApiProject(string name, bool authenticationEnabled) => $$"""
+    private static string ApiProject(string name, DatabaseProvider database, bool authenticationEnabled) => $$"""
     <Project Sdk="Microsoft.NET.Sdk.Web">
       <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
@@ -115,7 +115,7 @@ internal static class TemplateFiles
         <RootNamespace>{{name.Replace('-', '_')}}</RootNamespace>
       </PropertyGroup>
       <ItemGroup>
-        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+        <PackageReference Include="{{DatabasePackage(database)}}" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
         {{(authenticationEnabled ? "<PackageReference Include=\"Microsoft.AspNetCore.Identity.EntityFrameworkCore\" />" : string.Empty)}}
       </ItemGroup>
@@ -129,6 +129,9 @@ internal static class TemplateFiles
       </PropertyGroup>
       <ItemGroup>
         <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.11" />
+        <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.8" />
+        <PackageVersion Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.2" />
         <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11" />
         <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.11" />
         <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.11" />
@@ -140,9 +143,9 @@ internal static class TemplateFiles
     </Project>
     """;
 
-    private static string ProjectReadme(string name, bool authenticationEnabled) => authenticationEnabled
-        ? AuthenticatedProjectReadme(name)
-        : PlainProjectReadme(name);
+    private static string ProjectReadme(string name, DatabaseProvider database, bool authenticationEnabled) => authenticationEnabled
+        ? AuthenticatedProjectReadme(name, database)
+        : PlainProjectReadme(name, database);
 
     private static string Permissions(string identifier) => $$"""
     namespace {{identifier}}.Api.Authorization;
@@ -156,10 +159,10 @@ internal static class TemplateFiles
     }
     """;
 
-    private static string PlainProjectReadme(string name) => $$"""
+    private static string PlainProjectReadme(string name, DatabaseProvider database) => $$"""
     # {{name}}
 
-    This project was generated by Dotisan. It is a standard ASP.NET Core + Vue/Vite application with EF Core SQLite defaults.
+    This project was generated by Dotisan. It is a standard ASP.NET Core + Vue/Vite application with EF Core {{DatabaseDisplayName(database)}}.
 
     ~~~powershell
     dotnet build {{name}}.sln
@@ -189,6 +192,10 @@ internal static class TemplateFiles
 
     Press Ctrl+C once while `dotisan dev` is running to stop the API and frontend together. Dotisan allows graceful shutdown before falling back to process-tree cleanup.
 
+    ## Database provider
+
+    {{DatabaseSetup(name, database)}}
+
     ## Audit foundation
 
     `Auditing/AuditEntry.cs`, `Auditing/IAuditWriter.cs`, and `Auditing/AuditWriter.cs` are ordinary application source. Audit is enabled by default through `Audit:Enabled`; use the standard `Audit__Enabled=false` override to disable writes. Author the schema with `dotnet ef migrations add InitialAudit --project src\{{name}}.Api` and apply it with `dotnet ef database update --project src\{{name}}.Api`. Generated resource operations record actor, tenant placeholder, action, changed fields, trace ID, and correlation ID. Audit is persistence logging, not event sourcing.
@@ -196,10 +203,10 @@ internal static class TemplateFiles
     dotisan.config controls orchestration preferences only. Normal appsettings.json, environment variables, EF Core, and Vite configuration remain the source of truth for their respective concerns. Resource scaffolding creates source files but never creates migrations.
     """;
 
-    private static string AuthenticatedProjectReadme(string name) => $$"""
+    private static string AuthenticatedProjectReadme(string name, DatabaseProvider database) => $$"""
     # {{name}}
 
-    This project was generated by Dotisan as a standard ASP.NET Core + Vue/Vite application with EF Core SQLite defaults and opt-in ASP.NET Core Identity cookie authentication.
+    This project was generated by Dotisan as a standard ASP.NET Core + Vue/Vite application with EF Core {{DatabaseDisplayName(database)}} and opt-in ASP.NET Core Identity cookie authentication.
 
     ## Build and run
 
@@ -246,6 +253,10 @@ internal static class TemplateFiles
 
     Press Ctrl+C once while `dotisan dev` is running to stop the API and frontend together. Dotisan allows graceful shutdown before falling back to process-tree cleanup.
 
+    ## Database provider
+
+    {{DatabaseSetup(name, database)}}
+
     ## Authorization
 
     `Authorization/Permissions.cs` contains editable permission constants and the generated API registers one standard ASP.NET Core policy per entry. Generated endpoints use explicit `RequireAuthorization(...)` calls. Assign permissions as `permission` claims on standard `IdentityRole` instances with `RoleManager<IdentityRole>`; unauthenticated callers receive `401` and authenticated callers without a required claim receive `403`.
@@ -279,11 +290,11 @@ internal static class TemplateFiles
     }
     """;
 
-    private static string ApiProgram(string identifier, bool authenticationEnabled, bool registrationEnabled) => authenticationEnabled
-        ? AuthenticatedApiProgram(identifier, registrationEnabled)
-        : PlainApiProgram(identifier);
+    private static string ApiProgram(string identifier, DatabaseProvider database, bool authenticationEnabled, bool registrationEnabled) => authenticationEnabled
+        ? AuthenticatedApiProgram(identifier, database, registrationEnabled)
+        : PlainApiProgram(identifier, database);
 
-    private static string PlainApiProgram(string identifier) => $$"""
+    private static string PlainApiProgram(string identifier, DatabaseProvider database) => $$"""
     using {{identifier}}.Api.Auditing;
     using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Data;
@@ -291,8 +302,10 @@ internal static class TemplateFiles
 
     var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddProblemDetails();
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required.");
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+        {{DatabaseRegistration(database)}});
     builder.Services.AddScoped<IAuditWriter, AuditWriter>();
 
     var app = builder.Build();
@@ -309,7 +322,7 @@ internal static class TemplateFiles
     public partial class Program { }
     """;
 
-    private static string AuthenticatedApiProgram(string identifier, bool registrationEnabled) => $$"""
+    private static string AuthenticatedApiProgram(string identifier, DatabaseProvider database, bool registrationEnabled) => $$"""
     using System.Security.Claims;
     using {{identifier}}.Api.Authorization;
     using {{identifier}}.Api.Auditing;
@@ -325,8 +338,10 @@ internal static class TemplateFiles
 
     var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddProblemDetails();
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required.");
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+        {{DatabaseRegistration(database)}});
     builder.Services.AddScoped<IAuditWriter, AuditWriter>();
     builder.Services.AddIdentityCore<ApplicationUser>(options =>
     {
@@ -382,6 +397,67 @@ internal static class TemplateFiles
 
     public partial class Program { }
     """;
+
+    private static string DatabasePackage(DatabaseProvider database) => database switch
+    {
+        DatabaseProvider.SqlServer => "Microsoft.EntityFrameworkCore.SqlServer",
+        DatabaseProvider.PostgreSQL => "Npgsql.EntityFrameworkCore.PostgreSQL",
+        DatabaseProvider.MySQL => "Pomelo.EntityFrameworkCore.MySql",
+        _ => "Microsoft.EntityFrameworkCore.Sqlite"
+    };
+
+    private static string DatabaseDisplayName(DatabaseProvider database) => database switch
+    {
+        DatabaseProvider.SqlServer => "SQL Server",
+        DatabaseProvider.PostgreSQL => "PostgreSQL",
+        DatabaseProvider.MySQL => "MySQL",
+        _ => "SQLite defaults"
+    };
+
+    private static string DatabaseSetup(string name, DatabaseProvider database) => database switch
+    {
+        DatabaseProvider.SqlServer => $"This project uses EF Core SQL Server. The local default is `Server=localhost;Database={name};Trusted_Connection=True;TrustServerCertificate=True`. Start SQL Server and replace the connection string through standard ASP.NET Core configuration before running migrations. Dotisan does not provision or start the database service.",
+        DatabaseProvider.PostgreSQL => $"This project uses EF Core PostgreSQL. The local default is `Host=localhost;Database={name.ToLowerInvariant()};Username=postgres;Password=postgres`. Start PostgreSQL and replace the connection string and credentials through standard ASP.NET Core configuration before running migrations. Dotisan does not provision or start the database service.",
+        DatabaseProvider.MySQL => $"This project uses EF Core MySQL. The local default is `Server=localhost;Database={name.ToLowerInvariant()};User=root;Password=`. Start MySQL and replace the connection string and credentials through standard ASP.NET Core configuration before running migrations. Dotisan does not provision or start the database service.",
+        _ => "This project uses EF Core SQLite. SQLite is file-based and needs no separate database service; the default connection string is `Data Source=app.db`.",
+    };
+
+    private static string DatabaseRegistration(DatabaseProvider database) => database switch
+    {
+        DatabaseProvider.SqlServer => "options.UseSqlServer(connectionString)",
+        DatabaseProvider.PostgreSQL => "options.UseNpgsql(connectionString)",
+        DatabaseProvider.MySQL => "options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString))",
+        _ => "options.UseSqlite(connectionString)"
+    };
+
+    private static string AppSettings(string name, DatabaseProvider database)
+    {
+        var connectionString = database switch
+        {
+            DatabaseProvider.SqlServer => $"Server=localhost;Database={name};Trusted_Connection=True;TrustServerCertificate=True",
+            DatabaseProvider.PostgreSQL => $"Host=localhost;Database={name.ToLowerInvariant()};Username=postgres;Password=postgres",
+            DatabaseProvider.MySQL => $"Server=localhost;Database={name.ToLowerInvariant()};User=root;Password=",
+            _ => "Data Source=app.db"
+        };
+
+        return $$"""
+        {
+          "ConnectionStrings": {
+            "DefaultConnection": "{{connectionString}}"
+          },
+          "Audit": {
+            "Enabled": true
+          },
+          "Logging": {
+            "LogLevel": {
+              "Default": "Information",
+              "Microsoft.AspNetCore": "Warning"
+            }
+          },
+          "AllowedHosts": "*"
+        }
+        """;
+    }
 
     private static string DbContext(string identifier, bool authenticationEnabled) => authenticationEnabled
         ? IdentityDbContext(identifier)
@@ -634,7 +710,7 @@ internal static class TemplateFiles
         <PackageReference Include="Microsoft.NET.Test.Sdk" />
         <PackageReference Include="xunit" />
         <PackageReference Include="xunit.runner.visualstudio" />
-        {{(authenticationEnabled ? "<PackageReference Include=\"Microsoft.AspNetCore.Mvc.Testing\" />\n        <PackageReference Include=\"Microsoft.Data.Sqlite\" />" : string.Empty)}}
+        {{(authenticationEnabled ? "<PackageReference Include=\"Microsoft.AspNetCore.Mvc.Testing\" />\n        <PackageReference Include=\"Microsoft.EntityFrameworkCore.Sqlite\" />\n        <PackageReference Include=\"Microsoft.Data.Sqlite\" />" : string.Empty)}}
         <ProjectReference Include="..\\..\\src\\{{name}}.Api\\{{name}}.Api.csproj" />
       </ItemGroup>
     </Project>

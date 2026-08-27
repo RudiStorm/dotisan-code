@@ -54,6 +54,71 @@ public sealed class GoldenTemplateGeneratorTests
         }
     }
 
+    [Theory]
+    [InlineData(DatabaseProvider.SQLite, "Microsoft.EntityFrameworkCore.Sqlite", "UseSqlite", "Data Source=app.db", "SQLite")]
+    [InlineData(DatabaseProvider.SqlServer, "Microsoft.EntityFrameworkCore.SqlServer", "UseSqlServer", "Server=localhost;Database=DataApp;Trusted_Connection=True;TrustServerCertificate=True", "SQL Server")]
+    [InlineData(DatabaseProvider.PostgreSQL, "Npgsql.EntityFrameworkCore.PostgreSQL", "UseNpgsql", "Host=localhost;Database=dataapp;Username=postgres;Password=postgres", "PostgreSQL")]
+    [InlineData(DatabaseProvider.MySQL, "Pomelo.EntityFrameworkCore.MySql", "UseMySql", "Server=localhost;Database=dataapp;User=root;Password=", "MySQL")]
+    public async Task Generator_uses_the_selected_database_provider(
+        DatabaseProvider provider,
+        string package,
+        string registration,
+        string connectionString,
+        string displayName)
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-database-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var result = await new GoldenTemplateGenerator().GenerateAsync(
+                ProjectOptions.Quick("DataApp", output) with { Database = provider }, CancellationToken.None);
+
+            Assert.True(result.Success, result.ErrorMessage);
+            var apiProject = await File.ReadAllTextAsync(Path.Combine(output, "src", "DataApp.Api", "DataApp.Api.csproj"));
+            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "DataApp.Api", "Program.cs"));
+            var appsettings = await File.ReadAllTextAsync(Path.Combine(output, "src", "DataApp.Api", "appsettings.json"));
+            var readme = await File.ReadAllTextAsync(Path.Combine(output, "README.md"));
+
+            Assert.Contains($"<PackageReference Include=\"{package}\"", apiProject);
+            Assert.Contains(registration, program);
+            Assert.Contains(connectionString, appsettings);
+            Assert.Contains($"EF Core {displayName}", readme);
+            if (provider != DatabaseProvider.SQLite)
+                Assert.DoesNotContain("Microsoft.EntityFrameworkCore.Sqlite", apiProject);
+        }
+        finally
+        {
+            if (Directory.Exists(output))
+                Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(DatabaseProvider.SqlServer)]
+    [InlineData(DatabaseProvider.PostgreSQL)]
+    [InlineData(DatabaseProvider.MySQL)]
+    public async Task Authenticated_provider_projects_keep_sqlite_test_host_support(DatabaseProvider provider)
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-auth-database-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var result = await new GoldenTemplateGenerator().GenerateAsync(
+                ProjectOptions.Quick("DataApp", output) with
+                {
+                    Database = provider,
+                    AuthenticationEnabled = true
+                }, CancellationToken.None);
+
+            Assert.True(result.Success, result.ErrorMessage);
+            var testProject = await File.ReadAllTextAsync(Path.Combine(output, "tests", "DataApp.Api.Tests", "DataApp.Api.Tests.csproj"));
+            Assert.Contains("Microsoft.EntityFrameworkCore.Sqlite", testProject);
+        }
+        finally
+        {
+            if (Directory.Exists(output))
+                Directory.Delete(output, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task Resource_scaffolder_creates_vertical_endpoint_model_and_db_registration_without_migration()
     {

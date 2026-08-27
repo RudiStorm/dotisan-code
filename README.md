@@ -14,7 +14,7 @@ The repository contains focused projects for:
 - Dotisan.TypeScript — initial nullable/optional C# contract type mapping.
 - Dotisan.Testing — reusable test helpers.
 
-The generated app uses normal ASP.NET Core configuration, dependency injection, Minimal APIs, EF Core SQLite, and (when selected) ASP.NET Core Identity with cookie authentication. Dotisan does not replace those platform features.
+The generated app uses normal ASP.NET Core configuration, dependency injection, Minimal APIs, and EF Core. SQLite is the default provider; the Quick wizard can also generate SQL Server, PostgreSQL, or MySQL configuration. When selected, ASP.NET Core Identity uses the same generated provider and standard cookie authentication. Dotisan does not replace those platform features.
 
 ## Run locally
 
@@ -48,6 +48,21 @@ After the wizard choices are accepted, `dotisan new` checks the .NET SDK, `dotne
 Press Ctrl+C once while `dotisan dev` is running to stop the API and frontend together. Dotisan gives each service a short graceful-shutdown window and uses process-tree cleanup only if a service does not exit.
 
 For the interactive Quick wizard, omit --yes. It asks for SQLite/SQL Server/PostgreSQL/MySQL, authentication, registration policy, tenancy, and pnpm/npm. Press Enter to accept each default. Authentication is opt-in; `--auth yes` generates standard ASP.NET Core Identity endpoints and cookie authentication.
+
+## Database providers
+
+SQLite is the default and uses `Data Source=app.db`, so a new project can run without a separate database service. The other wizard choices generate the matching EF Core provider package, `UseSqlServer`, `UseNpgsql`, or `UseMySql` registration, and a local development connection-string example:
+
+- SQL Server: `Server=localhost;Database=MyApp;Trusted_Connection=True;TrustServerCertificate=True`
+- PostgreSQL: `Host=localhost;Database=myapp;Username=postgres;Password=postgres`
+- MySQL: `Server=localhost;Database=myapp;User=root;Password=`
+
+Start the selected database service and replace development credentials through normal ASP.NET Core configuration or user secrets before authoring and applying migrations. `dotisan new` does not provision a database server. Use standard EF Core tooling:
+
+~~~powershell
+dotnet ef migrations add InitialCreate --project src\MyApp.Api
+dotnet ef database update --project src\MyApp.Api
+~~~
 
 ## Global tool packaging
 

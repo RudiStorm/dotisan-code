@@ -17,6 +17,8 @@ Multi-tenancy: No
 Package manager: pnpm
 ~~~
 
+SQLite is the default because it is file-based and requires no separate database service. The wizard also supports SQL Server, PostgreSQL, and MySQL. Each choice generates the matching EF Core package, provider registration, and local connection-string example in `src/TodoApp.Api/appsettings.json`.
+
 Authentication is opt-in. To generate the v0.3.0 authorization slice non-interactively:
 
 ~~~powershell
@@ -62,6 +64,26 @@ TodoApp/
 ├── Directory.Packages.props
 ├── Dockerfile
 └── TodoApp.sln
+~~~
+
+## Database providers
+
+For SQL Server, PostgreSQL, or MySQL, start the database service before applying migrations. `dotisan new` checks local development tools but does not provision or start an external database server. Configure credentials with normal ASP.NET Core configuration or user secrets rather than committing them.
+
+The generated defaults are:
+
+~~~text
+SQLite:     Data Source=app.db
+SQL Server: Server=localhost;Database=TodoApp;Trusted_Connection=True;TrustServerCertificate=True
+PostgreSQL: Host=localhost;Database=todoapp;Username=postgres;Password=postgres
+MySQL:      Server=localhost;Database=todoapp;User=root;Password=
+~~~
+
+The API uses `UseSqlite`, `UseSqlServer`, `UseNpgsql`, or `UseMySql` according to the wizard choice. Author and apply migrations with the standard EF Core CLI:
+
+~~~powershell
+dotnet ef migrations add InitialCreate --project src\TodoApp.Api
+dotnet ef database update --project src\TodoApp.Api
 ~~~
 
 ## Build and run
