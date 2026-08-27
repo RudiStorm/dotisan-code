@@ -116,6 +116,58 @@ public sealed class CliApplicationTests
         Assert.Contains("UAT", services.StartArguments);
     }
 
+    [Fact]
+    public void Npm_package_manager_uses_a_startable_command_on_windows()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "dotisan-npm-command-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "src", "App.Api"));
+        File.WriteAllText(Path.Combine(root, "App.sln"), string.Empty);
+        File.WriteAllText(Path.Combine(root, "src", "App.Api", "App.Api.csproj"), "<Project />");
+        File.WriteAllText(Path.Combine(root, "dotisan.config"), "package_manager: npm\n");
+
+        try
+        {
+            var services = new DefaultDotisanServices(root);
+
+            Assert.Equal(OperatingSystem.IsWindows() ? "npm.cmd" : "npm", services.PackageManager);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Windows_batch_package_manager_processes_can_start_with_arguments()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        var root = Path.Combine(Path.GetTempPath(), "dotisan-npm-process-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(root, "src", "App.Api"));
+        File.WriteAllText(Path.Combine(root, "App.sln"), string.Empty);
+        File.WriteAllText(Path.Combine(root, "src", "App.Api", "App.Api.csproj"), "<Project />");
+
+        try
+        {
+            var services = new DefaultDotisanServices(root);
+            await using var process = await services.StartAsync(
+                "npm.cmd",
+                ["--version"],
+                root,
+                new MemoryConsole(),
+                CancellationToken.None);
+
+            Assert.Equal(0, await process.Completion);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
     private sealed class RecordingServices : IDotisanServices
     {
         public string WorkingDirectory => "C:\\work";

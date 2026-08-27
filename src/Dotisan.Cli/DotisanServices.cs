@@ -120,14 +120,15 @@ public sealed class DefaultDotisanServices : IDotisanServices
 
     private static string ReadPackageManager(string? projectRoot)
     {
+        var packageManager = "pnpm";
         if (projectRoot is not null)
         {
             var configPath = Path.Combine(projectRoot, "dotisan.config");
             if (File.Exists(configPath) && File.ReadAllLines(configPath).Any(line => line.Trim().Equals("package_manager: npm", StringComparison.OrdinalIgnoreCase)))
-                return "npm";
+                packageManager = "npm";
         }
 
-        return "pnpm";
+        return OperatingSystem.IsWindows() ? $"{packageManager}.cmd" : packageManager;
     }
 }
 
@@ -147,7 +148,15 @@ internal sealed class ProcessDotisanProcess : IDotisanProcess
 
     public static Task<IDotisanProcess> StartAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory, IConsole console, CancellationToken cancellationToken)
     {
-        var startInfo = new ProcessStartInfo(fileName)
+        var executable = fileName;
+        IReadOnlyList<string> processArguments = arguments;
+        if (OperatingSystem.IsWindows() && fileName.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase))
+        {
+            executable = Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe";
+            processArguments = ["/d", "/c", string.Join(" ", new[] { fileName }.Concat(arguments))];
+        }
+
+        var startInfo = new ProcessStartInfo(executable)
         {
             WorkingDirectory = workingDirectory,
             UseShellExecute = false,
@@ -155,7 +164,7 @@ internal sealed class ProcessDotisanProcess : IDotisanProcess
             RedirectStandardError = true,
             CreateNoWindow = true
         };
-        foreach (var argument in arguments)
+        foreach (var argument in processArguments)
             startInfo.ArgumentList.Add(argument);
 
         var process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
