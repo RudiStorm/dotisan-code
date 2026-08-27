@@ -45,6 +45,8 @@ dotisan dev
 
 After the wizard choices are accepted, `dotisan new` checks the .NET SDK, `dotnet-ef`, and the selected frontend package manager. Missing tools are reported with copy-paste install and verification commands. Project creation continues so you can install the missing prerequisite and retry the relevant native command; a missing npm/pnpm installation skips only frontend dependency installation.
 
+Press Ctrl+C once while `dotisan dev` is running to stop the API and frontend together. Dotisan gives each service a short graceful-shutdown window and uses process-tree cleanup only if a service does not exit.
+
 For the interactive Quick wizard, omit --yes. It asks for SQLite/SQL Server/PostgreSQL/MySQL, authentication, registration policy, tenancy, and pnpm/npm. Press Enter to accept each default. Authentication is opt-in; `--auth yes` generates standard ASP.NET Core Identity endpoints and cookie authentication.
 
 ## Global tool packaging

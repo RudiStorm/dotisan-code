@@ -220,7 +220,14 @@ internal sealed class DevCommand : WorkspaceCommand
                 processes.Add(await services.StartAsync(packageManager, ["run", "dev"], services.FrontendDirectory, context.Console, cancellationToken));
             }
 
-            await Task.WhenAny(processes.Select(process => process.Completion));
+            var cancellationTask = Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+            var completedTask = await Task.WhenAny(processes.Select(process => process.Completion).Append(cancellationTask));
+            if (completedTask == cancellationTask || cancellationToken.IsCancellationRequested)
+            {
+                context.Console.WriteLine("Stopping development services...");
+                await Task.WhenAll(processes.Select(process => process.StopAsync()));
+            }
+
             return DotisanExitCode.Success;
         }
         catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)

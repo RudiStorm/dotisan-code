@@ -135,12 +135,10 @@ public sealed class DefaultDotisanServices : IDotisanServices
 internal sealed class ProcessDotisanProcess : IDotisanProcess
 {
     private readonly Process process;
-    private readonly CancellationTokenRegistration cancellationRegistration;
 
-    private ProcessDotisanProcess(Process process, CancellationTokenRegistration cancellationRegistration)
+    private ProcessDotisanProcess(Process process)
     {
         this.process = process;
-        this.cancellationRegistration = cancellationRegistration;
         Completion = WaitForExitAsync();
     }
 
@@ -162,7 +160,7 @@ internal sealed class ProcessDotisanProcess : IDotisanProcess
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            CreateNoWindow = true
+            CreateNoWindow = false
         };
         foreach (var argument in processArguments)
             startInfo.ArgumentList.Add(argument);
@@ -174,17 +172,49 @@ internal sealed class ProcessDotisanProcess : IDotisanProcess
         process.ErrorDataReceived += (_, eventArgs) => { if (eventArgs.Data is not null) console.WriteError(eventArgs.Data); };
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
-        var registration = cancellationToken.Register(() => Kill(process));
-        return Task.FromResult<IDotisanProcess>(new ProcessDotisanProcess(process, registration));
+        var processWrapper = new ProcessDotisanProcess(process);
+        processWrapper.cancellationRegistration = cancellationToken.Register(() => _ = processWrapper.StopAsync());
+        return Task.FromResult<IDotisanProcess>(processWrapper);
+    }
+
+    public Task StopAsync()
+    {
+        lock (stopLock)
+            return stopTask ??= StopCoreAsync();
     }
 
     public async ValueTask DisposeAsync()
     {
         cancellationRegistration.Dispose();
-        if (!process.HasExited)
-            Kill(process);
+        await StopAsync();
         await process.WaitForExitAsync();
         process.Dispose();
+    }
+
+    private readonly object stopLock = new();
+    private Task? stopTask;
+    private CancellationTokenRegistration cancellationRegistration;
+
+    private async Task StopCoreAsync()
+    {
+        if (process.HasExited)
+            return;
+
+        try
+        {
+            process.CloseMainWindow();
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        catch (NotSupportedException)
+        {
+        }
+
+        var waitForExit = process.WaitForExitAsync();
+        var exited = await Task.WhenAny(waitForExit, Task.Delay(TimeSpan.FromSeconds(2))) == waitForExit;
+        if (!exited && !process.HasExited)
+            Kill(process);
     }
 
     private async Task<int> WaitForExitAsync()

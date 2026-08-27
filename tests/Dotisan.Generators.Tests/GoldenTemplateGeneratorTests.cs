@@ -43,6 +43,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("Audit__Enabled", readme);
             Assert.Contains("InitialAudit", readme);
             Assert.Contains("checks the .NET SDK", readme);
+            Assert.Contains("Press Ctrl+C once", readme);
         }
         finally
         {
@@ -243,6 +244,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("Audit__Enabled", authenticatedReadme);
             Assert.Contains("not event sourcing", authenticatedReadme);
             Assert.Contains("checks the .NET SDK", authenticatedReadme);
+            Assert.Contains("Press Ctrl+C once", authenticatedReadme);
         }
         finally
         {

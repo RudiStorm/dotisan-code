@@ -187,6 +187,8 @@ internal static class TemplateFiles
 
     After the wizard, Dotisan checks the .NET SDK, `dotnet-ef`, and the selected frontend package manager. Missing tools are printed with install and verification commands. A missing npm or pnpm skips only frontend installation; the project remains available for native setup commands.
 
+    Press Ctrl+C once while `dotisan dev` is running to stop the API and frontend together. Dotisan allows graceful shutdown before falling back to process-tree cleanup.
+
     ## Audit foundation
 
     `Auditing/AuditEntry.cs`, `Auditing/IAuditWriter.cs`, and `Auditing/AuditWriter.cs` are ordinary application source. Audit is enabled by default through `Audit:Enabled`; use the standard `Audit__Enabled=false` override to disable writes. Author the schema with `dotnet ef migrations add InitialAudit --project src\{{name}}.Api` and apply it with `dotnet ef database update --project src\{{name}}.Api`. Generated resource operations record actor, tenant placeholder, action, changed fields, trace ID, and correlation ID. Audit is persistence logging, not event sourcing.
@@ -241,6 +243,8 @@ internal static class TemplateFiles
     `dotisan new` installs frontend dependencies before reporting success. If the project was generated with `--no-restore`, run `npm install` or `pnpm install` before `npm run dev`.
 
     After the wizard, Dotisan checks the .NET SDK, `dotnet-ef`, and the selected frontend package manager. Missing tools are printed with install and verification commands. A missing npm or pnpm skips only frontend installation; the project remains available for native setup commands.
+
+    Press Ctrl+C once while `dotisan dev` is running to stop the API and frontend together. Dotisan allows graceful shutdown before falling back to process-tree cleanup.
 
     ## Authorization
 

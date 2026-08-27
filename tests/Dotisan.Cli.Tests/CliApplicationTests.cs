@@ -224,6 +224,26 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task Dev_cancellation_stops_both_development_services_and_exits_cleanly()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices { BlockProcesses = true };
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        using var cancellation = new CancellationTokenSource();
+
+        var runTask = app.RunAsync(["dev"], cancellation.Token);
+        await services.BothProcessesStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        cancellation.Cancel();
+
+        var exitCode = await runTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Equal(2, services.BlockingProcesses.Count);
+        Assert.All(services.BlockingProcesses, process => Assert.True(process.StopRequested));
+        Assert.Contains("Stopping development services", console.Output);
+    }
+
+    [Fact]
     public void Npm_package_manager_uses_a_startable_command_on_windows()
     {
         var root = Path.Combine(Path.GetTempPath(), "dotisan-npm-command-" + Guid.NewGuid().ToString("N"));
@@ -287,6 +307,9 @@ public sealed class CliApplicationTests
         public List<(string FileName, IReadOnlyList<string> Arguments, string WorkingDirectory)> RunRequests { get; } = [];
         public bool FailFrontendInstall { get; init; }
         public string? FailPrerequisite { get; init; }
+        public bool BlockProcesses { get; init; }
+        public List<BlockingProcess> BlockingProcesses { get; } = [];
+        public TaskCompletionSource BothProcessesStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public string? StartFileName { get; private set; }
         public IReadOnlyList<string> StartArguments { get; private set; } = [];
 
@@ -317,12 +340,43 @@ public sealed class CliApplicationTests
         {
             StartFileName = fileName;
             StartArguments = arguments;
+            if (BlockProcesses)
+            {
+                var process = new BlockingProcess();
+                BlockingProcesses.Add(process);
+                if (BlockingProcesses.Count == 2)
+                    BothProcessesStarted.TrySetResult();
+                return Task.FromResult<IDotisanProcess>(process);
+            }
+
             return Task.FromResult<IDotisanProcess>(new CompletedProcess());
+        }
+
+        public sealed class BlockingProcess : IDotisanProcess
+        {
+            private readonly TaskCompletionSource<int> completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public Task<int> Completion => completion.Task;
+            public bool StopRequested { get; private set; }
+
+            public Task StopAsync()
+            {
+                StopRequested = true;
+                completion.TrySetResult(0);
+                return Task.CompletedTask;
+            }
+
+            public ValueTask DisposeAsync()
+            {
+                completion.TrySetResult(0);
+                return ValueTask.CompletedTask;
+            }
         }
 
         private sealed class CompletedProcess : IDotisanProcess
         {
             public Task<int> Completion => Task.FromResult(0);
+            public Task StopAsync() => Task.CompletedTask;
             public ValueTask DisposeAsync() => ValueTask.CompletedTask;
         }
     }

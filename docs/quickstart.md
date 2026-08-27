@@ -80,6 +80,8 @@ dotisan dev --lean
 dotisan build
 ~~~
 
+Press Ctrl+C once to stop `dotisan dev`. The CLI coordinates shutdown for both services, then falls back to process-tree cleanup if a child does not exit gracefully.
+
 ## Create a resource
 
 ~~~powershell

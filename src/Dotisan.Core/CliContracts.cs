@@ -51,6 +51,7 @@ public interface IDotisanServices
 public interface IDotisanProcess : IAsyncDisposable
 {
     Task<int> Completion { get; }
+    Task StopAsync();
 }
 
 public interface IDotisanCommand
