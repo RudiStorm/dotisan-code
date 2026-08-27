@@ -2,6 +2,17 @@
 
 Dotisan is a batteries-included application framework for standard ASP.NET Core and Vue applications. The v0.4.0 release provides a testable CLI foundation, authentication/authorization primitives, an inspectable audit foundation, and a deterministic golden template.
 
+## v0.5 compile-time contract metadata foundation
+
+The v0.5 contract metadata slice adds generated contract APIs to endpoint assemblies. When the source generator runs, `DotisanGeneratedEndpointExtensions` exposes `ContractManifest`, `ContractManifestJson`, and `ContractManifestSha256`. The manifest contains deterministic request/response model metadata that can be passed directly to `TypeScriptContractGenerator.Generate`, and the renderer returns `models.ts` in memory rather than writing to disk.
+
+~~~csharp
+var files = TypeScriptContractGenerator.Generate(DotisanGeneratedEndpointExtensions.ContractManifest);
+File.WriteAllText(Path.Combine("src", "generated", files[0].Path), files[0].Content);
+~~~
+
+This slice is intentionally narrow. OpenAPI, Zod, fetch clients, TanStack Query, Vue-template wiring, CLI commands, stale checks, validation-rule extraction, and CRUD scaffolding are not part of it.
+
 ## v0.4.0 workflow and audit foundation
 
 The repository contains focused projects for:
