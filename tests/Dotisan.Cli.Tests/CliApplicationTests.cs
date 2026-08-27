@@ -305,7 +305,7 @@ public sealed class CliApplicationTests
 
         Assert.Equal(DotisanExitCode.Success, exitCode);
         Assert.Equal("docker", services.RunRequests[0].FileName);
-        Assert.Equal(["compose", "up", "-d", "--wait", "database"], services.RunRequests[0].Arguments);
+        Assert.Equal(["compose", "up", "-d", "--wait", "--wait-timeout", "120", "database"], services.RunRequests[0].Arguments);
         Assert.Contains(services.RunRequests, request => request.FileName == "docker" && request.Arguments.SequenceEqual(["compose", "stop", "database"]));
     }
 
@@ -414,7 +414,7 @@ public sealed class CliApplicationTests
             FileName = fileName;
             Arguments = arguments;
             RunRequests.Add((fileName, arguments, workingDirectory));
-            if (BlockDatabaseStart && fileName == "docker" && arguments.SequenceEqual(["compose", "up", "-d", "--wait", "database"]))
+            if (BlockDatabaseStart && fileName == "docker" && arguments.SequenceEqual(["compose", "up", "-d", "--wait", "--wait-timeout", "120", "database"]))
             {
                 DatabaseStartRequested.TrySetResult();
                 try

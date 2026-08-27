@@ -103,7 +103,9 @@ public sealed class GoldenTemplateGeneratorTests
                     _ => throw new InvalidOperationException()
                 }, compose);
                 Assert.Contains("healthcheck:", compose);
-                Assert.Contains("docker compose up -d --wait database", readme);
+                if (provider == DatabaseProvider.MySQL)
+                    Assert.Contains("mysqladmin ping -h 127.0.0.1 -uroot -proot --silent", compose);
+                Assert.Contains("docker compose up -d --wait --wait-timeout 120 database", readme);
             }
             else
             {

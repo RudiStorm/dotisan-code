@@ -70,7 +70,7 @@ TodoApp/
 
 ## Database providers
 
-For SQL Server, PostgreSQL, or MySQL, keep Docker Desktop running. `dotisan new` checks Docker and generates a provider-specific `compose.yaml`; `dotisan dev` starts the `database` service, waits for its health check, and stops the container on exit without deleting its named volume. You can start it manually with `docker compose up -d --wait database`. Configure credentials with normal ASP.NET Core configuration or user secrets rather than committing them. Production database hosting remains your deployment responsibility.
+For SQL Server, PostgreSQL, or MySQL, keep Docker Desktop running. `dotisan new` checks Docker and generates a provider-specific `compose.yaml`; `dotisan dev` starts the `database` service, waits for its health check for up to 120 seconds, and stops the container on exit without deleting its named volume. You can start it manually with `docker compose up -d --wait --wait-timeout 120 database`. If the service becomes unhealthy, inspect `docker compose ps`, `docker compose logs database --tail 100`, and `docker inspect (docker compose ps -q database) --format '{{json .State.Health}}'`. Configure credentials with normal ASP.NET Core configuration or user secrets rather than committing them. Production database hosting remains your deployment responsibility.
 
 The generated defaults are:
 

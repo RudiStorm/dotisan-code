@@ -419,9 +419,9 @@ internal static class TemplateFiles
 
     private static string DatabaseSetup(string name, DatabaseProvider database) => database switch
     {
-        DatabaseProvider.SqlServer => $"This project uses EF Core SQL Server. The local default is `Server=localhost,1433;Database={name};User Id=sa;Password=DotisanDev123!;TrustServerCertificate=True`. The generated `compose.yaml` starts SQL Server with `dotisan dev` or `docker compose up -d --wait database`; replace the connection string and credentials through standard ASP.NET Core configuration before running migrations. `dotisan dev` stops the container on exit and preserves its named volume.",
-        DatabaseProvider.PostgreSQL => $"This project uses EF Core PostgreSQL. The local default is `Host=localhost;Database={name.ToLowerInvariant()};Username=postgres;Password=postgres`. The generated `compose.yaml` starts PostgreSQL with `dotisan dev` or `docker compose up -d --wait database`; replace the connection string and credentials through standard ASP.NET Core configuration before running migrations. `dotisan dev` stops the container on exit and preserves its named volume.",
-        DatabaseProvider.MySQL => $"This project uses EF Core MySQL. The local default is `Server=localhost;Database={name.ToLowerInvariant()};User=root;Password=root`. The generated `compose.yaml` starts MySQL with `dotisan dev` or `docker compose up -d --wait database`; replace the connection string and credentials through standard ASP.NET Core configuration before running migrations. `dotisan dev` stops the container on exit and preserves its named volume.",
+        DatabaseProvider.SqlServer => $"This project uses EF Core SQL Server. The local default is `Server=localhost,1433;Database={name};User Id=sa;Password=DotisanDev123!;TrustServerCertificate=True`. The generated `compose.yaml` starts SQL Server with `dotisan dev` or `docker compose up -d --wait --wait-timeout 120 database`; replace the connection string and credentials through standard ASP.NET Core configuration before running migrations. `dotisan dev` stops the container on exit and preserves its named volume.",
+        DatabaseProvider.PostgreSQL => $"This project uses EF Core PostgreSQL. The local default is `Host=localhost;Database={name.ToLowerInvariant()};Username=postgres;Password=postgres`. The generated `compose.yaml` starts PostgreSQL with `dotisan dev` or `docker compose up -d --wait --wait-timeout 120 database`; replace the connection string and credentials through standard ASP.NET Core configuration before running migrations. `dotisan dev` stops the container on exit and preserves its named volume.",
+        DatabaseProvider.MySQL => $"This project uses EF Core MySQL. The local default is `Server=localhost;Database={name.ToLowerInvariant()};User=root;Password=root`. The generated `compose.yaml` starts MySQL with `dotisan dev` or `docker compose up -d --wait --wait-timeout 120 database`; replace the connection string and credentials through standard ASP.NET Core configuration before running migrations. `dotisan dev` stops the container on exit and preserves its named volume.",
         _ => "This project uses EF Core SQLite. SQLite is file-based and needs no separate database service; the default connection string is `Data Source=app.db`.",
     };
 
@@ -520,7 +520,7 @@ internal static class TemplateFiles
                 volumes:
                   - {{volumeName}}:/var/lib/mysql
                 healthcheck:
-                  test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+                  test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot --silent"]
                   interval: 5s
                   timeout: 5s
                   retries: 20

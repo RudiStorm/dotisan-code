@@ -218,7 +218,7 @@ internal sealed class DevCommand : WorkspaceCommand
                 databaseStartAttempted = true;
                 var databaseResult = await services.RunAsync(
                     "docker",
-                    ["compose", "up", "-d", "--wait", "database"],
+                    ["compose", "up", "-d", "--wait", "--wait-timeout", "120", "database"],
                     services.WorkingDirectory,
                     context.Console,
                     cancellationToken);
