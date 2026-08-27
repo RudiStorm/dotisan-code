@@ -97,3 +97,50 @@ Checked the final diff for:
 - no reflection or assembly loading APIs introduced.
 
 No remaining concerns after the focused source-generator tests and generator build completed successfully.
+
+## Round 1 Fix Report
+
+Reviewed findings addressed:
+
+- Property metadata no longer merges arbitrary constructor-parameter attributes. Serialization metadata now comes from the property symbol itself plus valid record primary-constructor `property:` attributes only.
+- Public readable inherited transport properties are now included when building object models, while duplicate hidden/overridden names are skipped by preferring the most-derived declaration.
+- The `JsonIgnore(Condition = ...)` syntax fallback now recognizes qualified and aliased `WhenWritingDefault` spellings by matching the rightmost enum member identifier instead of exact text.
+- Added explicit coverage that an unsupported property shape maps to `ContractTypeKind.Unknown`.
+
+### Additional Tests Added
+
+- `Ignores_non_record_constructor_parameter_serialization_attributes`
+- `Includes_inherited_public_properties_without_duplicate_hidden_names`
+- Updated `Generates_sorted_explicit_mapping_and_manifest` to cover:
+  - fully qualified `JsonIgnoreCondition.WhenWritingDefault`
+  - unsupported `TimeSpan` transport property -> `ContractTypeKind.Unknown`
+
+### Verification Re-run
+
+Covering source-generator tests:
+
+```powershell
+dotnet test tests\Dotisan.SourceGenerators.Tests\Dotisan.SourceGenerators.Tests.csproj --configuration Release --no-restore --filter FullyQualifiedName~SourceGeneratorTests
+```
+
+Output:
+
+```text
+Passed!  - Failed: 0, Passed: 4, Skipped: 0, Total: 4, Duration: 1 s - Dotisan.SourceGenerators.Tests.dll
+```
+
+Generator build:
+
+```powershell
+dotnet build src\Dotisan.SourceGenerators\Dotisan.SourceGenerators.csproj --configuration Release --no-restore --verbosity minimal
+```
+
+Output:
+
+```text
+Build succeeded.
+0 Warning(s)
+0 Error(s)
+```
+
+Round 1 status: all blocking findings resolved, with no remaining concerns.

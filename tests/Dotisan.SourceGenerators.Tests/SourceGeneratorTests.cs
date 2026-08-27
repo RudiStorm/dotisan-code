@@ -27,7 +27,8 @@ public sealed class SourceGeneratorTests
                 public sealed record Request(
                     [property: JsonPropertyName("display_name")] string DisplayName,
                     int? Count,
-                    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Enabled,
+                    [property: JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] bool Enabled,
+                    TimeSpan Delay,
                     IReadOnlyList<Nested> Items,
                     Dictionary<string, Status> Lookup);
 
@@ -71,6 +72,7 @@ public sealed class SourceGeneratorTests
         Assert.Contains("global::Dotisan.Core.ContractTypeKind.Dictionary", generated);
         Assert.Contains("global::Dotisan.Core.ContractTypeKind.Object", generated);
         Assert.Contains("global::Dotisan.Core.ContractTypeKind.Enum", generated);
+        Assert.Contains("global::Dotisan.Core.ContractTypeKind.Unknown", generated);
         Assert.Contains("\"display_name\"", generated);
         Assert.Contains("nullable: true", generated);
         Assert.Contains("optional: true", generated);
@@ -82,6 +84,93 @@ public sealed class SourceGeneratorTests
         Assert.DoesNotContain("Assembly.Load", generated);
         Assert.DoesNotContain("GetTypes(", generated);
         Assert.DoesNotContain("Activator", generated);
+    }
+
+    [Fact]
+    public void Ignores_non_record_constructor_parameter_serialization_attributes()
+    {
+        var result = RunGenerator(CreateSource(
+            """
+            public sealed class ParameterLeakEndpoint : IDotisanEndpoint
+            {
+                public sealed class Request
+                {
+                    public Request(
+                        [JsonPropertyName("ctor_name")] string DisplayName,
+                        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Enabled)
+                    {
+                        this.DisplayName = DisplayName;
+                        this.Enabled = Enabled;
+                    }
+
+                    public string DisplayName { get; }
+
+                    public bool Enabled { get; }
+                }
+
+                public sealed record Response(string Value);
+                public static EndpointOptions Configure() => new("parameter.leak", "Leak", "ParameterLeak", "POST", "/api/leak");
+                public static void Map(IEndpointRouteBuilder endpoints) { }
+            }
+            """,
+            """
+            public sealed class PlaceholderEndpoint : IDotisanEndpoint
+            {
+                public sealed record Request(string Value);
+                public sealed record Response(string Value);
+                public static EndpointOptions Configure() => new("placeholder.read", "Placeholder", "ReadPlaceholder", "GET", "/api/placeholder");
+                public static void Map(IEndpointRouteBuilder endpoints) { }
+            }
+            """));
+
+        var generated = GetGeneratedSource(result);
+
+        Assert.True(result.Diagnostics.IsEmpty);
+        Assert.Contains("\"displayName\"", generated);
+        Assert.DoesNotContain("\"ctor_name\"", generated);
+        Assert.DoesNotContain("optional: true", generated);
+    }
+
+    [Fact]
+    public void Includes_inherited_public_properties_without_duplicate_hidden_names()
+    {
+        var result = RunGenerator(CreateSource(
+            """
+            public sealed class InheritedEndpoint : IDotisanEndpoint
+            {
+                public sealed class Request : RequestBase
+                {
+                    public string Own { get; init; } = string.Empty;
+                    public new int Hidden { get; init; }
+                }
+
+                public abstract class RequestBase
+                {
+                    public string BaseValue { get; init; } = string.Empty;
+                    public string Hidden { get; init; } = string.Empty;
+                }
+
+                public sealed record Response(string Value);
+                public static EndpointOptions Configure() => new("inherited.read", "Inherited", "ReadInherited", "GET", "/api/inherited");
+                public static void Map(IEndpointRouteBuilder endpoints) { }
+            }
+            """,
+            """
+            public sealed class PlaceholderEndpoint : IDotisanEndpoint
+            {
+                public sealed record Request(string Value);
+                public sealed record Response(string Value);
+                public static EndpointOptions Configure() => new("placeholder.read", "Placeholder", "ReadPlaceholder", "GET", "/api/placeholder");
+                public static void Map(IEndpointRouteBuilder endpoints) { }
+            }
+            """));
+
+        var generated = GetGeneratedSource(result);
+
+        Assert.True(result.Diagnostics.IsEmpty);
+        Assert.Contains("\"baseValue\"", generated);
+        Assert.Contains("\"own\"", generated);
+        Assert.Equal(1, CountOccurrences(generated, "\"hidden\""));
     }
 
     [Fact]
@@ -151,5 +240,18 @@ public sealed class SourceGeneratorTests
         var index = generated.IndexOf(marker, StringComparison.Ordinal);
         Assert.True(index >= 0, "Expected generated source to contain the ContractManifest member.");
         return generated[index..];
+    }
+
+    private static int CountOccurrences(string text, string value)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = text.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+
+        return count;
     }
 }

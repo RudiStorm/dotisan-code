@@ -461,10 +461,7 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
             return new ContractModel(model.Name, model.SourceType, model.Symbol, [], enumValues);
         }
 
-        var properties = model.Symbol
-            .GetMembers()
-            .OfType<IPropertySymbol>()
-            .Where(static property => !property.IsStatic && !property.IsIndexer && property.DeclaredAccessibility == Accessibility.Public)
+        var properties = GetReadableTransportProperties(model.Symbol)
             .Select(property => new ContractProperty(
                 GetTransportPropertyName(property),
                 DescribeType(property.Type, GetSourceTypeName(property.Type), addModel),
@@ -552,20 +549,34 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
         {
             yield return attribute;
         }
+    }
 
-        foreach (var constructor in property.ContainingType.InstanceConstructors)
+    private static IPropertySymbol[] GetReadableTransportProperties(INamedTypeSymbol type)
+    {
+        var properties = new Dictionary<string, IPropertySymbol>(StringComparer.Ordinal);
+
+        for (var current = type; current is not null; current = current.BaseType)
         {
-            foreach (var parameter in constructor.Parameters)
+            foreach (var property in current.GetMembers()
+                         .OfType<IPropertySymbol>()
+                         .OrderBy(static property => property.Name, StringComparer.Ordinal))
             {
-                if (string.Equals(parameter.Name, property.Name, StringComparison.Ordinal))
+                if (property.IsStatic
+                    || property.IsIndexer
+                    || property.DeclaredAccessibility != Accessibility.Public
+                    || property.GetMethod?.DeclaredAccessibility != Accessibility.Public
+                    || properties.ContainsKey(property.Name))
                 {
-                    foreach (var attribute in parameter.GetAttributes())
-                    {
-                        yield return attribute;
-                    }
+                    continue;
                 }
+
+                properties.Add(property.Name, property);
             }
         }
+
+        return properties.Values
+            .OrderBy(static property => property.Name, StringComparer.Ordinal)
+            .ToArray();
     }
 
     private static bool TryGetDictionaryValueType(ITypeSymbol type, out ITypeSymbol valueType)
@@ -763,7 +774,7 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
             foreach (var argument in attribute.ArgumentList?.Arguments ?? default)
             {
                 if (string.Equals(argument.NameEquals?.Name.Identifier.ValueText, "Condition", StringComparison.Ordinal)
-                    && string.Equals(argument.Expression.ToString(), "JsonIgnoreCondition.WhenWritingDefault", StringComparison.Ordinal))
+                    && IsWhenWritingDefaultExpression(argument.Expression))
                 {
                     return true;
                 }
@@ -785,8 +796,7 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
 
             foreach (var parameter in recordDeclaration.ParameterList.Parameters)
             {
-                if (string.Equals(parameter.Identifier.ValueText, property.Name, StringComparison.Ordinal)
-                    || string.Equals(parameter.Identifier.ValueText, property.Name, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(parameter.Identifier.ValueText, property.Name, StringComparison.Ordinal))
                 {
                     parameterSyntax = parameter;
                     return true;
@@ -802,8 +812,8 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
     {
         foreach (var attributeList in parameterSyntax.AttributeLists)
         {
-            if (attributeList.Target is not null
-                && !string.Equals(attributeList.Target.Identifier.ValueText, "property", StringComparison.Ordinal))
+            if (attributeList.Target is null
+                || !string.Equals(attributeList.Target.Identifier.ValueText, "property", StringComparison.Ordinal))
             {
                 continue;
             }
@@ -822,6 +832,37 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
             || string.Equals(attributeName, simpleName + "Attribute", StringComparison.Ordinal)
             || attributeName.EndsWith("." + simpleName, StringComparison.Ordinal)
             || attributeName.EndsWith("." + simpleName + "Attribute", StringComparison.Ordinal);
+    }
+
+    private static bool IsWhenWritingDefaultExpression(ExpressionSyntax expression)
+    {
+        return TryGetRightmostIdentifier(expression, out var identifier)
+            && string.Equals(identifier, "WhenWritingDefault", StringComparison.Ordinal);
+    }
+
+    private static bool TryGetRightmostIdentifier(ExpressionSyntax expression, out string identifier)
+    {
+        switch (expression)
+        {
+            case IdentifierNameSyntax identifierName:
+                identifier = identifierName.Identifier.ValueText;
+                return true;
+            case GenericNameSyntax genericName:
+                identifier = genericName.Identifier.ValueText;
+                return true;
+            case MemberAccessExpressionSyntax memberAccess:
+                identifier = memberAccess.Name.Identifier.ValueText;
+                return true;
+            case QualifiedNameSyntax qualifiedName:
+                identifier = qualifiedName.Right.Identifier.ValueText;
+                return true;
+            case AliasQualifiedNameSyntax aliasQualifiedName:
+                identifier = aliasQualifiedName.Name.Identifier.ValueText;
+                return true;
+            default:
+                identifier = string.Empty;
+                return false;
+        }
     }
 
     private static string ToCSharpStringLiteral(string value)
