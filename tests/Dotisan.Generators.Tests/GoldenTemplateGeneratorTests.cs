@@ -85,6 +85,8 @@ public sealed class GoldenTemplateGeneratorTests
                 .ToArray();
             var dbContext = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Data", "AppDbContext.cs"));
             var user = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Identity", "ApplicationUser.cs"));
+            var authenticatedProgram = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Program.cs"));
+            var plainProgram = await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Api", "Program.cs"));
 
             Assert.Contains("Microsoft.AspNetCore.Identity.EntityFrameworkCore", apiProject);
             Assert.Contains("Microsoft.AspNetCore.Mvc.Testing", testProject);
@@ -103,6 +105,16 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("PasswordSignInAsync", accountEndpoints);
             Assert.Contains("UserManager<ApplicationUser>", accountEndpoints);
             Assert.DoesNotContain("AccountEndpoints.cs", plainPaths);
+            Assert.Contains("AddIdentityCore<ApplicationUser>", authenticatedProgram);
+            Assert.Contains("AddEntityFrameworkStores<AppDbContext>", authenticatedProgram);
+            Assert.Contains("AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)", authenticatedProgram);
+            Assert.Contains("AddAuthorization", authenticatedProgram);
+            Assert.Contains("UseAuthentication", authenticatedProgram);
+            Assert.Contains("UseAuthorization", authenticatedProgram);
+            Assert.Contains("UseAntiforgery", authenticatedProgram);
+            Assert.Contains("MapAccountEndpoints", authenticatedProgram);
+            Assert.DoesNotContain("AddIdentityCore<ApplicationUser>", plainProgram);
+            Assert.DoesNotContain("MapAccountEndpoints", plainProgram);
         }
         finally
         {

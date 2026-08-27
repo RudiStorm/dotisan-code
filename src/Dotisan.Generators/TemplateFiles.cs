@@ -65,7 +65,7 @@ internal static class TemplateFiles
             """),
             new("Dockerfile", Dockerfile(options.Name)),
             new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.AuthenticationEnabled)),
-            new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier)),
+            new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.AuthenticationEnabled, options.Registration)),
             new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled)),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationUser.cs", ApplicationUser(identifier)) }
@@ -159,7 +159,11 @@ internal static class TemplateFiles
     dotisan.config controls orchestration preferences only. Normal appsettings.json, environment variables, EF Core, and Vite configuration remain the source of truth for their respective concerns. Resource scaffolding creates source files but never creates migrations.
     """;
 
-    private static string ApiProgram(string identifier) => $$"""
+    private static string ApiProgram(string identifier, bool authenticationEnabled, RegistrationPolicy registrationPolicy) => authenticationEnabled
+        ? AuthenticatedApiProgram(identifier, registrationPolicy)
+        : PlainApiProgram(identifier);
+
+    private static string PlainApiProgram(string identifier) => $$"""
     using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Data;
     using {{identifier}}.Api.Infrastructure;
@@ -174,6 +178,62 @@ internal static class TemplateFiles
     app.UseDefaultFiles();
     app.UseStaticFiles();
     app.MapDotisanEndpoints();
+    app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }))
+        .WithName("Health")
+        .WithTags("System");
+    app.MapFallbackToFile("index.html");
+    app.Run();
+
+    public partial class Program { }
+    """;
+
+    private static string AuthenticatedApiProgram(string identifier, RegistrationPolicy registrationPolicy) => $$"""
+    using System.Security.Claims;
+    using {{identifier}}.Api.Data;
+    using {{identifier}}.Api.Features.Account;
+    using {{identifier}}.Api.Identity;
+    using {{identifier}}.Api.Infrastructure;
+    using Dotisan.Core;
+    using Microsoft.AspNetCore.Authentication.Cookies;
+    using Microsoft.AspNetCore.Http;
+    using Microsoft.EntityFrameworkCore;
+
+    var builder = WebApplication.CreateBuilder(args);
+    builder.Services.AddProblemDetails();
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+    builder.Services.AddIdentityCore<ApplicationUser>(options =>
+    {
+        options.User.RequireUniqueEmail = true;
+        options.Password.RequiredLength = 8;
+        options.Lockout.MaxFailedAccessAttempts = 5;
+    })
+    .AddSignInManager()
+    .AddEntityFrameworkStores<AppDbContext>();
+    builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+        .AddCookie(options =>
+        {
+            options.Cookie.HttpOnly = true;
+            options.Cookie.SameSite = SameSiteMode.Lax;
+            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            options.Events.OnRedirectToLogin = context =>
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                return Task.CompletedTask;
+            };
+        });
+    builder.Services.AddAuthorization();
+    builder.Services.AddAntiforgery(options => options.HeaderName = "X-XSRF-TOKEN");
+
+    var app = builder.Build();
+    app.UseExceptionHandler();
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+    app.UseAuthentication();
+    app.UseAuthorization();
+    app.UseAntiforgery();
+    app.MapDotisanEndpoints();
+    app.MapAccountEndpoints(RegistrationPolicy.{{registrationPolicy}});
     app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }))
         .WithName("Health")
         .WithTags("System");
