@@ -260,6 +260,7 @@ internal static class TemplateFiles
 
     private static string AuthenticatedApiProgram(string identifier, bool registrationEnabled) => $$"""
     using System.Security.Claims;
+    using {{identifier}}.Api.Authorization;
     using {{identifier}}.Api.Data;
     using {{identifier}}.Api.Features.Account;
     using {{identifier}}.Api.Identity;
@@ -279,6 +280,7 @@ internal static class TemplateFiles
         options.Password.RequiredLength = 8;
         options.Lockout.MaxFailedAccessAttempts = 5;
     })
+    .AddRoles<IdentityRole>()
     .AddSignInManager()
     .AddEntityFrameworkStores<AppDbContext>();
     builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
@@ -293,7 +295,14 @@ internal static class TemplateFiles
                 return Task.CompletedTask;
             };
         });
-    builder.Services.AddAuthorization();
+    builder.Services.AddAuthorization(options =>
+    {
+        foreach (var permission in Permissions.All)
+        {
+            options.AddPolicy(permission, policy =>
+                policy.RequireClaim(Permissions.ClaimType, permission));
+        }
+    });
     builder.Services.AddAntiforgery(options => options.HeaderName = "X-XSRF-TOKEN");
 
     var app = builder.Build();

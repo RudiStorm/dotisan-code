@@ -115,9 +115,12 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("AuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme", accountEndpoints);
             Assert.DoesNotContain("AccountEndpoints.cs", plainPaths);
             Assert.Contains("AddIdentityCore<ApplicationUser>", authenticatedProgram);
+            Assert.Contains("AddRoles<IdentityRole>()", authenticatedProgram);
             Assert.Contains("AddEntityFrameworkStores<AppDbContext>", authenticatedProgram);
             Assert.Contains("AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)", authenticatedProgram);
-            Assert.Contains("AddAuthorization", authenticatedProgram);
+            Assert.Contains("AddAuthorization(options =>", authenticatedProgram);
+            Assert.Contains("Permissions.All", authenticatedProgram);
+            Assert.Contains("RequireClaim(Permissions.ClaimType, permission)", authenticatedProgram);
             Assert.Contains("UseAuthentication", authenticatedProgram);
             Assert.Contains("UseAuthorization", authenticatedProgram);
             Assert.Contains("UseAntiforgery", authenticatedProgram);
