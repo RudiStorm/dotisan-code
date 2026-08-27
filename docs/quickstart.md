@@ -33,6 +33,17 @@ dotnet run --project src\Dotisan.Cli -- new TodoApp --yes --output .\TodoApp
 
 Project creation restores the .NET solution and installs frontend dependencies with the selected package manager before reporting success. Use `--no-restore` for intentional offline generation; then run `dotnet restore` and `npm install` or `pnpm install` yourself.
 
+Before restore and frontend installation, Dotisan checks that the .NET SDK, `dotnet-ef`, and the selected package manager are available. If a tool is missing, the command prints an install command and a verification command. The project is still created; a missing npm or pnpm only skips frontend installation until that tool is installed.
+
+Common prerequisite commands:
+
+~~~powershell
+dotnet tool install --global dotnet-ef
+npm install --global pnpm # only when pnpm was selected and is missing
+~~~
+
+Install Node.js LTS from https://nodejs.org/ when npm is missing. Verify with `dotnet ef --version`, `npm --version`, or `pnpm --version` as appropriate.
+
 The generated project contains:
 
 ~~~text

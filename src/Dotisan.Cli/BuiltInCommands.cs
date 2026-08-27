@@ -344,29 +344,59 @@ internal sealed class NewCommand : IDotisanCommand
         }
 
         context.Console.WriteLine($"Created {options.Name} in {result.OutputDirectory}.");
-        if (restore && context.Services is not null)
+        if (context.Services is not null)
         {
-            var solutionPath = Path.Combine(result.OutputDirectory, $"{options.Name}.sln");
-            var restoreResult = await context.Services.RunAsync("dotnet", ["restore", solutionPath], result.OutputDirectory, context.Console, cancellationToken);
-            if (!restoreResult.Success)
+            var prerequisiteResult = await DefaultPrerequisiteChecker.CheckAsync(options.PackageManager, context.Services, cancellationToken);
+            if (prerequisiteResult.Missing.Count == 0)
             {
-                context.Console.WriteError(restoreResult.ErrorMessage ?? "The generated project was created, but dotnet restore failed.");
-                context.Console.WriteError("You can retry with 'dotnet restore' from the generated project directory.");
-                return DotisanExitCode.GenerationError;
+                var packageManagerName = options.PackageManager == PackageManager.Npm ? "npm" : "pnpm";
+                context.Console.WriteLine($"Prerequisite check passed: .NET SDK, dotnet-ef, and {packageManagerName} are installed.");
+            }
+            else
+            {
+                context.Console.WriteError($"Prerequisite check found {prerequisiteResult.Missing.Count} missing tool(s):");
+                foreach (var missing in prerequisiteResult.Missing)
+                {
+                    context.Console.WriteError($"Missing prerequisite: {missing.Name}");
+                    context.Console.WriteError($"  Install with: {missing.InstallCommand}");
+                    context.Console.WriteError($"  Verify with: {missing.VerifyCommand}");
+                }
             }
 
-            var packageManagerName = options.PackageManager == PackageManager.Npm ? "npm" : "pnpm";
-            var packageManagerCommand = OperatingSystem.IsWindows() ? $"{packageManagerName}.cmd" : packageManagerName;
-            var frontendDirectory = Path.Combine(result.OutputDirectory, "src", $"{options.Name}.Web");
-            context.Console.WriteLine($"Installing frontend dependencies with {packageManagerName}...");
-            var installResult = await context.Services.RunAsync(packageManagerCommand, ["install"], frontendDirectory, context.Console, cancellationToken);
-            if (!installResult.Success)
+            if (restore)
             {
-                context.Console.WriteError("The project was created, but frontend dependency installation failed.");
-                if (!string.IsNullOrWhiteSpace(installResult.ErrorMessage))
-                    context.Console.WriteError(installResult.ErrorMessage);
-                context.Console.WriteError($"You can retry with '{packageManagerName} install' from the generated frontend directory.");
-                return DotisanExitCode.GenerationError;
+                var solutionPath = Path.Combine(result.OutputDirectory, $"{options.Name}.sln");
+                if (!prerequisiteResult.IsMissing(".NET SDK"))
+                {
+                    var restoreResult = await context.Services.RunAsync("dotnet", ["restore", solutionPath], result.OutputDirectory, context.Console, cancellationToken);
+                    if (!restoreResult.Success)
+                    {
+                        context.Console.WriteError(restoreResult.ErrorMessage ?? "The generated project was created, but dotnet restore failed.");
+                        context.Console.WriteError("You can retry with 'dotnet restore' from the generated project directory.");
+                        return DotisanExitCode.GenerationError;
+                    }
+                }
+
+                var packageManagerName = options.PackageManager == PackageManager.Npm ? "npm" : "pnpm";
+                var frontendDirectory = Path.Combine(result.OutputDirectory, "src", $"{options.Name}.Web");
+                if (prerequisiteResult.IsMissing(packageManagerName))
+                {
+                    context.Console.WriteError($"The project was created, but frontend dependency installation was skipped because {packageManagerName} is missing.");
+                }
+                else
+                {
+                    var packageManagerCommand = DefaultPrerequisiteChecker.PackageManagerCommand(options.PackageManager);
+                    context.Console.WriteLine($"Installing frontend dependencies with {packageManagerName}...");
+                    var installResult = await context.Services.RunAsync(packageManagerCommand, ["install"], frontendDirectory, context.Console, cancellationToken);
+                    if (!installResult.Success)
+                    {
+                        context.Console.WriteError("The project was created, but frontend dependency installation failed.");
+                        if (!string.IsNullOrWhiteSpace(installResult.ErrorMessage))
+                            context.Console.WriteError(installResult.ErrorMessage);
+                        context.Console.WriteError($"You can retry with '{packageManagerName} install' from the generated frontend directory.");
+                        return DotisanExitCode.GenerationError;
+                    }
+                }
             }
         }
         context.Console.WriteLine($"Next: cd {Path.GetRelativePath(Directory.GetCurrentDirectory(), result.OutputDirectory)}");

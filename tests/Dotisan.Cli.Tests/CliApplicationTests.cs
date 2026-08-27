@@ -112,12 +112,69 @@ public sealed class CliApplicationTests
         var exitCode = await app.RunAsync(["new", "TodoApp", "--yes", "--package-manager", "npm", "--output", outputDirectory]);
 
         Assert.Equal(DotisanExitCode.Success, exitCode);
-        Assert.Equal(2, services.RunRequests.Count);
+        Assert.Equal(5, services.RunRequests.Count);
         Assert.Equal("dotnet", services.RunRequests[0].FileName);
-        Assert.Equal(["restore", Path.Combine(outputDirectory, "TodoApp.sln")], services.RunRequests[0].Arguments);
-        Assert.Equal(OperatingSystem.IsWindows() ? "npm.cmd" : "npm", services.RunRequests[1].FileName);
-        Assert.Equal(["install"], services.RunRequests[1].Arguments);
-        Assert.Equal(Path.Combine(outputDirectory, "src", "TodoApp.Web"), services.RunRequests[1].WorkingDirectory);
+        Assert.Equal(["--version"], services.RunRequests[0].Arguments);
+        Assert.Equal("dotnet", services.RunRequests[1].FileName);
+        Assert.Equal(["ef", "--version"], services.RunRequests[1].Arguments);
+        Assert.Equal(OperatingSystem.IsWindows() ? "npm.cmd" : "npm", services.RunRequests[2].FileName);
+        Assert.Equal(["--version"], services.RunRequests[2].Arguments);
+        Assert.Equal("dotnet", services.RunRequests[3].FileName);
+        Assert.Equal(["restore", Path.Combine(outputDirectory, "TodoApp.sln")], services.RunRequests[3].Arguments);
+        Assert.Equal(OperatingSystem.IsWindows() ? "npm.cmd" : "npm", services.RunRequests[4].FileName);
+        Assert.Equal(["install"], services.RunRequests[4].Arguments);
+        Assert.Equal(Path.Combine(outputDirectory, "src", "TodoApp.Web"), services.RunRequests[4].WorkingDirectory);
+    }
+
+    [Fact]
+    public async Task New_reports_missing_dotnet_ef_with_install_guidance_and_continues_setup()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices { FailPrerequisite = "dotnet-ef" };
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "dotisan-new-missing-ef-" + Guid.NewGuid().ToString("N"));
+
+        var exitCode = await app.RunAsync(["new", "TodoApp", "--yes", "--package-manager", "npm", "--output", outputDirectory]);
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Contains("Missing prerequisite: dotnet-ef", console.ErrorOutput);
+        Assert.Contains("dotnet tool install --global dotnet-ef", console.ErrorOutput);
+        Assert.Contains("dotnet ef --version", console.ErrorOutput);
+        Assert.Contains(services.RunRequests, request => request.Arguments.SequenceEqual(["install"]));
+    }
+
+    [Fact]
+    public async Task New_checks_the_selected_pnpm_package_manager()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices();
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "dotisan-new-pnpm-check-" + Guid.NewGuid().ToString("N"));
+
+        var exitCode = await app.RunAsync(["new", "TodoApp", "--yes", "--package-manager", "pnpm", "--output", outputDirectory]);
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Equal(OperatingSystem.IsWindows() ? "pnpm.cmd" : "pnpm", services.RunRequests[2].FileName);
+        Assert.Equal(["--version"], services.RunRequests[2].Arguments);
+        Assert.Equal(OperatingSystem.IsWindows() ? "pnpm.cmd" : "pnpm", services.RunRequests[4].FileName);
+        Assert.Equal(["install"], services.RunRequests[4].Arguments);
+    }
+
+    [Fact]
+    public async Task New_reports_missing_package_manager_and_skips_frontend_install()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices { FailPrerequisite = "npm" };
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "dotisan-new-missing-npm-" + Guid.NewGuid().ToString("N"));
+
+        var exitCode = await app.RunAsync(["new", "TodoApp", "--yes", "--package-manager", "npm", "--output", outputDirectory]);
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Contains("Missing prerequisite: npm", console.ErrorOutput);
+        Assert.Contains("https://nodejs.org/", console.ErrorOutput);
+        Assert.DoesNotContain(services.RunRequests, request => request.Arguments.SequenceEqual(["install"]));
+        Assert.Contains("frontend dependency installation was skipped", console.ErrorOutput);
     }
 
     [Fact]
@@ -146,7 +203,9 @@ public sealed class CliApplicationTests
         var exitCode = await app.RunAsync(["new", "TodoApp", "--yes", "--no-restore", "--output", outputDirectory]);
 
         Assert.Equal(DotisanExitCode.Success, exitCode);
-        Assert.Empty(services.RunRequests);
+        Assert.Equal(3, services.RunRequests.Count);
+        Assert.DoesNotContain(services.RunRequests, request => request.Arguments.Contains("restore", StringComparer.Ordinal));
+        Assert.DoesNotContain(services.RunRequests, request => request.Arguments.SequenceEqual(["install"]));
     }
 
     [Fact]
@@ -227,6 +286,7 @@ public sealed class CliApplicationTests
         public IReadOnlyList<string> Arguments { get; private set; } = [];
         public List<(string FileName, IReadOnlyList<string> Arguments, string WorkingDirectory)> RunRequests { get; } = [];
         public bool FailFrontendInstall { get; init; }
+        public string? FailPrerequisite { get; init; }
         public string? StartFileName { get; private set; }
         public IReadOnlyList<string> StartArguments { get; private set; } = [];
 
@@ -244,6 +304,10 @@ public sealed class CliApplicationTests
             FileName = fileName;
             Arguments = arguments;
             RunRequests.Add((fileName, arguments, workingDirectory));
+            if (FailPrerequisite == "dotnet-ef" && fileName == "dotnet" && arguments.SequenceEqual(["ef", "--version"]))
+                return Task.FromResult(DotisanOperationResult.Failed("dotnet-ef is not installed."));
+            if (FailPrerequisite == "npm" && arguments.SequenceEqual(["--version"]))
+                return Task.FromResult(DotisanOperationResult.Failed("npm is not installed."));
             if (FailFrontendInstall && arguments.SequenceEqual(["install"], StringComparer.Ordinal))
                 return Task.FromResult(DotisanOperationResult.Failed("npm exited with code 1."));
             return Task.FromResult(DotisanOperationResult.Succeeded());
