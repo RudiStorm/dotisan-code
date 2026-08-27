@@ -104,6 +104,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("CurrentUserResponse", accountEndpoints);
             Assert.Contains("PasswordSignInAsync", accountEndpoints);
             Assert.Contains("UserManager<ApplicationUser>", accountEndpoints);
+            Assert.Contains("AuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme", accountEndpoints);
             Assert.DoesNotContain("AccountEndpoints.cs", plainPaths);
             Assert.Contains("AddIdentityCore<ApplicationUser>", authenticatedProgram);
             Assert.Contains("AddEntityFrameworkStores<AppDbContext>", authenticatedProgram);
@@ -113,6 +114,11 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("UseAuthorization", authenticatedProgram);
             Assert.Contains("UseAntiforgery", authenticatedProgram);
             Assert.Contains("MapAccountEndpoints", authenticatedProgram);
+            Assert.Contains("using Microsoft.AspNetCore.Identity;", authenticatedProgram);
+            Assert.DoesNotContain("using Dotisan.Core;", authenticatedProgram);
+            Assert.DoesNotContain("using Dotisan.Core;", accountEndpoints);
+            Assert.Contains("RequireAntiforgeryTokenAttribute", accountEndpoints);
+            Assert.DoesNotContain("RequireAntiforgery()", accountEndpoints);
             Assert.DoesNotContain("AddIdentityCore<ApplicationUser>", plainProgram);
             Assert.DoesNotContain("MapAccountEndpoints", plainProgram);
             Assert.Contains("tests/AuthApp.Api.Tests/AuthenticationEndpointTests.cs", authenticatedPaths);

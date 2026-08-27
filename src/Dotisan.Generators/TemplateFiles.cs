@@ -65,13 +65,13 @@ internal static class TemplateFiles
             """),
             new("Dockerfile", Dockerfile(options.Name)),
             new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.AuthenticationEnabled)),
-            new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.AuthenticationEnabled, options.Registration)),
+            new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public)),
             new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled)),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationUser.cs", ApplicationUser(identifier)) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
-                ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Account/AccountEndpoints.cs", AccountEndpoints(identifier, options.Registration)) }
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Account/AccountEndpoints.cs", AccountEndpoints(identifier, options.Registration == RegistrationPolicy.Public)) }
                 : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier)),
             new($"src/{options.Name}.Api/appsettings.json", "{\n  \"ConnectionStrings\": {\n    \"DefaultConnection\": \"Data Source=app.db\"\n  },\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\",\n      \"Microsoft.AspNetCore\": \"Warning\"\n    }\n  },\n  \"AllowedHosts\": \"*\"\n}\n"),
@@ -162,8 +162,8 @@ internal static class TemplateFiles
     dotisan.config controls orchestration preferences only. Normal appsettings.json, environment variables, EF Core, and Vite configuration remain the source of truth for their respective concerns. Resource scaffolding creates source files but never creates migrations.
     """;
 
-    private static string ApiProgram(string identifier, bool authenticationEnabled, RegistrationPolicy registrationPolicy) => authenticationEnabled
-        ? AuthenticatedApiProgram(identifier, registrationPolicy)
+    private static string ApiProgram(string identifier, bool authenticationEnabled, bool registrationEnabled) => authenticationEnabled
+        ? AuthenticatedApiProgram(identifier, registrationEnabled)
         : PlainApiProgram(identifier);
 
     private static string PlainApiProgram(string identifier) => $$"""
@@ -190,15 +190,15 @@ internal static class TemplateFiles
     public partial class Program { }
     """;
 
-    private static string AuthenticatedApiProgram(string identifier, RegistrationPolicy registrationPolicy) => $$"""
+    private static string AuthenticatedApiProgram(string identifier, bool registrationEnabled) => $$"""
     using System.Security.Claims;
     using {{identifier}}.Api.Data;
     using {{identifier}}.Api.Features.Account;
     using {{identifier}}.Api.Identity;
     using {{identifier}}.Api.Infrastructure;
-    using Dotisan.Core;
     using Microsoft.AspNetCore.Authentication.Cookies;
     using Microsoft.AspNetCore.Http;
+    using Microsoft.AspNetCore.Identity;
     using Microsoft.EntityFrameworkCore;
 
     var builder = WebApplication.CreateBuilder(args);
@@ -236,7 +236,7 @@ internal static class TemplateFiles
     app.UseAuthorization();
     app.UseAntiforgery();
     app.MapDotisanEndpoints();
-    app.MapAccountEndpoints(RegistrationPolicy.{{registrationPolicy}});
+    app.MapAccountEndpoints({{registrationEnabled.ToString().ToLowerInvariant()}});
     app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }))
         .WithName("Health")
         .WithTags("System");
@@ -278,10 +278,10 @@ internal static class TemplateFiles
     }
     """;
 
-    private static string AccountEndpoints(string identifier, RegistrationPolicy registrationPolicy) => $$"""
+    private static string AccountEndpoints(string identifier, bool registrationEnabled) => $$"""
     using System.Security.Claims;
     using {{identifier}}.Api.Identity;
-    using Dotisan.Core;
+    using Microsoft.AspNetCore.Authentication.Cookies;
     using Microsoft.AspNetCore.Antiforgery;
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Http;
@@ -292,13 +292,13 @@ internal static class TemplateFiles
 
     public static class AccountEndpoints
     {
-        public static IEndpointRouteBuilder MapAccountEndpoints(this IEndpointRouteBuilder endpoints)
+        public static IEndpointRouteBuilder MapAccountEndpoints(this IEndpointRouteBuilder endpoints, bool registrationEnabled)
         {
             var group = endpoints.MapGroup("/api/account");
             group.MapGet("/antiforgery", IssueAntiforgery).AllowAnonymous();
-            group.MapPost("/register", (RegisterRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager) => Register(request, users, signInManager)).AllowAnonymous().RequireAntiforgery();
-            group.MapPost("/login", (LoginRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager) => Login(request, users, signInManager)).AllowAnonymous().RequireAntiforgery();
-            group.MapPost("/logout", (SignInManager<ApplicationUser> signInManager) => Logout(signInManager)).RequireAuthorization().RequireAntiforgery();
+            group.MapPost("/register", (RegisterRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager) => Register(request, users, signInManager, registrationEnabled)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/login", (LoginRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager) => Login(request, users, signInManager)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/logout", (SignInManager<ApplicationUser> signInManager) => Logout(signInManager)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
             group.MapGet("/me", (ClaimsPrincipal user) => Me(user)).RequireAuthorization();
             return endpoints;
         }
@@ -309,9 +309,9 @@ internal static class TemplateFiles
             return Results.Ok(new { token = tokens.RequestToken });
         }
 
-        private static async Task<IResult> Register(RegisterRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager)
+        private static async Task<IResult> Register(RegisterRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, bool registrationEnabled)
         {
-            if (RegistrationPolicy.{{registrationPolicy}} is not RegistrationPolicy.Public)
+            if (!registrationEnabled)
             {
                 return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Registration is unavailable.", extensions: new Dictionary<string, object?> { ["code"] = "registration_unavailable" });
             }
@@ -326,6 +326,7 @@ internal static class TemplateFiles
                 return Results.ValidationProblem(errors);
             }
 
+            signInManager.AuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
             await signInManager.SignInAsync(user, isPersistent: false);
             return Results.Ok(new CurrentUserResponse(user.Id, user.Email!));
         }
@@ -338,6 +339,7 @@ internal static class TemplateFiles
                 return Results.Unauthorized();
             }
 
+            signInManager.AuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
             var result = await signInManager.PasswordSignInAsync(user, request.Password, request.RememberMe, lockoutOnFailure: true);
             return result.Succeeded
                 ? Results.Ok(new CurrentUserResponse(user.Id, user.Email!))
@@ -346,6 +348,7 @@ internal static class TemplateFiles
 
         private static async Task<IResult> Logout(SignInManager<ApplicationUser> signInManager)
         {
+            signInManager.AuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
             await signInManager.SignOutAsync();
             return Results.NoContent();
         }
@@ -425,6 +428,7 @@ internal static class TemplateFiles
     using Microsoft.EntityFrameworkCore;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.DependencyInjection.Extensions;
+    using Microsoft.Extensions.Logging;
 
     namespace {{identifier}}.Api.Tests;
 
@@ -469,6 +473,7 @@ internal static class TemplateFiles
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");
+            builder.ConfigureLogging(logging => logging.ClearProviders().AddConsole());
             builder.ConfigureServices(services =>
             {
                 connection = new SqliteConnection("Data Source=:memory:");
