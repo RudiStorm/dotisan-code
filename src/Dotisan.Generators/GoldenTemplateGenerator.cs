@@ -258,13 +258,16 @@ public sealed class ResourceScaffolder
 
         var permissionPrefix = featureName.ToLowerInvariant();
         var constantPrefix = featureName;
+        var existingNames = permissions[(allStart + allPrefix.Length)..allEnd]
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var newNames = ResourceActions.Select(action => constantPrefix + action).ToArray();
         var permissionsToAdd = ResourceActions
             .Select(action => $"    public const string {constantPrefix}{action} = \"{permissionPrefix}.{action.ToLowerInvariant()}\";")
             .ToArray();
         var updated = permissions.Insert(markerIndex, string.Join(Environment.NewLine, permissionsToAdd) + Environment.NewLine);
         var updatedAllStart = updated.IndexOf(allPrefix, StringComparison.Ordinal);
         var updatedAllEnd = updated.IndexOf("];", updatedAllStart, StringComparison.Ordinal);
-        var names = string.Join(", ", BasePermissions.Concat(permissionsToAdd.Select(line => line[(line.IndexOf("string ", StringComparison.Ordinal) + 7)..line.IndexOf(" =", StringComparison.Ordinal)])));
+        var names = string.Join(", ", BasePermissions.Concat(existingNames).Concat(newNames).Distinct(StringComparer.Ordinal));
         return updated.Remove(updatedAllStart, updatedAllEnd + 2 - updatedAllStart)
             .Insert(updatedAllStart, $"{allPrefix}{names}];");
     }

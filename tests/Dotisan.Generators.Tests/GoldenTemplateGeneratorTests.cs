@@ -87,6 +87,11 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("Permissions.CustomersDelete", endpoints);
             Assert.Contains("MapPut", endpoints);
             Assert.Contains("MapDelete", endpoints);
+
+            var secondResult = await ResourceScaffolder.ScaffoldAsync(output, "Order", CancellationToken.None);
+            Assert.True(secondResult.Success, secondResult.ErrorMessage);
+            permissions = await File.ReadAllTextAsync(Path.Combine(output, "src", "AuthApp.Api", "Authorization", "Permissions.cs"));
+            Assert.Contains("[ProfileView, CustomersView, CustomersCreate, CustomersUpdate, CustomersDelete, OrdersView, OrdersCreate, OrdersUpdate, OrdersDelete]", permissions);
         }
         finally
         {
