@@ -29,12 +29,8 @@ public sealed class DefaultPrompts : IPrompts
             return ProjectOptions.Quick(name, outputDirectory);
         }
 
-        console.WriteLine("Setup mode:");
-        console.WriteLine("> Quick");
-        console.WriteLine("  Advanced");
-        console.WriteLine("Press Enter for Quick.");
-        var mode = readLine();
-        if (!string.IsNullOrWhiteSpace(mode) && mode.StartsWith("a", StringComparison.OrdinalIgnoreCase))
+        var mode = ReadChoice("Setup mode", "Quick", ["Quick", "Advanced"]);
+        if (mode.Equals("Advanced", StringComparison.OrdinalIgnoreCase))
         {
             console.WriteLine("Advanced setup is reserved for a future release; continuing with Quick defaults.");
         }
@@ -67,18 +63,23 @@ public sealed class DefaultPrompts : IPrompts
 
     private string ReadChoice(string label, string defaultValue, IReadOnlyList<string> choices)
     {
-        console.WriteLine($"{label}: {string.Join(" / ", choices)} (default: {defaultValue})");
-        var value = readLine();
+        console.WriteLine($"{label} (default: {defaultValue})");
+        for (var index = 0; index < choices.Count; index++)
+        {
+            console.WriteLine($"  {index + 1}) {choices[index]}");
+        }
+
+        var value = readLine()?.Trim();
+        if (int.TryParse(value, out var choiceNumber) && choiceNumber >= 1 && choiceNumber <= choices.Count)
+            return choices[choiceNumber - 1];
+
         return choices.FirstOrDefault(choice => string.Equals(choice, value, StringComparison.OrdinalIgnoreCase)) ?? defaultValue;
     }
 
     private bool ReadYesNo(string label, bool defaultValue)
     {
-        console.WriteLine($"{label}: {(defaultValue ? "Yes" : "No")} (default)");
-        var value = readLine();
-        return value?.Equals("yes", StringComparison.OrdinalIgnoreCase) == true
-            || value?.Equals("true", StringComparison.OrdinalIgnoreCase) == true
-            || (string.IsNullOrWhiteSpace(value) && defaultValue);
+        var value = ReadChoice(label, defaultValue ? "Yes" : "No", ["No", "Yes"]);
+        return value.Equals("Yes", StringComparison.OrdinalIgnoreCase);
     }
 
     private RegistrationPolicy ReadRegistration()
