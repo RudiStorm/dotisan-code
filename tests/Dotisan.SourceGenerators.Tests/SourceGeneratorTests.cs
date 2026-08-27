@@ -10,11 +10,7 @@ public sealed class SourceGeneratorTests
     [Fact]
     public void Generates_sorted_explicit_mapping_and_manifest()
     {
-        var result = RunGenerator(
-            """
-            using Dotisan.Core;
-            using Microsoft.AspNetCore.Routing;
-
+        const string zEndpoint = """
             public sealed class ZEndpoint : IDotisanEndpoint
             {
                 public sealed record Request(string Value);
@@ -24,21 +20,37 @@ public sealed class SourceGeneratorTests
                 public static EndpointOptions Configure() => new("z.read", "Z", "ReadZ", "GET", "/api/z");
                 public static void Map(IEndpointRouteBuilder endpoints) { }
             }
-
+            """;
+        const string aEndpoint = """
             public sealed class AEndpoint : IDotisanEndpoint
             {
-                public sealed record Request(string Value);
-                public sealed record Response(string Value);
+                public sealed record Request(
+                    [property: JsonPropertyName("display_name")] string DisplayName,
+                    int? Count,
+                    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Enabled,
+                    IReadOnlyList<Nested> Items,
+                    Dictionary<string, Status> Lookup);
+
+                public sealed record Response(Nested Item);
+                public sealed record Nested(Guid Id, DateOnly Date);
+                public enum Status { Unknown = 0, Ready = 2 }
                 public sealed class Handler { }
                 public sealed class Validator { }
                 public static EndpointOptions Configure() => new("a.read", "A", "ReadA", "GET", "/api/a");
                 public static void Map(IEndpointRouteBuilder endpoints) { }
             }
-            """);
+            """;
+
+        var result = RunGenerator(CreateSource(zEndpoint, aEndpoint));
+        var reversedResult = RunGenerator(CreateSource(aEndpoint, zEndpoint));
 
         var generated = GetGeneratedSource(result);
+        var reversedGenerated = GetGeneratedSource(reversedResult);
+        var contractMembers = GetContractMembers(generated);
+        var reversedContractMembers = GetContractMembers(reversedGenerated);
 
         Assert.True(result.Diagnostics.IsEmpty);
+        Assert.True(reversedResult.Diagnostics.IsEmpty);
         Assert.Contains("DotisanEndpointDefinition.For<global::AEndpoint>", generated);
         Assert.Contains("DotisanEndpointDefinition.For<global::ZEndpoint>", generated);
         Assert.True(generated.IndexOf("global::AEndpoint", StringComparison.Ordinal) <
@@ -49,10 +61,27 @@ public sealed class SourceGeneratorTests
         Assert.Contains("ManifestSchemaVersion", generated);
         Assert.Contains("EndpointManifestJson", generated);
         Assert.Contains("EndpointManifestSha256", generated);
+        Assert.Contains("public static global::Dotisan.Core.ContractManifest ContractManifest { get; } =", generated);
+        Assert.Contains("public static string ContractManifestJson => ContractManifest.ToJson();", generated);
+        Assert.Contains("public static string ContractManifestSha256 => ContractManifest.Sha256;", generated);
         Assert.Contains("services.AddScoped<global::AEndpoint.Handler>();", generated);
         Assert.Contains("services.AddScoped<global::AEndpoint.Validator>();", generated);
+        Assert.Contains("global::Dotisan.Core.ContractTypeKind.Integer", generated);
+        Assert.Contains("global::Dotisan.Core.ContractTypeKind.Array", generated);
+        Assert.Contains("global::Dotisan.Core.ContractTypeKind.Dictionary", generated);
+        Assert.Contains("global::Dotisan.Core.ContractTypeKind.Object", generated);
+        Assert.Contains("global::Dotisan.Core.ContractTypeKind.Enum", generated);
+        Assert.Contains("\"display_name\"", generated);
+        Assert.Contains("nullable: true", generated);
+        Assert.Contains("optional: true", generated);
+        Assert.Contains("\"AEndpointNested\"", generated);
+        Assert.Contains("\"AEndpointStatus\"", generated);
+        Assert.Contains("new global::Dotisan.Core.ContractEnumValue(\"Unknown\", 0)", generated);
+        Assert.Contains("new global::Dotisan.Core.ContractEnumValue(\"Ready\", 2)", generated);
+        Assert.Equal(contractMembers, reversedContractMembers);
         Assert.DoesNotContain("Assembly.Load", generated);
         Assert.DoesNotContain("GetTypes(", generated);
+        Assert.DoesNotContain("Activator", generated);
     }
 
     [Fact]
@@ -99,5 +128,28 @@ public sealed class SourceGeneratorTests
             .Single(source => source.HintName == "Dotisan.GeneratedEndpoints.g.cs")
             .SourceText
             .ToString();
+    }
+
+    private static string CreateSource(string firstEndpoint, string secondEndpoint)
+    {
+        return $$"""
+            using System;
+            using System.Collections.Generic;
+            using System.Text.Json.Serialization;
+            using Dotisan.Core;
+            using Microsoft.AspNetCore.Routing;
+
+            {{firstEndpoint}}
+
+            {{secondEndpoint}}
+            """;
+    }
+
+    private static string GetContractMembers(string generated)
+    {
+        const string marker = "    public static global::Dotisan.Core.ContractManifest ContractManifest { get; } =";
+        var index = generated.IndexOf(marker, StringComparison.Ordinal);
+        Assert.True(index >= 0, "Expected generated source to contain the ContractManifest member.");
+        return generated[index..];
     }
 }

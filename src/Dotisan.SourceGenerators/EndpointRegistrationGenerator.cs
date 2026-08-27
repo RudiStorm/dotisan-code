@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -12,6 +13,11 @@ namespace Dotisan.SourceGenerators;
 public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
 {
     private const string MarkerName = "Dotisan.Core.IDotisanEndpoint";
+    private const string JsonSerializationNamespace = "System.Text.Json.Serialization";
+    private const string JsonPropertyNameAttributeTypeName = "JsonPropertyNameAttribute";
+    private const string JsonIgnoreAttributeTypeName = "JsonIgnoreAttribute";
+    private const string JsonIgnoreConditionTypeName = "JsonIgnoreCondition";
+    private static readonly SymbolDisplayFormat FullyQualifiedTypeName = SymbolDisplayFormat.FullyQualifiedFormat;
 
     private static readonly DiagnosticDescriptor MissingMap = new(
         "DOTISAN001",
@@ -59,7 +65,8 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
         }
 
         return new EndpointCandidate(
-            symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat),
+            symbol,
+            symbol.ToDisplayString(FullyQualifiedTypeName),
             symbol.Name,
             context.Node.GetLocation(),
             HasStaticMethod(symbol, "Configure", parameterCount: 0),
@@ -117,6 +124,7 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
 
     private static string BuildSource(IReadOnlyList<EndpointCandidate> candidates)
     {
+        var models = BuildContractModels(candidates);
         var source = new StringBuilder();
         source.AppendLine("using System;");
         source.AppendLine("using System.Collections.Generic;");
@@ -205,13 +213,754 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
         source.AppendLine("    public const int ManifestSchemaVersion = global::Dotisan.Core.EndpointManifest.SchemaVersion;");
         source.AppendLine("    public static string EndpointManifestJson => new global::Dotisan.Core.EndpointManifest(EndpointManifest).ToJson();");
         source.AppendLine("    public static string EndpointManifestSha256 => new global::Dotisan.Core.EndpointManifest(EndpointManifest).Sha256;");
+        source.AppendLine();
+        AppendContractManifest(source, models);
         source.AppendLine("}");
         return source.ToString();
+    }
+
+    private static EmittedContractModel[] BuildContractModels(IReadOnlyList<EndpointCandidate> candidates)
+    {
+        var collector = new ContractModelCollector();
+
+        foreach (var candidate in candidates)
+        {
+            if (candidate.Symbol.GetTypeMembers("Request").FirstOrDefault() is { } request)
+            {
+                collector.AddRootModel(request, candidate.DisplayName + "Request");
+            }
+
+            if (candidate.Symbol.GetTypeMembers("Response").FirstOrDefault() is { } response)
+            {
+                collector.AddRootModel(response, candidate.DisplayName + "Response");
+            }
+        }
+
+        return collector.Build();
+    }
+
+    private static void AppendContractManifest(StringBuilder source, IReadOnlyList<EmittedContractModel> models)
+    {
+        source.AppendLine("    public static global::Dotisan.Core.ContractManifest ContractManifest { get; } =");
+        source.AppendLine("        new global::Dotisan.Core.ContractManifest(");
+        source.AppendLine("            1,");
+        source.AppendLine("            EndpointManifest,");
+
+        if (models.Count == 0)
+        {
+            source.AppendLine("            global::System.Array.Empty<global::Dotisan.Core.ContractModel>());");
+        }
+        else
+        {
+            source.AppendLine("            new global::Dotisan.Core.ContractModel[]");
+            source.AppendLine("            {");
+            foreach (var model in models)
+            {
+                AppendContractModelExpression(source, "                ", model);
+                source.AppendLine(",");
+            }
+
+            source.AppendLine("            });");
+        }
+
+        source.AppendLine();
+        source.AppendLine("    public static string ContractManifestJson => ContractManifest.ToJson();");
+        source.AppendLine("    public static string ContractManifestSha256 => ContractManifest.Sha256;");
+        source.AppendLine();
+    }
+
+    private static void AppendContractModelExpression(
+        StringBuilder source,
+        string indent,
+        EmittedContractModel model)
+    {
+        source.Append(indent).AppendLine("new global::Dotisan.Core.ContractModel(");
+        source.Append(indent).Append("    ").Append(ToCSharpStringLiteral(model.Name)).AppendLine(",");
+        source.Append(indent).Append("    ").Append(ToCSharpStringLiteral(model.SourceType)).AppendLine(",");
+        AppendContractPropertyArray(source, indent + "    ", model.Properties);
+        source.AppendLine(",");
+        AppendContractEnumValueArray(source, indent + "    ", model.EnumValues);
+        source.Append(indent).Append(')');
+    }
+
+    private static void AppendContractPropertyArray(
+        StringBuilder source,
+        string indent,
+        IReadOnlyList<EmittedContractProperty> properties)
+    {
+        if (properties.Count == 0)
+        {
+            source.Append(indent).Append("global::System.Array.Empty<global::Dotisan.Core.ContractProperty>()");
+            return;
+        }
+
+        source.Append(indent).AppendLine("new global::Dotisan.Core.ContractProperty[]");
+        source.Append(indent).AppendLine("{");
+        foreach (var property in properties)
+        {
+            source.Append(indent).AppendLine("    new global::Dotisan.Core.ContractProperty(");
+            source.Append(indent).Append("        ").Append(ToCSharpStringLiteral(property.Name)).AppendLine(",");
+            source.Append(indent).Append("        ");
+            AppendContractTypeDescriptorExpression(source, property.Type);
+            source.AppendLine(",");
+            source.Append(indent)
+                .Append("        /* nullable: ")
+                .Append(property.Nullable ? "true" : "false")
+                .Append(" */ ")
+                .Append(property.Nullable ? "true" : "false")
+                .AppendLine(",");
+            source.Append(indent)
+                .Append("        /* optional: ")
+                .Append(property.Optional ? "true" : "false")
+                .Append(" */ ")
+                .Append(property.Optional ? "true" : "false")
+                .AppendLine("),");
+        }
+
+        source.Append(indent).Append('}');
+    }
+
+    private static void AppendContractEnumValueArray(
+        StringBuilder source,
+        string indent,
+        IReadOnlyList<ContractEnumValue> enumValues)
+    {
+        if (enumValues.Count == 0)
+        {
+            source.Append(indent).Append("global::System.Array.Empty<global::Dotisan.Core.ContractEnumValue>()");
+            return;
+        }
+
+        source.Append(indent).AppendLine("new global::Dotisan.Core.ContractEnumValue[]");
+        source.Append(indent).AppendLine("{");
+        foreach (var enumValue in enumValues)
+        {
+            source.Append(indent).Append("    new global::Dotisan.Core.ContractEnumValue(")
+                .Append(ToCSharpStringLiteral(enumValue.Name))
+                .Append(", ")
+                .Append(enumValue.Value.ToString(CultureInfo.InvariantCulture))
+                .AppendLine("),");
+        }
+
+        source.Append(indent).Append('}');
+    }
+
+    private static void AppendContractTypeDescriptorExpression(
+        StringBuilder source,
+        EmittedContractTypeDescriptor descriptor)
+    {
+        source.Append("new global::Dotisan.Core.ContractTypeDescriptor(");
+        source.Append("global::Dotisan.Core.ContractTypeKind.").Append(descriptor.Kind);
+
+        if (descriptor.ReferenceName is not null)
+        {
+            source.Append(", ReferenceName: ").Append(ToCSharpStringLiteral(descriptor.ReferenceName));
+        }
+
+        if (descriptor.ElementType is not null)
+        {
+            source.Append(", ElementType: ");
+            AppendContractTypeDescriptorExpression(source, descriptor.ElementType);
+        }
+
+        source.Append(')');
+    }
+
+    private static ContractTypeDescriptor DescribeType(
+        ITypeSymbol type,
+        string sourceTypeName,
+        Action<ContractModel> addModel)
+    {
+        var descriptorType = UnwrapNullableType(type);
+        sourceTypeName = GetSourceTypeName(descriptorType);
+
+        if (descriptorType.SpecialType == SpecialType.System_String)
+        {
+            return new ContractTypeDescriptor(ContractTypeKind.String);
+        }
+
+        if (descriptorType.SpecialType == SpecialType.System_Boolean)
+        {
+            return new ContractTypeDescriptor(ContractTypeKind.Boolean);
+        }
+
+        if (IsIntegerType(descriptorType.SpecialType))
+        {
+            return new ContractTypeDescriptor(ContractTypeKind.Integer);
+        }
+
+        if (IsDecimalType(descriptorType.SpecialType))
+        {
+            return new ContractTypeDescriptor(ContractTypeKind.Decimal);
+        }
+
+        if (IsSpecialTypeName(descriptorType, "System.Guid"))
+        {
+            return new ContractTypeDescriptor(ContractTypeKind.Guid);
+        }
+
+        if (IsSpecialTypeName(descriptorType, "System.DateTime")
+            || IsSpecialTypeName(descriptorType, "System.DateTimeOffset"))
+        {
+            return new ContractTypeDescriptor(ContractTypeKind.DateTime);
+        }
+
+        if (IsSpecialTypeName(descriptorType, "System.DateOnly"))
+        {
+            return new ContractTypeDescriptor(ContractTypeKind.DateOnly);
+        }
+
+        if (IsSpecialTypeName(descriptorType, "System.TimeOnly"))
+        {
+            return new ContractTypeDescriptor(ContractTypeKind.TimeOnly);
+        }
+
+        if (TryGetDictionaryValueType(descriptorType, out var dictionaryValueType))
+        {
+            return new ContractTypeDescriptor(
+                ContractTypeKind.Dictionary,
+                ElementType: DescribeType(dictionaryValueType, GetSourceTypeName(dictionaryValueType), addModel));
+        }
+
+        if (TryGetEnumerableElementType(descriptorType, out var elementType))
+        {
+            return new ContractTypeDescriptor(
+                ContractTypeKind.Array,
+                ElementType: DescribeType(elementType, GetSourceTypeName(elementType), addModel));
+        }
+
+        if (descriptorType is INamedTypeSymbol namedType && namedType.TypeKind == TypeKind.Enum)
+        {
+            addModel(new ContractModel(SanitizeSourceTypeName(sourceTypeName), sourceTypeName, namedType));
+            return new ContractTypeDescriptor(ContractTypeKind.Enum, ReferenceSourceType: sourceTypeName);
+        }
+
+        if (descriptorType is INamedTypeSymbol objectType && IsObjectType(objectType))
+        {
+            addModel(new ContractModel(SanitizeSourceTypeName(sourceTypeName), sourceTypeName, objectType));
+            return new ContractTypeDescriptor(ContractTypeKind.Object, ReferenceSourceType: sourceTypeName);
+        }
+
+        return new ContractTypeDescriptor(ContractTypeKind.Unknown);
+    }
+
+    private static ContractModel CreateCompletedModel(
+        ContractModel model,
+        Action<ContractModel> addModel)
+    {
+        if (model.Symbol.TypeKind == TypeKind.Enum)
+        {
+            var enumValues = model.Symbol
+                .GetMembers()
+                .OfType<IFieldSymbol>()
+                .Where(static field => field.HasConstantValue && !field.IsImplicitlyDeclared)
+                .Select(field => new ContractEnumValue(field.Name, Convert.ToInt32(field.ConstantValue, CultureInfo.InvariantCulture)))
+                .OrderBy(enumValue => enumValue.Name, StringComparer.Ordinal)
+                .ToArray();
+
+            return new ContractModel(model.Name, model.SourceType, model.Symbol, [], enumValues);
+        }
+
+        var properties = model.Symbol
+            .GetMembers()
+            .OfType<IPropertySymbol>()
+            .Where(static property => !property.IsStatic && !property.IsIndexer && property.DeclaredAccessibility == Accessibility.Public)
+            .Select(property => new ContractProperty(
+                GetTransportPropertyName(property),
+                DescribeType(property.Type, GetSourceTypeName(property.Type), addModel),
+                IsNullableProperty(property),
+                IsOptionalProperty(property)))
+            .OrderBy(property => property.Name, StringComparer.Ordinal)
+            .ToArray();
+
+        return new ContractModel(model.Name, model.SourceType, model.Symbol, properties, []);
+    }
+
+    private static bool IsNullableProperty(IPropertySymbol property)
+    {
+        return property.NullableAnnotation == NullableAnnotation.Annotated
+            || property.Type is INamedTypeSymbol namedType
+            && namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T;
+    }
+
+    private static bool IsOptionalProperty(IPropertySymbol property)
+    {
+        foreach (var attribute in GetSerializationAttributes(property))
+        {
+            if (!IsNamedType(attribute.AttributeClass, JsonIgnoreAttributeTypeName, JsonSerializationNamespace))
+            {
+                continue;
+            }
+
+            foreach (var argument in attribute.NamedArguments)
+            {
+                if (string.Equals(argument.Key, "Condition", StringComparison.Ordinal)
+                    && IsWhenWritingDefault(argument.Value))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return HasWhenWritingDefaultSyntaxAttribute(property);
+    }
+
+    private static bool IsWhenWritingDefault(TypedConstant value)
+    {
+        var enumType = value.Type;
+        if (enumType is null
+            || !IsNamedType(enumType, JsonIgnoreConditionTypeName, JsonSerializationNamespace))
+        {
+            return false;
+        }
+
+        var whenWritingDefault = enumType
+            .GetMembers("WhenWritingDefault")
+            .OfType<IFieldSymbol>()
+            .FirstOrDefault(static field => field.HasConstantValue);
+
+        return whenWritingDefault is not null
+            && Equals(value.Value, whenWritingDefault.ConstantValue);
+    }
+
+    private static string GetTransportPropertyName(IPropertySymbol property)
+    {
+        foreach (var attribute in GetSerializationAttributes(property))
+        {
+            if (!IsNamedType(attribute.AttributeClass, JsonPropertyNameAttributeTypeName, JsonSerializationNamespace)
+                || attribute.ConstructorArguments.Length == 0
+                || attribute.ConstructorArguments[0].Value is not string transportName
+                || string.IsNullOrWhiteSpace(transportName))
+            {
+                continue;
+            }
+
+            return transportName;
+        }
+
+        if (TryGetJsonPropertyNameFromSyntax(property, out var syntaxTransportName))
+        {
+            return syntaxTransportName;
+        }
+
+        return ConvertToCamelCase(property.Name);
+    }
+
+    private static IEnumerable<AttributeData> GetSerializationAttributes(IPropertySymbol property)
+    {
+        foreach (var attribute in property.GetAttributes())
+        {
+            yield return attribute;
+        }
+
+        foreach (var constructor in property.ContainingType.InstanceConstructors)
+        {
+            foreach (var parameter in constructor.Parameters)
+            {
+                if (string.Equals(parameter.Name, property.Name, StringComparison.Ordinal))
+                {
+                    foreach (var attribute in parameter.GetAttributes())
+                    {
+                        yield return attribute;
+                    }
+                }
+            }
+        }
+    }
+
+    private static bool TryGetDictionaryValueType(ITypeSymbol type, out ITypeSymbol valueType)
+    {
+        if (type is IArrayTypeSymbol)
+        {
+            valueType = null!;
+            return false;
+        }
+
+        foreach (var candidate in GetSelfAndInterfaces(type))
+        {
+            if (!candidate.IsGenericType
+                || candidate.TypeArguments.Length != 2
+                || candidate.TypeArguments[0].SpecialType != SpecialType.System_String)
+            {
+                continue;
+            }
+
+            if (candidate.ContainingNamespace.ToDisplayString() == "System.Collections.Generic"
+                && (candidate.Name == "Dictionary" || candidate.Name == "IDictionary"))
+            {
+                valueType = candidate.TypeArguments[1];
+                return true;
+            }
+        }
+
+        valueType = null!;
+        return false;
+    }
+
+    private static bool TryGetEnumerableElementType(ITypeSymbol type, out ITypeSymbol elementType)
+    {
+        if (type is IArrayTypeSymbol arrayType)
+        {
+            if (arrayType.Rank == 1)
+            {
+                elementType = arrayType.ElementType;
+                return true;
+            }
+
+            elementType = null!;
+            return false;
+        }
+
+        if (type.SpecialType == SpecialType.System_String)
+        {
+            elementType = null!;
+            return false;
+        }
+
+        foreach (var candidate in GetSelfAndInterfaces(type))
+        {
+            if (candidate.IsGenericType
+                && candidate.TypeArguments.Length == 1
+                && candidate.Name == "IEnumerable"
+                && candidate.ContainingNamespace.ToDisplayString() == "System.Collections.Generic")
+            {
+                elementType = candidate.TypeArguments[0];
+                return true;
+            }
+        }
+
+        elementType = null!;
+        return false;
+    }
+
+    private static IEnumerable<INamedTypeSymbol> GetSelfAndInterfaces(ITypeSymbol type)
+    {
+        if (type is INamedTypeSymbol namedType)
+        {
+            yield return namedType;
+
+            foreach (var interfaceType in namedType.AllInterfaces.OrderBy(
+                         static interfaceSymbol => interfaceSymbol.ToDisplayString(FullyQualifiedTypeName),
+                         StringComparer.Ordinal))
+            {
+                yield return interfaceType;
+            }
+        }
+    }
+
+    private static bool IsObjectType(INamedTypeSymbol type)
+    {
+        return type.TypeKind == TypeKind.Class || type.IsRecord;
+    }
+
+    private static bool IsIntegerType(SpecialType specialType)
+    {
+        return specialType is SpecialType.System_Byte
+            or SpecialType.System_SByte
+            or SpecialType.System_Int16
+            or SpecialType.System_UInt16
+            or SpecialType.System_Int32
+            or SpecialType.System_UInt32
+            or SpecialType.System_Int64
+            or SpecialType.System_UInt64;
+    }
+
+    private static bool IsDecimalType(SpecialType specialType)
+    {
+        return specialType is SpecialType.System_Decimal
+            or SpecialType.System_Double
+            or SpecialType.System_Single;
+    }
+
+    private static ITypeSymbol UnwrapNullableType(ITypeSymbol type)
+    {
+        return type is INamedTypeSymbol namedType
+               && namedType.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T
+               && namedType.TypeArguments.Length == 1
+            ? namedType.TypeArguments[0]
+            : type;
+    }
+
+    private static bool IsSpecialTypeName(ITypeSymbol type, string metadataName)
+    {
+        return string.Equals(type.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat), metadataName, StringComparison.Ordinal);
+    }
+
+    private static bool IsNamedType(ITypeSymbol? type, string name, string containingNamespace)
+    {
+        return type is INamedTypeSymbol namedType
+            && string.Equals(namedType.Name, name, StringComparison.Ordinal)
+            && string.Equals(namedType.ContainingNamespace.ToDisplayString(), containingNamespace, StringComparison.Ordinal);
+    }
+
+    private static string GetSourceTypeName(ITypeSymbol type)
+    {
+        return type.ToDisplayString(FullyQualifiedTypeName);
+    }
+
+    private static string SanitizeSourceTypeName(string sourceTypeName)
+    {
+        var builder = new StringBuilder(sourceTypeName.Length);
+
+        foreach (var character in sourceTypeName)
+        {
+            if (char.IsLetterOrDigit(character))
+            {
+                builder.Append(character);
+            }
+        }
+
+        var sanitized = builder.ToString();
+
+        if (sanitized.StartsWith("global", StringComparison.Ordinal))
+        {
+            sanitized = sanitized.Substring("global".Length);
+        }
+
+        return string.IsNullOrWhiteSpace(sanitized)
+            ? "ContractModel"
+            : sanitized;
+    }
+
+    private static bool TryGetJsonPropertyNameFromSyntax(IPropertySymbol property, out string transportName)
+    {
+        if (TryGetPrimaryConstructorParameter(property, out var parameterSyntax))
+        {
+            foreach (var attribute in GetPropertyTargetAttributes(parameterSyntax))
+            {
+                if (!IsAttributeName(attribute, "JsonPropertyName"))
+                {
+                    continue;
+                }
+
+                if (attribute.ArgumentList?.Arguments.FirstOrDefault()?.Expression is LiteralExpressionSyntax literal
+                    && literal.IsKind(SyntaxKind.StringLiteralExpression))
+                {
+                    transportName = literal.Token.ValueText;
+                    return true;
+                }
+            }
+        }
+
+        transportName = string.Empty;
+        return false;
+    }
+
+    private static bool HasWhenWritingDefaultSyntaxAttribute(IPropertySymbol property)
+    {
+        if (!TryGetPrimaryConstructorParameter(property, out var parameterSyntax))
+        {
+            return false;
+        }
+
+        foreach (var attribute in GetPropertyTargetAttributes(parameterSyntax))
+        {
+            if (!IsAttributeName(attribute, "JsonIgnore"))
+            {
+                continue;
+            }
+
+            foreach (var argument in attribute.ArgumentList?.Arguments ?? default)
+            {
+                if (string.Equals(argument.NameEquals?.Name.Identifier.ValueText, "Condition", StringComparison.Ordinal)
+                    && string.Equals(argument.Expression.ToString(), "JsonIgnoreCondition.WhenWritingDefault", StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool TryGetPrimaryConstructorParameter(IPropertySymbol property, out ParameterSyntax parameterSyntax)
+    {
+        foreach (var syntaxReference in property.ContainingType.DeclaringSyntaxReferences)
+        {
+            if (syntaxReference.GetSyntax() is not RecordDeclarationSyntax recordDeclaration
+                || recordDeclaration.ParameterList is null)
+            {
+                continue;
+            }
+
+            foreach (var parameter in recordDeclaration.ParameterList.Parameters)
+            {
+                if (string.Equals(parameter.Identifier.ValueText, property.Name, StringComparison.Ordinal)
+                    || string.Equals(parameter.Identifier.ValueText, property.Name, StringComparison.OrdinalIgnoreCase))
+                {
+                    parameterSyntax = parameter;
+                    return true;
+                }
+            }
+        }
+
+        parameterSyntax = null!;
+        return false;
+    }
+
+    private static IEnumerable<AttributeSyntax> GetPropertyTargetAttributes(ParameterSyntax parameterSyntax)
+    {
+        foreach (var attributeList in parameterSyntax.AttributeLists)
+        {
+            if (attributeList.Target is not null
+                && !string.Equals(attributeList.Target.Identifier.ValueText, "property", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            foreach (var attribute in attributeList.Attributes)
+            {
+                yield return attribute;
+            }
+        }
+    }
+
+    private static bool IsAttributeName(AttributeSyntax attribute, string simpleName)
+    {
+        var attributeName = attribute.Name.ToString();
+        return string.Equals(attributeName, simpleName, StringComparison.Ordinal)
+            || string.Equals(attributeName, simpleName + "Attribute", StringComparison.Ordinal)
+            || attributeName.EndsWith("." + simpleName, StringComparison.Ordinal)
+            || attributeName.EndsWith("." + simpleName + "Attribute", StringComparison.Ordinal);
+    }
+
+    private static string ToCSharpStringLiteral(string value)
+    {
+        var builder = new StringBuilder(value.Length + 2);
+        builder.Append('"');
+
+        foreach (var character in value)
+        {
+            _ = character switch
+            {
+                '\\' => builder.Append(@"\\"),
+                '"' => builder.Append("\\\""),
+                '\r' => builder.Append(@"\r"),
+                '\n' => builder.Append(@"\n"),
+                '\t' => builder.Append(@"\t"),
+                _ => builder.Append(character)
+            };
+        }
+
+        builder.Append('"');
+        return builder.ToString();
+    }
+
+    private static string ConvertToCamelCase(string value)
+    {
+        if (string.IsNullOrEmpty(value) || !char.IsUpper(value[0]))
+        {
+            return value;
+        }
+
+        var characters = value.ToCharArray();
+        for (var index = 0; index < characters.Length; index++)
+        {
+            var hasNext = index + 1 < characters.Length;
+            if (index > 0 && hasNext && !char.IsUpper(characters[index + 1]))
+            {
+                break;
+            }
+
+            characters[index] = char.ToLowerInvariant(characters[index]);
+
+            if (!hasNext)
+            {
+                break;
+            }
+        }
+
+        return new string(characters);
+    }
+
+    private sealed class ContractModelCollector
+    {
+        private readonly Dictionary<string, ContractModel> modelsBySourceType = new(StringComparer.Ordinal);
+        private readonly HashSet<string> building = new(StringComparer.Ordinal);
+
+        public void AddRootModel(INamedTypeSymbol symbol, string name)
+        {
+            AddModel(new ContractModel(name, GetSourceTypeName(symbol), symbol));
+        }
+
+        public void AddModel(ContractModel model)
+        {
+            if (modelsBySourceType.ContainsKey(model.SourceType) || !building.Add(model.SourceType))
+            {
+                return;
+            }
+
+            var completedModel = CreateCompletedModel(model, AddModel);
+            modelsBySourceType[completedModel.SourceType] = completedModel;
+            building.Remove(model.SourceType);
+        }
+
+        public EmittedContractModel[] Build()
+        {
+            var ordered = modelsBySourceType.Values
+                .OrderBy(model => model.SourceType, StringComparer.Ordinal)
+                .ToArray();
+            var resolvedNames = ResolveModelNames(ordered);
+
+            return ordered
+                .Select(model => new EmittedContractModel(
+                    resolvedNames[model.SourceType],
+                    model.SourceType,
+                    model.Properties
+                        .OrderBy(property => property.Name, StringComparer.Ordinal)
+                        .Select(property => new EmittedContractProperty(
+                            property.Name,
+                            ResolveDescriptor(property.Type, resolvedNames),
+                            property.Nullable,
+                            property.Optional))
+                        .ToArray(),
+                    model.EnumValues
+                        .OrderBy(enumValue => enumValue.Name, StringComparer.Ordinal)
+                        .ToArray()))
+                .OrderBy(model => model.Name, StringComparer.Ordinal)
+                .ToArray();
+        }
+
+        private static Dictionary<string, string> ResolveModelNames(IReadOnlyList<ContractModel> models)
+        {
+            var names = new Dictionary<string, string>(StringComparer.Ordinal);
+
+            foreach (var group in models.GroupBy(model => model.Name, StringComparer.Ordinal))
+            {
+                var ordered = group
+                    .OrderBy(model => model.SourceType, StringComparer.Ordinal)
+                    .ToArray();
+
+                for (var index = 0; index < ordered.Length; index++)
+                {
+                    names[ordered[index].SourceType] = index == 0
+                        ? ordered[index].Name
+                        : ordered[index].Name + (index + 1).ToString(CultureInfo.InvariantCulture);
+                }
+            }
+
+            return names;
+        }
+
+        private static EmittedContractTypeDescriptor ResolveDescriptor(
+            ContractTypeDescriptor descriptor,
+            IReadOnlyDictionary<string, string> resolvedNames)
+        {
+            var referenceName = descriptor.ReferenceSourceType is null
+                ? null
+                : resolvedNames[descriptor.ReferenceSourceType];
+            var elementType = descriptor.ElementType is null
+                ? null
+                : ResolveDescriptor(descriptor.ElementType, resolvedNames);
+
+            return new EmittedContractTypeDescriptor(descriptor.Kind, referenceName, elementType);
+        }
     }
 
     private sealed class EndpointCandidate
     {
         public EndpointCandidate(
+            INamedTypeSymbol symbol,
             string typeName,
             string displayName,
             Location location,
@@ -220,6 +969,7 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
             bool hasHandler,
             bool hasValidator)
         {
+            Symbol = symbol;
             TypeName = typeName;
             DisplayName = displayName;
             Location = location;
@@ -229,6 +979,7 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
             HasValidator = hasValidator;
         }
 
+        public INamedTypeSymbol Symbol { get; }
         public string TypeName { get; }
         public string DisplayName { get; }
         public Location Location { get; }
@@ -236,5 +987,143 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
         public bool HasMap { get; }
         public bool HasHandler { get; }
         public bool HasValidator { get; }
+    }
+
+    private sealed class ContractModel
+    {
+        public ContractModel(
+            string name,
+            string sourceType,
+            INamedTypeSymbol symbol,
+            IReadOnlyList<ContractProperty>? properties = null,
+            IReadOnlyList<ContractEnumValue>? enumValues = null)
+        {
+            Name = name;
+            SourceType = sourceType;
+            Symbol = symbol;
+            Properties = properties ?? [];
+            EnumValues = enumValues ?? [];
+        }
+
+        public string Name { get; }
+        public string SourceType { get; }
+        public INamedTypeSymbol Symbol { get; }
+        public IReadOnlyList<ContractProperty> Properties { get; }
+        public IReadOnlyList<ContractEnumValue> EnumValues { get; }
+    }
+
+    private sealed class ContractProperty
+    {
+        public ContractProperty(string name, ContractTypeDescriptor type, bool nullable, bool optional)
+        {
+            Name = name;
+            Type = type;
+            Nullable = nullable;
+            Optional = optional;
+        }
+
+        public string Name { get; }
+        public ContractTypeDescriptor Type { get; }
+        public bool Nullable { get; }
+        public bool Optional { get; }
+    }
+
+    private sealed class ContractEnumValue
+    {
+        public ContractEnumValue(string name, int value)
+        {
+            Name = name;
+            Value = value;
+        }
+
+        public string Name { get; }
+        public int Value { get; }
+    }
+
+    private sealed class ContractTypeDescriptor
+    {
+        public ContractTypeDescriptor(
+            ContractTypeKind kind,
+            string? ReferenceSourceType = null,
+            ContractTypeDescriptor? ElementType = null)
+        {
+            Kind = kind;
+            this.ReferenceSourceType = ReferenceSourceType;
+            this.ElementType = ElementType;
+        }
+
+        public ContractTypeKind Kind { get; }
+        public string? ReferenceSourceType { get; }
+        public ContractTypeDescriptor? ElementType { get; }
+    }
+
+    private sealed class EmittedContractModel
+    {
+        public EmittedContractModel(
+            string name,
+            string sourceType,
+            IReadOnlyList<EmittedContractProperty> properties,
+            IReadOnlyList<ContractEnumValue> enumValues)
+        {
+            Name = name;
+            SourceType = sourceType;
+            Properties = properties;
+            EnumValues = enumValues;
+        }
+
+        public string Name { get; }
+        public string SourceType { get; }
+        public IReadOnlyList<EmittedContractProperty> Properties { get; }
+        public IReadOnlyList<ContractEnumValue> EnumValues { get; }
+    }
+
+    private sealed class EmittedContractProperty
+    {
+        public EmittedContractProperty(string name, EmittedContractTypeDescriptor type, bool nullable, bool optional)
+        {
+            Name = name;
+            Type = type;
+            Nullable = nullable;
+            Optional = optional;
+        }
+
+        public string Name { get; }
+        public EmittedContractTypeDescriptor Type { get; }
+        public bool Nullable { get; }
+        public bool Optional { get; }
+    }
+
+    private sealed class EmittedContractTypeDescriptor
+    {
+        public EmittedContractTypeDescriptor(
+            ContractTypeKind kind,
+            string? referenceName = null,
+            EmittedContractTypeDescriptor? elementType = null)
+        {
+            Kind = kind;
+            ReferenceName = referenceName;
+            ElementType = elementType;
+        }
+
+        public ContractTypeKind Kind { get; }
+        public string? ReferenceName { get; }
+        public EmittedContractTypeDescriptor? ElementType { get; }
+    }
+
+    private enum ContractTypeKind
+    {
+        String,
+        Boolean,
+        Integer,
+        Decimal,
+        Guid,
+        DateTime,
+        DateOnly,
+        TimeOnly,
+        Array,
+        Dictionary,
+        Object,
+        Enum,
+        Unknown
     }
 }
