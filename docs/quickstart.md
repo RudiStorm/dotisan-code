@@ -17,7 +17,7 @@ Multi-tenancy: No
 Package manager: pnpm
 ~~~
 
-Authentication is opt-in. To generate the v0.2.0 authentication slice non-interactively:
+Authentication is opt-in. To generate the v0.3.0 authorization slice non-interactively:
 
 ~~~powershell
 dotnet run --project src\Dotisan.Cli -- new AuthApp --auth yes --registration public --yes --output .\AuthApp

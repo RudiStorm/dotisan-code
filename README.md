@@ -2,7 +2,7 @@
 
 Dotisan is a batteries-included application framework for standard ASP.NET Core and Vue applications. The first implementation slice provides a testable CLI foundation and a deterministic golden template.
 
-## v0.2.0 workflow and v0.3 authorization foundation
+## v0.3.0 workflow and v0.4 audit foundation
 
 The repository contains focused projects for:
 
@@ -49,7 +49,7 @@ For the interactive Quick wizard, omit --yes. It asks for SQLite/SQL Server/Post
 
 ~~~powershell
 dotnet pack src\Dotisan.Cli\Dotisan.Cli.csproj --configuration Release --output .\artifacts
-dotnet tool install --global Dotisan --add-source .\artifacts --version 0.2.0
+dotnet tool install --global Dotisan --add-source .\artifacts --version 0.3.0
 dotisan new MyApp
 ~~~
 
