@@ -159,9 +159,10 @@ internal static class TemplateFiles
 
     ~~~powershell
     cd src\{{name}}.Web
-    npm install
     npm run dev
     ~~~
+
+    `dotisan new` installs frontend dependencies before reporting success. If the project was generated with `--no-restore`, run `npm install` or `pnpm install` before `npm run dev`.
 
     dotisan.config controls orchestration preferences only. Normal appsettings.json, environment variables, EF Core, and Vite configuration remain the source of truth for their respective concerns. Resource scaffolding creates source files but never creates migrations.
     """;
@@ -207,9 +208,10 @@ internal static class TemplateFiles
 
     ~~~powershell
     cd src\{{name}}.Web
-    npm install
     npm run dev
     ~~~
+
+    `dotisan new` installs frontend dependencies before reporting success. If the project was generated with `--no-restore`, run `npm install` or `pnpm install` before `npm run dev`.
 
     `dotisan.config` controls orchestration preferences only. `appsettings.json`, environment variables, ASP.NET Core services, EF Core configuration, and Vite configuration remain the source of truth for their respective concerns.
     """;

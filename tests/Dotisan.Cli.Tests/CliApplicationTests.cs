@@ -102,6 +102,54 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task New_restores_dotnet_and_installs_frontend_dependencies()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices();
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "dotisan-new-install-" + Guid.NewGuid().ToString("N"));
+
+        var exitCode = await app.RunAsync(["new", "TodoApp", "--yes", "--package-manager", "npm", "--output", outputDirectory]);
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Equal(2, services.RunRequests.Count);
+        Assert.Equal("dotnet", services.RunRequests[0].FileName);
+        Assert.Equal(["restore", Path.Combine(outputDirectory, "TodoApp.sln")], services.RunRequests[0].Arguments);
+        Assert.Equal(OperatingSystem.IsWindows() ? "npm.cmd" : "npm", services.RunRequests[1].FileName);
+        Assert.Equal(["install"], services.RunRequests[1].Arguments);
+        Assert.Equal(Path.Combine(outputDirectory, "src", "TodoApp.Web"), services.RunRequests[1].WorkingDirectory);
+    }
+
+    [Fact]
+    public async Task New_reports_frontend_install_failure_as_generation_error()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices { FailFrontendInstall = true };
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "dotisan-new-install-failure-" + Guid.NewGuid().ToString("N"));
+
+        var exitCode = await app.RunAsync(["new", "TodoApp", "--yes", "--package-manager", "npm", "--output", outputDirectory]);
+
+        Assert.Equal(DotisanExitCode.GenerationError, exitCode);
+        Assert.Contains("frontend dependency installation failed", console.ErrorOutput);
+        Assert.Contains("npm install", console.ErrorOutput);
+    }
+
+    [Fact]
+    public async Task New_no_restore_skips_dependency_restoration()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices();
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "dotisan-new-no-restore-" + Guid.NewGuid().ToString("N"));
+
+        var exitCode = await app.RunAsync(["new", "TodoApp", "--yes", "--no-restore", "--output", outputDirectory]);
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Empty(services.RunRequests);
+    }
+
+    [Fact]
     public async Task Dev_lean_starts_the_api_watch_process()
     {
         var console = new MemoryConsole();
@@ -177,6 +225,8 @@ public sealed class CliApplicationTests
         public string? ResourceName { get; private set; }
         public string? FileName { get; private set; }
         public IReadOnlyList<string> Arguments { get; private set; } = [];
+        public List<(string FileName, IReadOnlyList<string> Arguments, string WorkingDirectory)> RunRequests { get; } = [];
+        public bool FailFrontendInstall { get; init; }
         public string? StartFileName { get; private set; }
         public IReadOnlyList<string> StartArguments { get; private set; } = [];
 
@@ -193,6 +243,9 @@ public sealed class CliApplicationTests
         {
             FileName = fileName;
             Arguments = arguments;
+            RunRequests.Add((fileName, arguments, workingDirectory));
+            if (FailFrontendInstall && arguments.SequenceEqual(["install"], StringComparer.Ordinal))
+                return Task.FromResult(DotisanOperationResult.Failed("npm exited with code 1."));
             return Task.FromResult(DotisanOperationResult.Succeeded());
         }
 

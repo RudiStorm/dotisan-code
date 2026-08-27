@@ -354,6 +354,20 @@ internal sealed class NewCommand : IDotisanCommand
                 context.Console.WriteError("You can retry with 'dotnet restore' from the generated project directory.");
                 return DotisanExitCode.GenerationError;
             }
+
+            var packageManagerName = options.PackageManager == PackageManager.Npm ? "npm" : "pnpm";
+            var packageManagerCommand = OperatingSystem.IsWindows() ? $"{packageManagerName}.cmd" : packageManagerName;
+            var frontendDirectory = Path.Combine(result.OutputDirectory, "src", $"{options.Name}.Web");
+            context.Console.WriteLine($"Installing frontend dependencies with {packageManagerName}...");
+            var installResult = await context.Services.RunAsync(packageManagerCommand, ["install"], frontendDirectory, context.Console, cancellationToken);
+            if (!installResult.Success)
+            {
+                context.Console.WriteError("The project was created, but frontend dependency installation failed.");
+                if (!string.IsNullOrWhiteSpace(installResult.ErrorMessage))
+                    context.Console.WriteError(installResult.ErrorMessage);
+                context.Console.WriteError($"You can retry with '{packageManagerName} install' from the generated frontend directory.");
+                return DotisanExitCode.GenerationError;
+            }
         }
         context.Console.WriteLine($"Next: cd {Path.GetRelativePath(Directory.GetCurrentDirectory(), result.OutputDirectory)}");
         context.Console.WriteLine("Then run: dotnet build");

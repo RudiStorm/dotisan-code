@@ -41,6 +41,8 @@ dotisan migrate
 dotisan dev
 ~~~
 
+`dotisan new` restores the generated .NET solution and runs the selected frontend package manager's install command before it reports the project ready. Use `--no-restore` only when you intentionally need offline generation; run `dotnet restore` and `npm install` or `pnpm install` manually afterward.
+
 For the interactive Quick wizard, omit --yes. It asks for SQLite/SQL Server/PostgreSQL/MySQL, authentication, registration policy, tenancy, and pnpm/npm. Press Enter to accept each default. Authentication is opt-in; `--auth yes` generates standard ASP.NET Core Identity endpoints and cookie authentication.
 
 ## Global tool packaging

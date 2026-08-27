@@ -31,6 +31,8 @@ For scripts and CI, use the non-interactive equivalent:
 dotnet run --project src\Dotisan.Cli -- new TodoApp --yes --output .\TodoApp
 ~~~
 
+Project creation restores the .NET solution and installs frontend dependencies with the selected package manager before reporting success. Use `--no-restore` for intentional offline generation; then run `dotnet restore` and `npm install` or `pnpm install` yourself.
+
 The generated project contains:
 
 ~~~text
@@ -78,15 +80,14 @@ dotisan migrate
 
 The scaffold is ordinary source code and remains yours to edit. `make:resource` never creates a migration automatically.
 
-In another terminal, install and run the Vue app:
+In another terminal, run the Vue app. Dependencies were installed by `dotisan new`:
 
 ~~~powershell
 cd TodoApp\src\TodoApp.Web
-pnpm install
 pnpm dev
 ~~~
 
-npm install and npm run dev are supported as an alternative.
+npm run dev is supported as an alternative. If the project was generated with `--no-restore`, run `npm install` or `pnpm install` first.
 
 ## Native tooling stays available
 
