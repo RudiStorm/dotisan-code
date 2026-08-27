@@ -44,6 +44,15 @@ public sealed class ContractManifestTests
     }
 
     [Fact]
+    public void Rejects_non_v1_schema_version()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ContractManifest(
+            2,
+            [],
+            []));
+    }
+
+    [Fact]
     public void Rejects_invalid_descriptor_references()
     {
         Assert.Throws<ArgumentException>(() => new ContractTypeDescriptor(ContractTypeKind.Object));
@@ -82,6 +91,32 @@ public sealed class ContractManifestTests
         Assert.Contains("\"referenceName\":\"global::Owner\"", json);
         Assert.Contains("\"nullable\":true", json);
         Assert.Contains("\"optional\":true", json);
+    }
+
+    [Fact]
+    public void Copies_and_sorts_model_collections_at_construction_time()
+    {
+        var properties = new List<ContractProperty>
+        {
+            new("zValue", new ContractTypeDescriptor(ContractTypeKind.Integer), false, false),
+            new("aValue", new ContractTypeDescriptor(ContractTypeKind.String), false, false)
+        };
+
+        var enumValues = new List<ContractEnumValue>
+        {
+            new("Second", 2),
+            new("First", 1)
+        };
+
+        var model = new ContractModel("Model", "global::Model", properties, enumValues);
+
+        properties.Add(new ContractProperty("mutated", new ContractTypeDescriptor(ContractTypeKind.Boolean), false, false));
+        enumValues.Add(new ContractEnumValue("Mutated", 3));
+
+        Assert.Equal(["aValue", "zValue"], model.Properties.Select(property => property.Name));
+        Assert.Equal(["First", "Second"], model.EnumValues.Select(value => value.Name));
+        Assert.DoesNotContain(model.Properties, property => property.Name == "mutated");
+        Assert.DoesNotContain(model.EnumValues, value => value.Name == "Mutated");
     }
 
     [Fact]

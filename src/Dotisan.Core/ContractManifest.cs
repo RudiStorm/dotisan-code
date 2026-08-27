@@ -17,6 +17,11 @@ public sealed record ContractManifest
         ArgumentNullException.ThrowIfNull(Endpoints);
         ArgumentNullException.ThrowIfNull(Models);
 
+        if (SchemaVersion != 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(SchemaVersion), SchemaVersion, "Contract manifests only support schema version 1.");
+        }
+
         this.SchemaVersion = SchemaVersion;
         this.Endpoints = Endpoints
             .OrderBy(endpoint => endpoint.Id, StringComparer.Ordinal)
@@ -25,7 +30,6 @@ public sealed record ContractManifest
             .ToArray();
         this.Models = Models
             .OrderBy(model => model.Name, StringComparer.Ordinal)
-            .Select(NormalizeModel)
             .ToArray();
     }
 
@@ -53,48 +57,11 @@ public sealed record ContractManifest
         return options;
     }
 
-    private static ContractModel NormalizeModel(ContractModel model)
-    {
-        return new ContractModel(
-            RequireValue(model.Name, nameof(model.Name)),
-            RequireValue(model.SourceType, nameof(model.SourceType)),
-            model.Properties
-                .OrderBy(property => property.Name, StringComparer.Ordinal)
-                .Select(NormalizeProperty)
-                .ToArray(),
-            model.EnumValues
-                .OrderBy(enumValue => enumValue.Name, StringComparer.Ordinal)
-                .Select(NormalizeEnumValue)
-                .ToArray());
-    }
-
-    private static ContractProperty NormalizeProperty(ContractProperty property)
-    {
-        return new ContractProperty(
-            RequireValue(property.Name, nameof(property.Name)),
-            NormalizeDescriptor(property.Type),
-            property.Nullable,
-            property.Optional);
-    }
-
-    private static ContractEnumValue NormalizeEnumValue(ContractEnumValue enumValue)
-    {
-        return new ContractEnumValue(
-            RequireValue(enumValue.Name, nameof(enumValue.Name)),
-            enumValue.Value);
-    }
-
-    private static ContractTypeDescriptor NormalizeDescriptor(ContractTypeDescriptor descriptor)
-    {
-        ArgumentNullException.ThrowIfNull(descriptor);
-        return descriptor.Normalize();
-    }
-
     private static string RequireValue(string value, string parameterName)
     {
         return string.IsNullOrWhiteSpace(value)
             ? throw new ArgumentException("A non-empty value is required.", parameterName)
-            : value.Trim();
+            : value;
     }
 }
 
@@ -108,8 +75,12 @@ public sealed record ContractModel
     {
         this.Name = RequireValue(Name, nameof(Name));
         this.SourceType = RequireValue(SourceType, nameof(SourceType));
-        this.Properties = Properties ?? throw new ArgumentNullException(nameof(Properties));
-        this.EnumValues = EnumValues ?? throw new ArgumentNullException(nameof(EnumValues));
+        this.Properties = (Properties ?? throw new ArgumentNullException(nameof(Properties)))
+            .OrderBy(property => property.Name, StringComparer.Ordinal)
+            .ToArray();
+        this.EnumValues = (EnumValues ?? throw new ArgumentNullException(nameof(EnumValues)))
+            .OrderBy(enumValue => enumValue.Name, StringComparer.Ordinal)
+            .ToArray();
     }
 
     public string Name { get; }
@@ -124,7 +95,7 @@ public sealed record ContractModel
     {
         return string.IsNullOrWhiteSpace(value)
             ? throw new ArgumentException("A non-empty value is required.", parameterName)
-            : value.Trim();
+            : value;
     }
 }
 
@@ -150,7 +121,7 @@ public sealed record ContractProperty
     {
         return string.IsNullOrWhiteSpace(value)
             ? throw new ArgumentException("A non-empty value is required.", parameterName)
-            : value.Trim();
+            : value;
     }
 }
 
@@ -170,7 +141,7 @@ public sealed record ContractEnumValue
     {
         return string.IsNullOrWhiteSpace(value)
             ? throw new ArgumentException("A non-empty value is required.", parameterName)
-            : value.Trim();
+            : value;
     }
 }
 
@@ -211,8 +182,6 @@ public sealed record ContractTypeDescriptor
     public string? ReferenceName { get; }
 
     public ContractTypeDescriptor? ElementType { get; }
-
-    internal ContractTypeDescriptor Normalize() => this;
 
     private void Validate()
     {
@@ -264,6 +233,6 @@ public sealed record ContractTypeDescriptor
     {
         return string.IsNullOrWhiteSpace(value)
             ? throw new ArgumentException("A non-empty value is required.", parameterName)
-            : value.Trim();
+            : value;
     }
 }
