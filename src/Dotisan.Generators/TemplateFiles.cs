@@ -90,6 +90,9 @@ internal static class TemplateFiles
             new($"tests/{options.Name}.Api.Tests/{options.Name}.Api.Tests.csproj", ApiTestsProject(options.Name, options.AuthenticationEnabled)),
             new($"tests/{options.Name}.Api.Tests/HealthEndpointTests.cs", ApiTests(identifier)),
             new($"tests/{options.Name}.Api.Tests/Usings.cs", "global using Xunit;\n"),
+            ..(options.AuthenticationEnabled
+                ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/AuthenticationEndpointTests.cs", AuthenticationTests(identifier, options.Registration)) }
+                : Array.Empty<TemplateFile>()),
             new($"{options.Name}.sln", Solution(options.Name))
         ];
     }
@@ -410,6 +413,132 @@ internal static class TemplateFiles
             Assert.True(true);
         }
     }
+    """;
+
+    private static string AuthenticationTests(string identifier, RegistrationPolicy registrationPolicy) => $$"""
+    using System.Net;
+    using System.Net.Http.Json;
+    using {{identifier}}.Api.Data;
+    using Microsoft.AspNetCore.Hosting;
+    using Microsoft.AspNetCore.Mvc.Testing;
+    using Microsoft.Data.Sqlite;
+    using Microsoft.EntityFrameworkCore;
+    using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.DependencyInjection.Extensions;
+
+    namespace {{identifier}}.Api.Tests;
+
+    public sealed class AuthenticationEndpointTests(AuthenticationApplicationFactory factory) : IClassFixture<AuthenticationApplicationFactory>
+    {
+        [Fact]
+        public async Task Me_requires_authentication()
+        {
+            using var client = factory.CreateClient();
+            var response = await client.GetAsync("/api/account/me");
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Invalid_login_does_not_reveal_account_existence()
+        {
+            using var client = factory.CreateClient();
+            var antiforgery = await GetAntiforgeryToken(client);
+            using var login = new HttpRequestMessage(HttpMethod.Post, "/api/account/login");
+            login.Headers.Add("X-XSRF-TOKEN", antiforgery);
+            login.Content = JsonContent.Create(new { email = "missing@example.com", password = "wrong", rememberMe = false });
+
+            var response = await client.SendAsync(login);
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        {{(registrationPolicy == RegistrationPolicy.Public ? PublicAuthenticationTests() : RestrictedRegistrationTest())}}
+
+        private static async Task<string> GetAntiforgeryToken(HttpClient client)
+        {
+            var response = await client.GetFromJsonAsync<AntiforgeryResponse>("/api/account/antiforgery");
+            return response?.Token ?? throw new InvalidOperationException("The generated antiforgery endpoint returned no token.");
+        }
+
+        private sealed record AntiforgeryResponse(string Token);
+    }
+
+    public sealed class AuthenticationApplicationFactory : WebApplicationFactory<Program>
+    {
+        private SqliteConnection? connection;
+
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.UseEnvironment("Testing");
+            builder.ConfigureServices(services =>
+            {
+                connection = new SqliteConnection("Data Source=:memory:");
+                connection.Open();
+                services.RemoveAll<DbContextOptions<AppDbContext>>();
+                services.AddDbContext<AppDbContext>(options => options.UseSqlite(connection));
+
+                using var provider = services.BuildServiceProvider();
+                using var scope = provider.CreateScope();
+                scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureCreated();
+            });
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+                connection?.Dispose();
+            base.Dispose(disposing);
+        }
+    }
+    """;
+
+    private static string PublicAuthenticationTests() => """
+        [Fact]
+        public async Task Public_registration_logs_the_user_in_and_me_returns_the_account()
+        {
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+            var antiforgery = await GetAntiforgeryToken(client);
+            using var register = new HttpRequestMessage(HttpMethod.Post, "/api/account/register");
+            register.Headers.Add("X-XSRF-TOKEN", antiforgery);
+            register.Content = JsonContent.Create(new { email = "person@example.com", password = "Password1!" });
+
+            var registration = await client.SendAsync(register);
+            Assert.Equal(HttpStatusCode.OK, registration.StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/account/me")).StatusCode);
+        }
+
+        [Fact]
+        public async Task Logout_clears_the_authentication_cookie()
+        {
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+            var antiforgery = await GetAntiforgeryToken(client);
+            using var register = new HttpRequestMessage(HttpMethod.Post, "/api/account/register");
+            register.Headers.Add("X-XSRF-TOKEN", antiforgery);
+            register.Content = JsonContent.Create(new { email = "logout@example.com", password = "Password1!" });
+            Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(register)).StatusCode);
+
+            antiforgery = await GetAntiforgeryToken(client);
+            using var logout = new HttpRequestMessage(HttpMethod.Post, "/api/account/logout");
+            logout.Headers.Add("X-XSRF-TOKEN", antiforgery);
+            Assert.Equal(HttpStatusCode.NoContent, (await client.SendAsync(logout)).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/account/me")).StatusCode);
+        }
+    """;
+
+    private static string RestrictedRegistrationTest() => """
+        [Fact]
+        public async Task Restricted_registration_returns_a_stable_problem_code()
+        {
+            using var client = factory.CreateClient();
+            var antiforgery = await GetAntiforgeryToken(client);
+            using var register = new HttpRequestMessage(HttpMethod.Post, "/api/account/register");
+            register.Headers.Add("X-XSRF-TOKEN", antiforgery);
+            register.Content = JsonContent.Create(new { email = "person@example.com", password = "Password1!" });
+
+            var response = await client.SendAsync(register);
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+            var body = await response.Content.ReadAsStringAsync();
+            Assert.Contains("registration_unavailable", body, StringComparison.Ordinal);
+        }
     """;
 
     private static string WebIndex(string name) => $$"""

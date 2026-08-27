@@ -115,6 +115,9 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("MapAccountEndpoints", authenticatedProgram);
             Assert.DoesNotContain("AddIdentityCore<ApplicationUser>", plainProgram);
             Assert.DoesNotContain("MapAccountEndpoints", plainProgram);
+            Assert.Contains("tests/AuthApp.Api.Tests/AuthenticationEndpointTests.cs", authenticatedPaths);
+            var authenticationTests = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "tests", "AuthApp.Api.Tests", "AuthenticationEndpointTests.cs"));
+            Assert.Contains("WebApplicationFactory<Program>", authenticationTests);
         }
         finally
         {
