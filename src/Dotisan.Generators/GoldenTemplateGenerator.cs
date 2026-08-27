@@ -162,7 +162,7 @@ public sealed class ResourceScaffolder
 
     private static string Endpoint(string identifier, string resourceName, string featureName, bool authenticationEnabled) => $$"""
     using {{identifier}}.Api.Data;
-    {{(authenticationEnabled ? $"using {identifier}.Api.Authorization;" : string.Empty)}}
+    {{(authenticationEnabled ? $"using {identifier}.Api.Authorization;\n    using {identifier}.Api.Auditing;" : string.Empty)}}
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Routing;
     using Microsoft.EntityFrameworkCore;
@@ -173,11 +173,15 @@ public sealed class ResourceScaffolder
     {
         public static void Map{{resourceName}}Endpoints(IEndpointRouteBuilder endpoints)
         {
-            var collection = endpoints.MapGet("/api/{{featureName.ToLowerInvariant()}}", async (AppDbContext db, CancellationToken cancellationToken) =>
-                await db.{{featureName}}.AsNoTracking().ToListAsync(cancellationToken));
+            var collection = endpoints.MapGet("/api/{{featureName.ToLowerInvariant()}}", async (AppDbContext db, {{(authenticationEnabled ? "HttpContext httpContext, IAuditWriter audit, " : string.Empty)}}CancellationToken cancellationToken) =>
+            {
+                var entities = await db.{{featureName}}.AsNoTracking().ToListAsync(cancellationToken);
+                {{(authenticationEnabled ? "await audit.RecordAsync(httpContext, \"" + featureName + "\", null, \"list\", new Dictionary<string, object?>(), cancellationToken);" : string.Empty)}}
+                return entities;
+            });
             {{(authenticationEnabled ? "collection.RequireAuthorization(Permissions." + featureName + "View);" : string.Empty)}}
 
-            var create = endpoints.MapPost("/api/{{featureName.ToLowerInvariant()}}", async (Create{{resourceName}}Request request, AppDbContext db, CancellationToken cancellationToken) =>
+            var create = endpoints.MapPost("/api/{{featureName.ToLowerInvariant()}}", async (Create{{resourceName}}Request request, AppDbContext db, {{(authenticationEnabled ? "HttpContext httpContext, IAuditWriter audit, " : string.Empty)}}CancellationToken cancellationToken) =>
             {
                 if (string.IsNullOrWhiteSpace(request.Name))
                 {
@@ -187,19 +191,26 @@ public sealed class ResourceScaffolder
                 var entity = new {{resourceName}} { Name = request.Name.Trim() };
                 db.{{featureName}}.Add(entity);
                 await db.SaveChangesAsync(cancellationToken);
+                {{(authenticationEnabled ? "await audit.RecordAsync(httpContext, \"" + resourceName + "\", entity.Id.ToString(), \"create\", new Dictionary<string, object?> { [\"Name\"] = entity.Name }, cancellationToken);" : string.Empty)}}
                 return Results.Created($"/api/{{featureName.ToLowerInvariant()}}/{entity.Id}", entity);
             });
             {{(authenticationEnabled ? "create.RequireAuthorization(Permissions." + featureName + "Create);" : string.Empty)}}
 
             {{(authenticationEnabled ? $$"""
-            var read = endpoints.MapGet("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, AppDbContext db, CancellationToken cancellationToken) =>
+            var read = endpoints.MapGet("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, AppDbContext db, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) =>
             {
                 var entity = await db.{{featureName}}.AsNoTracking().FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
-                return entity is null ? Results.NotFound() : Results.Ok(entity);
+                if (entity is null)
+                {
+                    return Results.NotFound();
+                }
+
+                await audit.RecordAsync(httpContext, "{{resourceName}}", entity.Id.ToString(), "read", new Dictionary<string, object?>(), cancellationToken);
+                return Results.Ok(entity);
             });
             read.RequireAuthorization(Permissions.{{featureName}}View);
 
-            var update = endpoints.MapPut("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, Update{{resourceName}}Request request, AppDbContext db, CancellationToken cancellationToken) =>
+            var update = endpoints.MapPut("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, Update{{resourceName}}Request request, AppDbContext db, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) =>
             {
                 if (string.IsNullOrWhiteSpace(request.Name))
                 {
@@ -212,13 +223,15 @@ public sealed class ResourceScaffolder
                     return Results.NotFound();
                 }
 
+                var oldName = entity.Name;
                 entity.Name = request.Name.Trim();
                 await db.SaveChangesAsync(cancellationToken);
+                await audit.RecordAsync(httpContext, "{{resourceName}}", entity.Id.ToString(), "update", new Dictionary<string, object?> { ["Name"] = new { old = oldName, @new = entity.Name } }, cancellationToken);
                 return Results.Ok(entity);
             });
             update.RequireAuthorization(Permissions.{{featureName}}Update);
 
-            var delete = endpoints.MapDelete("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, AppDbContext db, CancellationToken cancellationToken) =>
+            var delete = endpoints.MapDelete("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, AppDbContext db, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) =>
             {
                 var entity = await db.{{featureName}}.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
                 if (entity is null)
@@ -228,6 +241,7 @@ public sealed class ResourceScaffolder
 
                 db.{{featureName}}.Remove(entity);
                 await db.SaveChangesAsync(cancellationToken);
+                await audit.RecordAsync(httpContext, "{{resourceName}}", entity.Id.ToString(), "delete", new Dictionary<string, object?>(), cancellationToken);
                 return Results.NoContent();
             });
             delete.RequireAuthorization(Permissions.{{featureName}}Delete);

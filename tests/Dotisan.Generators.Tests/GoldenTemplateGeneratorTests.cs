@@ -67,6 +67,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Data", "CustomerDbSet.cs")));
             Assert.Contains("MapCustomerEndpoints", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Infrastructure", "DotisanEndpointExtensions.cs")));
             Assert.DoesNotContain("RequireAuthorization", await File.ReadAllTextAsync(Path.Combine(featureDirectory, "CustomerEndpoints.cs")));
+            Assert.DoesNotContain("IAuditWriter", await File.ReadAllTextAsync(Path.Combine(featureDirectory, "CustomerEndpoints.cs")));
             Assert.False(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Migrations", "CustomerMigration.cs")));
         }
         finally
@@ -103,6 +104,14 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("Permissions.CustomersDelete", endpoints);
             Assert.Contains("MapPut", endpoints);
             Assert.Contains("MapDelete", endpoints);
+            Assert.Contains("IAuditWriter", endpoints);
+            Assert.Contains("HttpContext", endpoints);
+            Assert.Contains("RecordAsync", endpoints);
+            Assert.Contains("\"list\"", endpoints);
+            Assert.Contains("\"read\"", endpoints);
+            Assert.Contains("\"create\"", endpoints);
+            Assert.Contains("\"update\"", endpoints);
+            Assert.Contains("\"delete\"", endpoints);
 
             var secondResult = await ResourceScaffolder.ScaffoldAsync(output, "Order", CancellationToken.None);
             Assert.True(secondResult.Success, secondResult.ErrorMessage);
