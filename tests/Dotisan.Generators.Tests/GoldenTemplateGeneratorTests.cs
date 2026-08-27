@@ -18,7 +18,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(File.Exists(Path.Combine(output, "TodoApp.sln")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
-            Assert.Contains("\"version\": \"0.3.0\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
+            Assert.Contains("\"version\": \"0.4.0\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditEntry.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "IAuditWriter.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditWriter.cs")));

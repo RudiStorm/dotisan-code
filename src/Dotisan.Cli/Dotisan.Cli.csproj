@@ -6,12 +6,14 @@
     <PackageId>Dotisan</PackageId>
     <ToolCommandName>dotisan</ToolCommandName>
     <PackAsTool>true</PackAsTool>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <Description>Dotisan application scaffolding CLI.</Description>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Dotisan.Core\Dotisan.Core.csproj" />
     <ProjectReference Include="..\Dotisan.Generators\Dotisan.Generators.csproj" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="README.md" />
   </ItemGroup>
 </Project>
