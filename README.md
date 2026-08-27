@@ -49,7 +49,7 @@ For the interactive Quick wizard, omit --yes. It asks for SQLite/SQL Server/Post
 
 ~~~powershell
 dotnet pack src\Dotisan.Cli\Dotisan.Cli.csproj --configuration Release --output .\artifacts
-dotnet tool install --global Dotisan --add-source .\artifacts --version 0.1.0
+dotnet tool install --global Dotisan --add-source .\artifacts --version 0.2.0
 dotisan new MyApp
 ~~~
 

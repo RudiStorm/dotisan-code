@@ -18,6 +18,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(File.Exists(Path.Combine(output, "TodoApp.sln")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
+            Assert.Contains("\"version\": \"0.2.0\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
             Assert.Contains("UseSqlite", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.Contains("Data Source=app.db", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
             Assert.Contains("profile: quick", await File.ReadAllTextAsync(Path.Combine(output, "dotisan.config")));
