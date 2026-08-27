@@ -70,6 +70,9 @@ internal static class TemplateFiles
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationUser.cs", ApplicationUser(identifier)) }
                 : Array.Empty<TemplateFile>()),
+            ..(options.AuthenticationEnabled
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Account/AccountEndpoints.cs", AccountEndpoints(identifier, options.Registration)) }
+                : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier)),
             new($"src/{options.Name}.Api/appsettings.json", "{\n  \"ConnectionStrings\": {\n    \"DefaultConnection\": \"Data Source=app.db\"\n  },\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\",\n      \"Microsoft.AspNetCore\": \"Warning\"\n    }\n  },\n  \"AllowedHosts\": \"*\"\n}\n"),
             new($"src/{options.Name}.Api/appsettings.Development.json", "{\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\",\n      \"Microsoft.AspNetCore\": \"Information\"\n    }\n  }\n}\n"),
@@ -209,6 +212,93 @@ internal static class TemplateFiles
 
     public sealed class ApplicationUser : IdentityUser
     {
+    }
+    """;
+
+    private static string AccountEndpoints(string identifier, RegistrationPolicy registrationPolicy) => $$"""
+    using System.Security.Claims;
+    using {{identifier}}.Api.Identity;
+    using Dotisan.Core;
+    using Microsoft.AspNetCore.Antiforgery;
+    using Microsoft.AspNetCore.Builder;
+    using Microsoft.AspNetCore.Http;
+    using Microsoft.AspNetCore.Identity;
+    using Microsoft.AspNetCore.Routing;
+
+    namespace {{identifier}}.Api.Features.Account;
+
+    public static class AccountEndpoints
+    {
+        public static IEndpointRouteBuilder MapAccountEndpoints(this IEndpointRouteBuilder endpoints)
+        {
+            var group = endpoints.MapGroup("/api/account");
+            group.MapGet("/antiforgery", IssueAntiforgery).AllowAnonymous();
+            group.MapPost("/register", (RegisterRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager) => Register(request, users, signInManager)).AllowAnonymous().RequireAntiforgery();
+            group.MapPost("/login", (LoginRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager) => Login(request, users, signInManager)).AllowAnonymous().RequireAntiforgery();
+            group.MapPost("/logout", (SignInManager<ApplicationUser> signInManager) => Logout(signInManager)).RequireAuthorization().RequireAntiforgery();
+            group.MapGet("/me", (ClaimsPrincipal user) => Me(user)).RequireAuthorization();
+            return endpoints;
+        }
+
+        private static IResult IssueAntiforgery(HttpContext httpContext, IAntiforgery antiforgery)
+        {
+            var tokens = antiforgery.GetAndStoreTokens(httpContext);
+            return Results.Ok(new { token = tokens.RequestToken });
+        }
+
+        private static async Task<IResult> Register(RegisterRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager)
+        {
+            if (RegistrationPolicy.{{registrationPolicy}} is not RegistrationPolicy.Public)
+            {
+                return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Registration is unavailable.", extensions: new Dictionary<string, object?> { ["code"] = "registration_unavailable" });
+            }
+
+            var user = new ApplicationUser { UserName = request.Email, Email = request.Email };
+            var result = await users.CreateAsync(user, request.Password);
+            if (!result.Succeeded)
+            {
+                var errors = result.Errors
+                    .GroupBy(error => error.Code.Contains("Password", StringComparison.OrdinalIgnoreCase) ? "Password" : "Email", StringComparer.Ordinal)
+                    .ToDictionary(group => group.Key, group => group.Select(error => error.Description).ToArray(), StringComparer.Ordinal);
+                return Results.ValidationProblem(errors);
+            }
+
+            await signInManager.SignInAsync(user, isPersistent: false);
+            return Results.Ok(new CurrentUserResponse(user.Id, user.Email!));
+        }
+
+        private static async Task<IResult> Login(LoginRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager)
+        {
+            var user = await users.FindByEmailAsync(request.Email);
+            if (user is null)
+            {
+                return Results.Unauthorized();
+            }
+
+            var result = await signInManager.PasswordSignInAsync(user, request.Password, request.RememberMe, lockoutOnFailure: true);
+            return result.Succeeded
+                ? Results.Ok(new CurrentUserResponse(user.Id, user.Email!))
+                : Results.Unauthorized();
+        }
+
+        private static async Task<IResult> Logout(SignInManager<ApplicationUser> signInManager)
+        {
+            await signInManager.SignOutAsync();
+            return Results.NoContent();
+        }
+
+        private static IResult Me(ClaimsPrincipal user)
+        {
+            var id = user.FindFirstValue(ClaimTypes.NameIdentifier);
+            var email = user.FindFirstValue(ClaimTypes.Email);
+            return id is null || email is null
+                ? Results.Unauthorized()
+                : Results.Ok(new CurrentUserResponse(id, email));
+        }
+
+        public sealed record RegisterRequest(string Email, string Password);
+        public sealed record LoginRequest(string Email, string Password, bool RememberMe);
+        public sealed record CurrentUserResponse(string Id, string Email);
     }
     """;
 

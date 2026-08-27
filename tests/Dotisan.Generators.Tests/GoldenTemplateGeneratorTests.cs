@@ -94,6 +94,15 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("IdentityDbContext<ApplicationUser>", dbContext);
             Assert.Contains("public sealed class ApplicationUser : IdentityUser", user);
             Assert.DoesNotContain("src/PlainApp.Api/Identity/ApplicationUser.cs", plainPaths);
+            Assert.Contains("src/AuthApp.Api/Features/Account/AccountEndpoints.cs", authenticatedPaths);
+            var accountEndpoints = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Features", "Account", "AccountEndpoints.cs"));
+            Assert.Contains("MapAccountEndpoints", accountEndpoints);
+            Assert.Contains("RegisterRequest", accountEndpoints);
+            Assert.Contains("LoginRequest", accountEndpoints);
+            Assert.Contains("CurrentUserResponse", accountEndpoints);
+            Assert.Contains("PasswordSignInAsync", accountEndpoints);
+            Assert.Contains("UserManager<ApplicationUser>", accountEndpoints);
+            Assert.DoesNotContain("AccountEndpoints.cs", plainPaths);
         }
         finally
         {
