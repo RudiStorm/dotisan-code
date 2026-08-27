@@ -50,6 +50,23 @@ public sealed class TypeScriptTypeMapperTests
     }
 
     [Fact]
+    public void Maps_contract_type_compatibility_overload_with_flags()
+    {
+        Assert.Equal("string | null", TypeScriptTypeMapper.Map(ContractType.String, nullable: true));
+        Assert.Equal("number | undefined", TypeScriptTypeMapper.Map(ContractType.Decimal, optional: true));
+    }
+
+    [Fact]
+    public void Renders_empty_manifest_as_newline_terminated_models_file()
+    {
+        var generated = TypeScriptContractGenerator.Generate(new ContractManifest(1, [], []));
+
+        Assert.Single(generated);
+        Assert.Equal("models.ts", generated[0].Path);
+        Assert.Equal(Environment.NewLine, generated[0].Content);
+    }
+
+    [Fact]
     public void Renders_models_ts_deterministically()
     {
         var reversed = new ContractManifest(

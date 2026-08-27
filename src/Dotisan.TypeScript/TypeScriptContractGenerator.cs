@@ -37,6 +37,11 @@ public static class TypeScriptContractGenerator
             hasWrittenSection = true;
         }
 
+        if (builder.Length == 0)
+        {
+            builder.AppendLine();
+        }
+
         return [new GeneratedTypeScriptFile("models.ts", builder.ToString())];
     }
 
