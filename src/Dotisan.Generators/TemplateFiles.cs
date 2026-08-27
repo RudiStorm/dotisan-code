@@ -76,6 +76,9 @@ internal static class TemplateFiles
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Account/AccountEndpoints.cs", AccountEndpoints(identifier, options.Registration == RegistrationPolicy.Public)) }
                 : Array.Empty<TemplateFile>()),
+            ..(options.AuthenticationEnabled
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Authorization/AuthorizationEndpoints.cs", AuthorizationEndpoints(identifier)) }
+                : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier)),
             new($"src/{options.Name}.Api/appsettings.json", "{\n  \"ConnectionStrings\": {\n    \"DefaultConnection\": \"Data Source=app.db\"\n  },\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\",\n      \"Microsoft.AspNetCore\": \"Warning\"\n    }\n  },\n  \"AllowedHosts\": \"*\"\n}\n"),
             new($"src/{options.Name}.Api/appsettings.Development.json", "{\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\",\n      \"Microsoft.AspNetCore\": \"Information\"\n    }\n  }\n}\n"),
@@ -230,6 +233,26 @@ internal static class TemplateFiles
     `dotisan.config` controls orchestration preferences only. `appsettings.json`, environment variables, ASP.NET Core services, EF Core configuration, and Vite configuration remain the source of truth for their respective concerns.
     """;
 
+    private static string AuthorizationEndpoints(string identifier) => $$"""
+    using {{identifier}}.Api.Authorization;
+    using Microsoft.AspNetCore.Builder;
+    using Microsoft.AspNetCore.Http;
+    using Microsoft.AspNetCore.Routing;
+
+    namespace {{identifier}}.Api.Features.Authorization;
+
+    public static class AuthorizationEndpoints
+    {
+        public static void MapAuthorizationEndpoints(this IEndpointRouteBuilder endpoints)
+        {
+            endpoints.MapGet("/api/authorization/profile", () => Results.Ok(new { permission = Permissions.ProfileView }))
+                .RequireAuthorization(Permissions.ProfileView)
+                .WithName("AuthorizationProfile")
+                .WithTags("Authorization");
+        }
+    }
+    """;
+
     private static string ApiProgram(string identifier, bool authenticationEnabled, bool registrationEnabled) => authenticationEnabled
         ? AuthenticatedApiProgram(identifier, registrationEnabled)
         : PlainApiProgram(identifier);
@@ -263,6 +286,7 @@ internal static class TemplateFiles
     using {{identifier}}.Api.Authorization;
     using {{identifier}}.Api.Data;
     using {{identifier}}.Api.Features.Account;
+    using {{identifier}}.Api.Features.Authorization;
     using {{identifier}}.Api.Identity;
     using {{identifier}}.Api.Infrastructure;
     using Microsoft.AspNetCore.Authentication.Cookies;
@@ -314,6 +338,7 @@ internal static class TemplateFiles
     app.UseAntiforgery();
     app.MapDotisanEndpoints();
     app.MapAccountEndpoints({{registrationEnabled.ToString().ToLowerInvariant()}});
+    app.MapAuthorizationEndpoints();
     app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }))
         .WithName("Health")
         .WithTags("System");

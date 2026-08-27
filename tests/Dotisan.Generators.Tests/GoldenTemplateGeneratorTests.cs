@@ -99,6 +99,11 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("public sealed class ApplicationUser : IdentityUser", user);
             Assert.DoesNotContain("src/PlainApp.Api/Identity/ApplicationUser.cs", plainPaths);
             Assert.Contains("src/AuthApp.Api/Features/Account/AccountEndpoints.cs", authenticatedPaths);
+            Assert.Contains("src/AuthApp.Api/Features/Authorization/AuthorizationEndpoints.cs", authenticatedPaths);
+            Assert.DoesNotContain("src/PlainApp.Api/Features/Authorization/AuthorizationEndpoints.cs", plainPaths);
+            var authorizationEndpoints = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Features", "Authorization", "AuthorizationEndpoints.cs"));
+            Assert.Contains("MapGet(\"/api/authorization/profile\"", authorizationEndpoints);
+            Assert.Contains("RequireAuthorization(Permissions.ProfileView)", authorizationEndpoints);
             Assert.Contains("src/AuthApp.Api/Authorization/Permissions.cs", authenticatedPaths);
             Assert.DoesNotContain("src/PlainApp.Api/Authorization/Permissions.cs", plainPaths);
             var permissions = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Authorization", "Permissions.cs"));
@@ -125,6 +130,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("UseAuthorization", authenticatedProgram);
             Assert.Contains("UseAntiforgery", authenticatedProgram);
             Assert.Contains("MapAccountEndpoints", authenticatedProgram);
+            Assert.Contains("MapAuthorizationEndpoints", authenticatedProgram);
             Assert.Contains("using Microsoft.AspNetCore.Identity;", authenticatedProgram);
             Assert.DoesNotContain("using Dotisan.Core;", authenticatedProgram);
             Assert.DoesNotContain("using Dotisan.Core;", accountEndpoints);
