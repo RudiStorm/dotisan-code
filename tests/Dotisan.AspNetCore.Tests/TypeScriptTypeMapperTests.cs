@@ -109,8 +109,8 @@ public sealed class TypeScriptTypeMapperTests
             Environment.NewLine,
             [
                 "export enum Status {",
-                "  Unknown = 0,",
                 "  Ready = 2,",
+                "  Unknown = 0,",
                 "}",
                 "",
                 "export interface Profile {",
@@ -167,5 +167,37 @@ public sealed class TypeScriptTypeMapperTests
         Assert.Equal("models.ts", generated[0].Path);
         Assert.Equal(expected, generated[0].Content);
         Assert.Equal(generated[0].Content, regenerated[0].Content);
+    }
+
+    [Fact]
+    public void Renders_enum_members_in_manifest_name_order_instead_of_numeric_value_order()
+    {
+        var manifest = new ContractManifest(
+            1,
+            [],
+            [
+                new ContractModel(
+                    "Priority",
+                    "global::Priority",
+                    [],
+                    [
+                        new ContractEnumValue("Beta", 10),
+                        new ContractEnumValue("Alpha", 20)
+                    ])
+            ]);
+
+        var generated = TypeScriptContractGenerator.Generate(manifest);
+
+        var expected = string.Join(
+            Environment.NewLine,
+            [
+                "export enum Priority {",
+                "  Alpha = 20,",
+                "  Beta = 10,",
+                "}"
+            ]) + Environment.NewLine;
+
+        Assert.Single(generated);
+        Assert.Equal(expected, generated[0].Content);
     }
 }

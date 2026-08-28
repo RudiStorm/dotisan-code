@@ -49,9 +49,7 @@ public static class TypeScriptContractGenerator
     {
         builder.Append("export enum ").Append(model.Name).AppendLine(" {");
 
-        foreach (var value in model.EnumValues
-            .OrderBy(enumValue => enumValue.Value)
-            .ThenBy(enumValue => enumValue.Name, StringComparer.Ordinal))
+        foreach (var value in model.EnumValues)
         {
             builder.Append("  ").Append(value.Name).Append(" = ").Append(value.Value).AppendLine(",");
         }
