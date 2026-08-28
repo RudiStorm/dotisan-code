@@ -34,6 +34,82 @@ public sealed class ContractManifestTests
     }
 
     [Fact]
+    public void Preserves_legacy_json_when_endpoint_metadata_is_not_provided()
+    {
+        var manifest = new ContractManifest(
+            1,
+            [Entry("customers.read")],
+            []);
+
+        Assert.DoesNotContain("\"endpointMetadata\"", manifest.ToJson());
+        Assert.Null(manifest.EndpointMetadata);
+    }
+
+    [Fact]
+    public void Sorts_endpoint_transport_metadata_with_endpoints_and_serializes_transport_details()
+    {
+        var manifest = new ContractManifest(
+            1,
+            [
+                Entry("customers.write"),
+                Entry("customers.read")
+            ],
+            [],
+            [
+                EndpointContractMetadata.Create(
+                    "POST",
+                    "/api/customers/{id:guid}",
+                    new EndpointRequestBodyMetadata(
+                        new ContractTypeDescriptor(ContractTypeKind.Object, "CreateCustomerRequest")),
+                    [
+                        new EndpointParameterMetadata("id", new ContractTypeDescriptor(ContractTypeKind.Guid), false, false),
+                        new EndpointParameterMetadata("display_name", new ContractTypeDescriptor(ContractTypeKind.String), true, true)
+                    ],
+                    ["Writes", "Customers"],
+                    validation: true),
+                EndpointContractMetadata.Create(
+                    "GET",
+                    "/api/customers/{id:int}",
+                    new EndpointRequestBodyMetadata(
+                        new ContractTypeDescriptor(ContractTypeKind.Object, "ReadCustomerRequest")),
+                    [
+                        new EndpointParameterMetadata("id", new ContractTypeDescriptor(ContractTypeKind.Integer), false, false),
+                        new EndpointParameterMetadata("display_name", new ContractTypeDescriptor(ContractTypeKind.String), true, true)
+                    ],
+                    ["Reads"],
+                    validation: false)
+            ]);
+
+        Assert.Equal(["customers.read", "customers.write"], manifest.Endpoints.Select(endpoint => endpoint.Id));
+        Assert.NotNull(manifest.EndpointMetadata);
+        Assert.Equal(2, manifest.EndpointMetadata!.Count);
+
+        var read = manifest.EndpointMetadata[0];
+        Assert.Null(read.RequestBody);
+        Assert.Equal(200, read.SuccessStatusCode);
+        Assert.Equal(["id"], read.PathParameters.Select(parameter => parameter.Name));
+        Assert.Equal(ContractTypeKind.Integer, read.PathParameters[0].Type.Kind);
+        Assert.Equal(["display_name"], read.QueryParameters.Select(parameter => parameter.Name));
+        Assert.Equal(["Reads"], read.Tags);
+        Assert.False(read.Validation.Enabled);
+
+        var write = manifest.EndpointMetadata[1];
+        Assert.NotNull(write.RequestBody);
+        Assert.Equal("CreateCustomerRequest", write.RequestBody!.Type.ReferenceName);
+        Assert.Equal(201, write.SuccessStatusCode);
+        Assert.Equal(["Customers", "Writes"], write.Tags);
+        Assert.True(write.Validation.Enabled);
+        Assert.Empty(write.QueryParameters);
+
+        var json = manifest.ToJson();
+        Assert.Contains("\"endpointMetadata\":[{\"requestBody\":null", json);
+        Assert.Contains("\"successStatusCode\":200", json);
+        Assert.Contains("\"successStatusCode\":201", json);
+        Assert.Contains("\"referenceName\":\"CreateCustomerRequest\"", json);
+        Assert.Contains("\"queryParameters\":[{\"name\":\"display_name\"", json);
+    }
+
+    [Fact]
     public void Hash_is_stable_for_equivalent_input_order()
     {
         var first = CreateManifest(modelsInReverseOrder: false);
@@ -131,6 +207,26 @@ public sealed class ContractManifestTests
             []);
 
         Assert.Equal(["a.read", "z.read"], manifest.Endpoints.Select(endpoint => endpoint.Id));
+    }
+
+    [Fact]
+    public void Infers_route_token_path_parameters_without_request_properties()
+    {
+        var metadata = EndpointContractMetadata.Create(
+            "GET",
+            "/api/customers/{id:guid}/{version:int?}",
+            requestBody: null,
+            [
+                new EndpointParameterMetadata("search", new ContractTypeDescriptor(ContractTypeKind.String), true, true)
+            ],
+            [],
+            validation: false);
+
+        Assert.Equal(["id", "version"], metadata.PathParameters.Select(parameter => parameter.Name));
+        Assert.Equal(ContractTypeKind.Guid, metadata.PathParameters[0].Type.Kind);
+        Assert.Equal(ContractTypeKind.Integer, metadata.PathParameters[1].Type.Kind);
+        Assert.True(metadata.PathParameters[1].Optional);
+        Assert.Equal(["search"], metadata.QueryParameters.Select(parameter => parameter.Name));
     }
 
     private static ContractManifest CreateManifest(bool modelsInReverseOrder)

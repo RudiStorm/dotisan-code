@@ -17,7 +17,14 @@ public sealed class SourceGeneratorTests
                 public sealed record Response(string Value);
                 public sealed class Handler { }
                 public sealed class Validator { }
-                public static EndpointOptions Configure() => new("z.read", "Z", "ReadZ", "GET", "/api/z");
+                public static EndpointOptions Configure() => new(
+                    "z.write",
+                    "Z",
+                    "WriteZ",
+                    "POST",
+                    "/api/z/{id:guid}",
+                    tags: ["Writes", "Z"],
+                    validation: true);
                 public static void Map(IEndpointRouteBuilder endpoints) { }
             }
             """;
@@ -37,7 +44,13 @@ public sealed class SourceGeneratorTests
                 public enum Status { Unknown = 0, Ready = 2 }
                 public sealed class Handler { }
                 public sealed class Validator { }
-                public static EndpointOptions Configure() => new("a.read", "A", "ReadA", "GET", "/api/a");
+                public static EndpointOptions Configure() => new(
+                    "a.read",
+                    "A",
+                    "ReadA",
+                    "GET",
+                    "/api/a/{id:guid}",
+                    tags: ["Reads", "A"]);
                 public static void Map(IEndpointRouteBuilder endpoints) { }
             }
             """;
@@ -60,9 +73,16 @@ public sealed class SourceGeneratorTests
         Assert.Contains("MapDotisanEndpoints(this IEndpointRouteBuilder endpoints)", generated);
         Assert.Contains("AddDotisanEndpointServices(this IServiceCollection services)", generated);
         Assert.Contains("ManifestSchemaVersion", generated);
+        Assert.Contains("public static global::System.Collections.Generic.IReadOnlyList<global::Dotisan.Core.EndpointContractMetadata> EndpointMetadata { get; } =", generated);
+        Assert.Contains("global::Dotisan.Core.EndpointContractMetadata.Create(", generated);
+        Assert.Contains("global::AEndpoint.Configure().Method", generated);
+        Assert.Contains("global::AEndpoint.Configure().Route", generated);
+        Assert.Contains("global::AEndpoint.Configure().Tags", generated);
+        Assert.Contains("global::AEndpoint.Configure().Validation", generated);
         Assert.Contains("EndpointManifestJson", generated);
         Assert.Contains("EndpointManifestSha256", generated);
         Assert.Contains("public static global::Dotisan.Core.ContractManifest ContractManifest { get; } =", generated);
+        Assert.Contains("EndpointMetadata);", generated);
         Assert.Contains("public static string ContractManifestJson => ContractManifest.ToJson();", generated);
         Assert.Contains("public static string ContractManifestSha256 => ContractManifest.Sha256;", generated);
         Assert.Contains("services.AddScoped<global::AEndpoint.Handler>();", generated);
@@ -74,6 +94,9 @@ public sealed class SourceGeneratorTests
         Assert.Contains("global::Dotisan.Core.ContractTypeKind.Enum", generated);
         Assert.Contains("global::Dotisan.Core.ContractTypeKind.Unknown", generated);
         Assert.Contains("\"display_name\"", generated);
+        Assert.Contains("\"id\"", generated);
+        Assert.Contains("\"AEndpointRequest\"", generated);
+        Assert.Contains("\"ZEndpointRequest\"", generated);
         Assert.Contains("nullable: true", generated);
         Assert.Contains("optional: true", generated);
         Assert.Contains("\"AEndpointNested\"", generated);
@@ -170,7 +193,7 @@ public sealed class SourceGeneratorTests
         Assert.True(result.Diagnostics.IsEmpty);
         Assert.Contains("\"baseValue\"", generated);
         Assert.Contains("\"own\"", generated);
-        Assert.Equal(1, CountOccurrences(generated, "\"hidden\""));
+        Assert.Equal(2, CountOccurrences(generated, "\"hidden\""));
     }
 
     [Fact]
@@ -236,9 +259,9 @@ public sealed class SourceGeneratorTests
 
     private static string GetContractMembers(string generated)
     {
-        const string marker = "    public static global::Dotisan.Core.ContractManifest ContractManifest { get; } =";
+        const string marker = "    public static global::System.Collections.Generic.IReadOnlyList<global::Dotisan.Core.EndpointContractMetadata> EndpointMetadata { get; } =";
         var index = generated.IndexOf(marker, StringComparison.Ordinal);
-        Assert.True(index >= 0, "Expected generated source to contain the ContractManifest member.");
+        Assert.True(index >= 0, "Expected generated source to contain the EndpointMetadata member.");
         return generated[index..];
     }
 

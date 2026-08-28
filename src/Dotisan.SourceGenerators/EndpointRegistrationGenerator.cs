@@ -124,7 +124,7 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
 
     private static string BuildSource(IReadOnlyList<EndpointCandidate> candidates)
     {
-        var models = BuildContractModels(candidates);
+        var contractData = BuildContractData(candidates);
         var source = new StringBuilder();
         source.AppendLine("using System;");
         source.AppendLine("using System.Collections.Generic;");
@@ -214,18 +214,21 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
         source.AppendLine("    public static string EndpointManifestJson => new global::Dotisan.Core.EndpointManifest(EndpointManifest).ToJson();");
         source.AppendLine("    public static string EndpointManifestSha256 => new global::Dotisan.Core.EndpointManifest(EndpointManifest).Sha256;");
         source.AppendLine();
-        AppendContractManifest(source, models);
+        AppendEndpointMetadata(source, contractData.EndpointMetadata);
+        AppendContractManifest(source, contractData.Models);
         source.AppendLine("}");
         return source.ToString();
     }
 
-    private static EmittedContractModel[] BuildContractModels(IReadOnlyList<EndpointCandidate> candidates)
+    private static ContractBuildResult BuildContractData(IReadOnlyList<EndpointCandidate> candidates)
     {
         var collector = new ContractModelCollector();
+        var endpointMetadata = new List<EndpointContractMetadataCandidate>(candidates.Count);
 
         foreach (var candidate in candidates)
         {
-            if (candidate.Symbol.GetTypeMembers("Request").FirstOrDefault() is { } request)
+            var request = candidate.Symbol.GetTypeMembers("Request").FirstOrDefault();
+            if (request is not null)
             {
                 collector.AddRootModel(request, candidate.DisplayName + "Request");
             }
@@ -234,9 +237,75 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
             {
                 collector.AddRootModel(response, candidate.DisplayName + "Response");
             }
+
+            endpointMetadata.Add(new EndpointContractMetadataCandidate(
+                candidate.TypeName,
+                request is null
+                    ? null
+                    : new ContractTypeDescriptor(ContractTypeKind.Object, ReferenceSourceType: GetSourceTypeName(request)),
+                request is null
+                    ? []
+                    : BuildEndpointRequestParameters(request, collector.AddModel)));
         }
 
-        return collector.Build();
+        var modelBuild = collector.Build();
+
+        return new ContractBuildResult(
+            modelBuild.Models,
+            endpointMetadata
+                .Select(candidate => new EmittedEndpointContractMetadata(
+                    candidate.EndpointTypeName,
+                    candidate.RequestBody is null
+                        ? null
+                        : new EmittedEndpointRequestBodyMetadata(modelBuild.ResolveDescriptor(candidate.RequestBody)),
+                    candidate.RequestParameters
+                        .OrderBy(parameter => parameter.Name, StringComparer.Ordinal)
+                        .Select(parameter => new EmittedEndpointParameterMetadata(
+                            parameter.Name,
+                            modelBuild.ResolveDescriptor(parameter.Type),
+                            parameter.Nullable,
+                            parameter.Optional))
+                        .ToArray()))
+                .ToArray());
+    }
+
+    private static ContractProperty[] BuildEndpointRequestParameters(
+        INamedTypeSymbol requestType,
+        Action<ContractModel> addModel)
+    {
+        return GetReadableTransportProperties(requestType)
+            .Select(property => new ContractProperty(
+                GetTransportPropertyName(property),
+                DescribeType(property.Type, GetSourceTypeName(property.Type), addModel),
+                IsNullableProperty(property),
+                IsOptionalProperty(property)))
+            .OrderBy(property => property.Name, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static void AppendEndpointMetadata(
+        StringBuilder source,
+        IReadOnlyList<EmittedEndpointContractMetadata> endpointMetadata)
+    {
+        source.AppendLine("    public static global::System.Collections.Generic.IReadOnlyList<global::Dotisan.Core.EndpointContractMetadata> EndpointMetadata { get; } =");
+        if (endpointMetadata.Count == 0)
+        {
+            source.AppendLine("        global::System.Array.Empty<global::Dotisan.Core.EndpointContractMetadata>();");
+        }
+        else
+        {
+            source.AppendLine("        new global::Dotisan.Core.EndpointContractMetadata[]");
+            source.AppendLine("        {");
+            foreach (var metadata in endpointMetadata)
+            {
+                AppendEndpointMetadataExpression(source, "            ", metadata);
+                source.AppendLine(",");
+            }
+
+            source.AppendLine("        };");
+        }
+
+        source.AppendLine();
     }
 
     private static void AppendContractManifest(StringBuilder source, IReadOnlyList<EmittedContractModel> models)
@@ -248,7 +317,7 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
 
         if (models.Count == 0)
         {
-            source.AppendLine("            global::System.Array.Empty<global::Dotisan.Core.ContractModel>());");
+            source.AppendLine("            global::System.Array.Empty<global::Dotisan.Core.ContractModel>(),");
         }
         else
         {
@@ -260,13 +329,84 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
                 source.AppendLine(",");
             }
 
-            source.AppendLine("            });");
+            source.AppendLine("            },");
         }
 
+        source.AppendLine("            EndpointMetadata);");
         source.AppendLine();
         source.AppendLine("    public static string ContractManifestJson => ContractManifest.ToJson();");
         source.AppendLine("    public static string ContractManifestSha256 => ContractManifest.Sha256;");
         source.AppendLine();
+    }
+
+    private static void AppendEndpointMetadataExpression(
+        StringBuilder source,
+        string indent,
+        EmittedEndpointContractMetadata metadata)
+    {
+        source.Append(indent).AppendLine("global::Dotisan.Core.EndpointContractMetadata.Create(");
+        source.Append(indent).Append("    method: ").Append(metadata.EndpointTypeName).AppendLine(".Configure().Method,");
+        source.Append(indent).Append("    route: ").Append(metadata.EndpointTypeName).AppendLine(".Configure().Route,");
+        source.Append(indent).Append("    requestBody: ");
+        AppendEndpointRequestBodyExpression(source, metadata.RequestBody);
+        source.AppendLine(",");
+        source.Append(indent).Append("    requestParameters: ");
+        AppendEndpointParameterArray(source, indent + "    ", metadata.RequestParameters);
+        source.AppendLine(",");
+        source.Append(indent).Append("    tags: ").Append(metadata.EndpointTypeName).AppendLine(".Configure().Tags,");
+        source.Append(indent).Append("    validation: ").Append(metadata.EndpointTypeName).Append(".Configure().Validation)");
+    }
+
+    private static void AppendEndpointRequestBodyExpression(
+        StringBuilder source,
+        EmittedEndpointRequestBodyMetadata? requestBody)
+    {
+        if (requestBody is null)
+        {
+            source.Append("null");
+            return;
+        }
+
+        source.Append("new global::Dotisan.Core.EndpointRequestBodyMetadata(");
+        AppendContractTypeDescriptorExpression(source, requestBody.Type);
+        source.Append(')');
+    }
+
+    private static void AppendEndpointParameterArray(
+        StringBuilder source,
+        string indent,
+        IReadOnlyList<EmittedEndpointParameterMetadata> parameters)
+    {
+        if (parameters.Count == 0)
+        {
+            source.Append("global::System.Array.Empty<global::Dotisan.Core.EndpointParameterMetadata>()");
+            return;
+        }
+
+        source.AppendLine("new global::Dotisan.Core.EndpointParameterMetadata[]");
+        source.Append(indent).AppendLine("{");
+        foreach (var parameter in parameters)
+        {
+            source.Append(indent).AppendLine("    new global::Dotisan.Core.EndpointParameterMetadata(");
+            source.Append(indent).Append("        ").Append(ToCSharpStringLiteral(parameter.Name)).AppendLine(",");
+            source.Append(indent).Append("        ");
+            AppendContractTypeDescriptorExpression(source, parameter.Type);
+            source.AppendLine(",");
+            source.Append(indent)
+                .Append("        /* nullable: ")
+                .Append(parameter.Nullable ? "true" : "false")
+                .Append(" */ ")
+                .Append(parameter.Nullable ? "true" : "false")
+                .AppendLine(",");
+            source.Append(indent)
+                .Append("        /* optional: ")
+                .Append(parameter.Optional ? "true" : "false")
+                .Append(" */ ")
+                .Append(parameter.Optional ? "true" : "false")
+                .AppendLine("),");
+        }
+
+        source.Append(indent).Append('}');
     }
 
     private static void AppendContractModelExpression(
@@ -936,14 +1076,14 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
             building.Remove(model.SourceType);
         }
 
-        public EmittedContractModel[] Build()
+        public ContractModelBuildResult Build()
         {
             var ordered = modelsBySourceType.Values
                 .OrderBy(model => model.SourceType, StringComparer.Ordinal)
                 .ToArray();
             var resolvedNames = ResolveModelNames(ordered);
 
-            return ordered
+            var models = ordered
                 .Select(model => new EmittedContractModel(
                     resolvedNames[model.SourceType],
                     model.SourceType,
@@ -960,6 +1100,8 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
                         .ToArray()))
                 .OrderBy(model => model.Name, StringComparer.Ordinal)
                 .ToArray();
+
+            return new ContractModelBuildResult(models, resolvedNames);
         }
 
         private static Dictionary<string, string> ResolveModelNames(IReadOnlyList<ContractModel> models)
@@ -996,6 +1138,67 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
 
             return new EmittedContractTypeDescriptor(descriptor.Kind, referenceName, elementType);
         }
+    }
+
+    private sealed class ContractBuildResult
+    {
+        public ContractBuildResult(
+            IReadOnlyList<EmittedContractModel> models,
+            IReadOnlyList<EmittedEndpointContractMetadata> endpointMetadata)
+        {
+            Models = models;
+            EndpointMetadata = endpointMetadata;
+        }
+
+        public IReadOnlyList<EmittedContractModel> Models { get; }
+
+        public IReadOnlyList<EmittedEndpointContractMetadata> EndpointMetadata { get; }
+    }
+
+    private sealed class ContractModelBuildResult
+    {
+        private readonly IReadOnlyDictionary<string, string> resolvedNames;
+
+        public ContractModelBuildResult(
+            IReadOnlyList<EmittedContractModel> models,
+            IReadOnlyDictionary<string, string> resolvedNames)
+        {
+            Models = models;
+            this.resolvedNames = resolvedNames;
+        }
+
+        public IReadOnlyList<EmittedContractModel> Models { get; }
+
+        public EmittedContractTypeDescriptor ResolveDescriptor(ContractTypeDescriptor descriptor)
+        {
+            var referenceName = descriptor.ReferenceSourceType is null
+                ? null
+                : resolvedNames[descriptor.ReferenceSourceType];
+            var elementType = descriptor.ElementType is null
+                ? null
+                : ResolveDescriptor(descriptor.ElementType);
+
+            return new EmittedContractTypeDescriptor(descriptor.Kind, referenceName, elementType);
+        }
+    }
+
+    private sealed class EndpointContractMetadataCandidate
+    {
+        public EndpointContractMetadataCandidate(
+            string endpointTypeName,
+            ContractTypeDescriptor? requestBody,
+            IReadOnlyList<ContractProperty> requestParameters)
+        {
+            EndpointTypeName = endpointTypeName;
+            RequestBody = requestBody;
+            RequestParameters = requestParameters;
+        }
+
+        public string EndpointTypeName { get; }
+
+        public ContractTypeDescriptor? RequestBody { get; }
+
+        public IReadOnlyList<ContractProperty> RequestParameters { get; }
     }
 
     private sealed class EndpointCandidate
@@ -1116,6 +1319,58 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
         public string SourceType { get; }
         public IReadOnlyList<EmittedContractProperty> Properties { get; }
         public IReadOnlyList<ContractEnumValue> EnumValues { get; }
+    }
+
+    private sealed class EmittedEndpointContractMetadata
+    {
+        public EmittedEndpointContractMetadata(
+            string endpointTypeName,
+            EmittedEndpointRequestBodyMetadata? requestBody,
+            IReadOnlyList<EmittedEndpointParameterMetadata> requestParameters)
+        {
+            EndpointTypeName = endpointTypeName;
+            RequestBody = requestBody;
+            RequestParameters = requestParameters;
+        }
+
+        public string EndpointTypeName { get; }
+
+        public EmittedEndpointRequestBodyMetadata? RequestBody { get; }
+
+        public IReadOnlyList<EmittedEndpointParameterMetadata> RequestParameters { get; }
+    }
+
+    private sealed class EmittedEndpointRequestBodyMetadata
+    {
+        public EmittedEndpointRequestBodyMetadata(EmittedContractTypeDescriptor type)
+        {
+            Type = type;
+        }
+
+        public EmittedContractTypeDescriptor Type { get; }
+    }
+
+    private sealed class EmittedEndpointParameterMetadata
+    {
+        public EmittedEndpointParameterMetadata(
+            string name,
+            EmittedContractTypeDescriptor type,
+            bool nullable,
+            bool optional)
+        {
+            Name = name;
+            Type = type;
+            Nullable = nullable;
+            Optional = optional;
+        }
+
+        public string Name { get; }
+
+        public EmittedContractTypeDescriptor Type { get; }
+
+        public bool Nullable { get; }
+
+        public bool Optional { get; }
     }
 
     private sealed class EmittedContractProperty
