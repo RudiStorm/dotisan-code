@@ -5,6 +5,7 @@ obj/
 *.suo
 .vs/
 .worktrees/
+.superpowers/
 
 ## Node
 node_modules/
