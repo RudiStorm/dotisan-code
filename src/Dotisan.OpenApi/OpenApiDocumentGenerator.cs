@@ -73,7 +73,7 @@ public static class OpenApiDocumentGenerator
         Dictionary<string, ContractModel> modelsBySourceType)
     {
         var parameters = metadata.PathParameters
-            .Select(parameter => BuildParameter(parameter, "path", required: true, endpoint.Id, modelsByName))
+            .Select(parameter => BuildPathParameter(parameter, endpoint.Id, modelsByName))
             .Concat(metadata.QueryParameters.Select(parameter => BuildParameter(
                 parameter,
                 "query",
@@ -105,6 +105,20 @@ public static class OpenApiDocumentGenerator
             parameters,
             requestBody,
             new OpenApiResponse(metadata.SuccessStatusCode, responseSchema));
+    }
+
+    private static OpenApiParameter BuildPathParameter(
+        EndpointParameterMetadata parameter,
+        string endpointId,
+        Dictionary<string, ContractModel> modelsByName)
+    {
+        if (parameter.Optional)
+        {
+            throw new InvalidOperationException(
+                $"OpenAPI path parameters must be required; endpoint '{endpointId}' declares optional route parameter '{parameter.Name}'.");
+        }
+
+        return BuildParameter(parameter, "path", required: true, endpointId, modelsByName);
     }
 
     private static OpenApiParameter BuildParameter(

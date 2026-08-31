@@ -71,6 +71,95 @@ public sealed class OpenApiDocumentGeneratorTests
         Assert.Equal("OpenAPI generation does not support contract type kind 'Unknown' for 'SupportResponse.ticketId'.", error.Message);
     }
 
+    [Fact]
+    public void Rejects_optional_route_parameters_with_actionable_error()
+    {
+        var manifest = new ContractManifest(
+            1,
+            [
+                new EndpointManifestEntry(
+                    Id: "orders.optional",
+                    Feature: "Orders",
+                    Name: "orders.optional",
+                    Method: "GET",
+                    Route: "/orders/{orderId?}",
+                    Request: "global::OptionalOrderRequest",
+                    Response: "global::OptionalOrderResponse",
+                    Authorization: false,
+                    Permission: null,
+                    Version: null,
+                    Tags: [],
+                    Validation: false,
+                    Deprecated: false)
+            ],
+            [
+                new ContractModel(
+                    "OptionalOrderResponse",
+                    "global::OptionalOrderResponse",
+                    [
+                        new ContractProperty("id", new ContractTypeDescriptor(ContractTypeKind.Integer), false, false)
+                    ],
+                    [])
+            ],
+            [
+                EndpointContractMetadata.Create(
+                    "GET",
+                    "/orders/{orderId?}",
+                    requestBody: null,
+                    [],
+                    ["Orders"],
+                    validation: false)
+            ]);
+
+        var error = Assert.Throws<InvalidOperationException>(() => OpenApiDocumentGenerator.Generate(manifest, "Orders API", "v1"));
+        Assert.Equal(
+            "OpenAPI path parameters must be required; endpoint 'orders.optional' declares optional route parameter 'orderId'.",
+            error.Message);
+    }
+
+    [Fact]
+    public void Omits_response_content_for_204_no_content_operations()
+    {
+        var manifest = new ContractManifest(
+            1,
+            [
+                new EndpointManifestEntry(
+                    Id: "orders.delete",
+                    Feature: "Orders",
+                    Name: "orders.delete",
+                    Method: "DELETE",
+                    Route: "/orders/{orderId}",
+                    Request: "global::DeleteOrderRequest",
+                    Response: "global::DeleteOrderResponse",
+                    Authorization: false,
+                    Permission: null,
+                    Version: null,
+                    Tags: [],
+                    Validation: false,
+                    Deprecated: false)
+            ],
+            [],
+            [
+                EndpointContractMetadata.Create(
+                    "DELETE",
+                    "/orders/{orderId}",
+                    requestBody: null,
+                    [
+                        new EndpointParameterMetadata("orderId", new ContractTypeDescriptor(ContractTypeKind.Integer), false, false)
+                    ],
+                    ["Orders", "Deletes"],
+                    validation: false)
+            ]);
+
+        var generated = OpenApiDocumentGenerator.Generate(manifest, "Orders API", "v1");
+        var expectedJson = """
+            {"openapi":"3.1.0","jsonSchemaDialect":"https://spec.openapis.org/oas/3.1/dialect/base","info":{"title":"Orders API","version":"v1"},"paths":{"/orders/{orderId}":{"delete":{"operationId":"orders.delete","tags":["Deletes","Orders"],"parameters":[{"name":"orderId","in":"path","required":true,"schema":{"type":"integer"}}],"responses":{"204":{"description":"Success"}}}}},"components":{"schemas":{}}}
+            """;
+
+        Assert.Equal(expectedJson, generated.Json);
+        Assert.DoesNotContain("\"content\"", generated.Json, StringComparison.Ordinal);
+    }
+
     private static ContractManifest CreateManifest(bool reverseInputs)
     {
         var endpoints = reverseInputs
