@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+    <AssemblyName>Dotisan.OpenApi.Tests</AssemblyName>
+    <RootNamespace>Dotisan.OpenApi.Tests</RootNamespace>
+    <NoWarn>CA1707;CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="coverlet.collector" />
+    <ProjectReference Include="..\..\src\Dotisan.Core\Dotisan.Core.csproj" />
+    <ProjectReference Include="..\..\src\Dotisan.OpenApi\Dotisan.OpenApi.csproj" />
+  </ItemGroup>
+</Project>

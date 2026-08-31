@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dotisan.OpenApi</AssemblyName>
+    <RootNamespace>Dotisan.OpenApi</RootNamespace>
+    <PackageId>Dotisan.OpenApi</PackageId>
+    <NoWarn>CA1720;CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dotisan.Core\Dotisan.Core.csproj" />
+  </ItemGroup>
+</Project>
