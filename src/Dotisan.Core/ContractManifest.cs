@@ -12,6 +12,14 @@ public sealed record ContractManifest
     public ContractManifest(
         int SchemaVersion,
         IReadOnlyList<EndpointManifestEntry> Endpoints,
+        IReadOnlyList<ContractModel> Models)
+        : this(SchemaVersion, Endpoints, Models, EndpointMetadata: null)
+    {
+    }
+
+    public ContractManifest(
+        int SchemaVersion,
+        IReadOnlyList<EndpointManifestEntry> Endpoints,
         IReadOnlyList<ContractModel> Models,
         IReadOnlyList<EndpointContractMetadata>? EndpointMetadata = null)
     {

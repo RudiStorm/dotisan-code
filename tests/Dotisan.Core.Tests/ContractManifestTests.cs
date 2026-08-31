@@ -46,6 +46,19 @@ public sealed class ContractManifestTests
     }
 
     [Fact]
+    public void Preserves_original_three_parameter_constructor_signature()
+    {
+        var constructor = typeof(ContractManifest).GetConstructor(
+            [
+                typeof(int),
+                typeof(IReadOnlyList<EndpointManifestEntry>),
+                typeof(IReadOnlyList<ContractModel>)
+            ]);
+
+        Assert.NotNull(constructor);
+    }
+
+    [Fact]
     public void Sorts_endpoint_transport_metadata_with_endpoints_and_serializes_transport_details()
     {
         var manifest = new ContractManifest(

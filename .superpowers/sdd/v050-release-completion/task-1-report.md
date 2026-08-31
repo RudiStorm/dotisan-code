@@ -118,3 +118,51 @@ Results:
 - Success-status inference is intentionally minimal for Task 1: `POST` maps to `201`, `DELETE` maps to `204`, and other verbs currently map to `200`.
 - Route-token type inference currently recognizes the common typed ASP.NET constraints (`guid`, `int`, `long`, `short`, `byte`, `bool`, `decimal`, `double`, `float`, `datetime`) and falls back to `string`.
 - Portable validation rules are intentionally scaffolded as an enabled/rules envelope here; rule extraction remains for the later validation task.
+
+## Fix Round 1 — 2026-08-31
+
+### Review Findings Addressed
+
+1. Restored a real public three-parameter `ContractManifest` constructor overload while keeping the endpoint-metadata overload.
+2. Strengthened source-generator tests to compile the generated assembly, execute the exported manifest properties, and verify real `Json` and `Sha256` behavior rather than relying only on source-text assertions.
+3. Changed generated `EndpointManifest` and `EndpointMetadata` to reuse one `Configure()` snapshot per endpoint so exported values cannot diverge at runtime.
+
+### RED
+
+- The uncommitted compatibility test failed because `ContractManifest` no longer exposed an exact three-parameter constructor.
+- The new generated-behavior test failed because `SnapshotEndpoint.Configure()` was invoked `5` times instead of `1`.
+
+### GREEN
+
+- Added `public ContractManifest(int, IReadOnlyList<EndpointManifestEntry>, IReadOnlyList<ContractModel>)`.
+- Emitted one generated `EndpointOptions` snapshot field per endpoint and routed both generated manifest exports through that field.
+- Added a real generator execution test that:
+  - compiles the generated source into an assembly
+  - reads `EndpointManifest`, `EndpointMetadata`, and `ContractManifest`
+  - verifies `EndpointManifestJson`, `EndpointManifestSha256`, `ContractManifestJson`, and `ContractManifestSha256`
+  - proves one `Configure()` call per endpoint
+
+### Verification
+
+Focused:
+
+```powershell
+dotnet test tests\Dotisan.Core.Tests\Dotisan.Core.Tests.csproj --no-restore --filter FullyQualifiedName~ContractManifest
+dotnet test tests\Dotisan.SourceGenerators.Tests\Dotisan.SourceGenerators.Tests.csproj --no-restore --filter FullyQualifiedName~SourceGeneratorTests
+```
+
+Full relevant suites:
+
+```powershell
+dotnet test tests\Dotisan.Core.Tests\Dotisan.Core.Tests.csproj --no-restore --no-build
+dotnet test tests\Dotisan.SourceGenerators.Tests\Dotisan.SourceGenerators.Tests.csproj --no-restore --no-build
+```
+
+Results:
+
+- `Dotisan.Core.Tests`: 21 passed, 0 failed
+- `Dotisan.SourceGenerators.Tests`: 5 passed, 0 failed
+
+### Scope Notes
+
+- Added `tests/Dotisan.SourceGenerators.Tests/Dotisan.SourceGenerators.Tests.csproj` reference coverage for `Dotisan.AspNetCore` so the generated-assembly test can compile the emitted extension type on a clean build.

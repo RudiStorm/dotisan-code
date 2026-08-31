@@ -137,6 +137,20 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
         source.AppendLine();
         source.AppendLine("public static class DotisanGeneratedEndpointExtensions");
         source.AppendLine("{");
+        foreach (var candidate in candidates)
+        {
+            source.Append("    private static readonly global::Dotisan.Core.EndpointOptions ")
+                .Append(GetConfigureSnapshotFieldName(candidate.TypeName))
+                .Append(" = ")
+                .Append(candidate.TypeName)
+                .AppendLine(".Configure();");
+        }
+
+        if (candidates.Count > 0)
+        {
+            source.AppendLine();
+        }
+
         source.AppendLine("    public static IEndpointRouteBuilder MapDotisanEndpoints(this IEndpointRouteBuilder endpoints)");
         source.AppendLine("    {");
 
@@ -198,8 +212,8 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
             foreach (var candidate in candidates)
             {
                 source.Append("            ")
-                    .Append(candidate.TypeName)
-                    .Append(".Configure().ToManifestEntry(\"")
+                    .Append(GetConfigureSnapshotFieldName(candidate.TypeName))
+                    .Append(".ToManifestEntry(\"")
                     .Append(candidate.TypeName)
                     .Append(".Request\", \"")
                     .Append(candidate.TypeName)
@@ -344,17 +358,18 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
         string indent,
         EmittedEndpointContractMetadata metadata)
     {
+        var configureSnapshotFieldName = GetConfigureSnapshotFieldName(metadata.EndpointTypeName);
         source.Append(indent).AppendLine("global::Dotisan.Core.EndpointContractMetadata.Create(");
-        source.Append(indent).Append("    method: ").Append(metadata.EndpointTypeName).AppendLine(".Configure().Method,");
-        source.Append(indent).Append("    route: ").Append(metadata.EndpointTypeName).AppendLine(".Configure().Route,");
+        source.Append(indent).Append("    method: ").Append(configureSnapshotFieldName).AppendLine(".Method,");
+        source.Append(indent).Append("    route: ").Append(configureSnapshotFieldName).AppendLine(".Route,");
         source.Append(indent).Append("    requestBody: ");
         AppendEndpointRequestBodyExpression(source, metadata.RequestBody);
         source.AppendLine(",");
         source.Append(indent).Append("    requestParameters: ");
         AppendEndpointParameterArray(source, indent + "    ", metadata.RequestParameters);
         source.AppendLine(",");
-        source.Append(indent).Append("    tags: ").Append(metadata.EndpointTypeName).AppendLine(".Configure().Tags,");
-        source.Append(indent).Append("    validation: ").Append(metadata.EndpointTypeName).Append(".Configure().Validation)");
+        source.Append(indent).Append("    tags: ").Append(configureSnapshotFieldName).AppendLine(".Tags,");
+        source.Append(indent).Append("    validation: ").Append(configureSnapshotFieldName).Append(".Validation)");
     }
 
     private static void AppendEndpointRequestBodyExpression(
@@ -871,6 +886,11 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
         return string.IsNullOrWhiteSpace(sanitized)
             ? "ContractModel"
             : sanitized;
+    }
+
+    private static string GetConfigureSnapshotFieldName(string typeName)
+    {
+        return "ConfigureSnapshot_" + SanitizeSourceTypeName(typeName);
     }
 
     private static bool TryGetJsonPropertyNameFromSyntax(IPropertySymbol property, out string transportName)

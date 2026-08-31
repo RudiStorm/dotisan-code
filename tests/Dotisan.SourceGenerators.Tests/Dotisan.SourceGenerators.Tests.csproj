@@ -13,6 +13,7 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="coverlet.collector" />
+    <ProjectReference Include="..\..\src\Dotisan.AspNetCore\Dotisan.AspNetCore.csproj" />
     <ProjectReference Include="..\..\src\Dotisan.Core\Dotisan.Core.csproj" />
     <ProjectReference Include="..\..\src\Dotisan.SourceGenerators\Dotisan.SourceGenerators.csproj" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
