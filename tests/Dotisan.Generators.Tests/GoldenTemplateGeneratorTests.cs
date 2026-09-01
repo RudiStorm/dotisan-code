@@ -58,12 +58,19 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "JobRegistration.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "SampleJob.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "SampleJobHandler.cs")));
-            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "JobEndpoints.cs")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Features", "Jobs", "JobEndpoints.cs")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Features", "Health", "HealthEndpoints.cs")));
             var jobs = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "JobRegistration.cs"));
             Assert.Contains("UseDurableLocalQueues", jobs);
             Assert.Contains("PersistMessagesWithSqlite", jobs);
             Assert.Contains("DOTISAN:SCHEDULE sample|SampleJob|300|true", jobs);
-            Assert.Contains("ScheduleAsync", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "JobEndpoints.cs")));
+            Assert.Contains("ScheduleAsync", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Features", "Jobs", "JobEndpoints.cs")));
+            var endpointRegistry = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Infrastructure", "DotisanEndpointExtensions.cs"));
+            Assert.Contains("JobEndpoints.MapJobEndpoints", endpointRegistry);
+            Assert.Contains("HealthEndpoints.MapHealthEndpoints", endpointRegistry);
+            var generatedPaths = Directory.GetFiles(output, "*", SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(output, path).Replace(Path.DirectorySeparatorChar, '/'));
+            Assert.DoesNotContain("src/TodoApp.Api/Jobs/JobEndpoints.cs", generatedPaths);
             Assert.Contains("UseWolverine", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.Contains("\"Jobs\":", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
             Assert.Contains("Data Source=app.db", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
@@ -319,6 +326,8 @@ public sealed class GoldenTemplateGeneratorTests
             var user = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Identity", "ApplicationUser.cs"));
             var authenticatedProgram = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Program.cs"));
             var plainProgram = await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Api", "Program.cs"));
+            var authenticatedEndpointRegistry = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Infrastructure", "DotisanEndpointExtensions.cs"));
+            var plainEndpointRegistry = await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Api", "Infrastructure", "DotisanEndpointExtensions.cs"));
             var authenticatedReadme = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "README.md"));
 
             Assert.Contains("Microsoft.AspNetCore.Identity.EntityFrameworkCore", apiProject);
@@ -371,8 +380,14 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("UseAuthentication", authenticatedProgram);
             Assert.Contains("UseAuthorization", authenticatedProgram);
             Assert.Contains("UseAntiforgery", authenticatedProgram);
-            Assert.Contains("MapAccountEndpoints", authenticatedProgram);
-            Assert.Contains("MapAuthorizationEndpoints", authenticatedProgram);
+            Assert.DoesNotContain("MapAccountEndpoints", authenticatedProgram);
+            Assert.DoesNotContain("MapAuthorizationEndpoints", authenticatedProgram);
+            Assert.Contains("AccountEndpoints.MapAccountEndpoints", authenticatedEndpointRegistry);
+            Assert.Contains("AuthorizationEndpoints.MapAuthorizationEndpoints", authenticatedEndpointRegistry);
+            Assert.Contains("HealthEndpoints.MapHealthEndpoints", authenticatedEndpointRegistry);
+            Assert.Contains("JobEndpoints.MapJobEndpoints", authenticatedEndpointRegistry);
+            Assert.Contains("HealthEndpoints.MapHealthEndpoints", plainEndpointRegistry);
+            Assert.Contains("JobEndpoints.MapJobEndpoints", plainEndpointRegistry);
             Assert.Contains("using Microsoft.AspNetCore.Identity;", authenticatedProgram);
             Assert.DoesNotContain("using Dotisan.Core;", authenticatedProgram);
             Assert.DoesNotContain("using Dotisan.Core;", accountEndpoints);

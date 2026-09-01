@@ -78,7 +78,8 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Api/Jobs/JobRegistration.cs", JobRegistration(identifier, options.Database)),
             new($"src/{options.Name}.Api/Jobs/SampleJob.cs", SampleJob(identifier)),
             new($"src/{options.Name}.Api/Jobs/SampleJobHandler.cs", SampleJobHandler(identifier)),
-            new($"src/{options.Name}.Api/Jobs/JobEndpoints.cs", JobEndpoints(identifier)),
+            new($"src/{options.Name}.Api/Features/Jobs/JobEndpoints.cs", JobEndpoints(identifier)),
+            new($"src/{options.Name}.Api/Features/Health/HealthEndpoints.cs", HealthEndpoints(identifier)),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationUser.cs", ApplicationUser(identifier)) }
                 : Array.Empty<TemplateFile>()),
@@ -91,7 +92,7 @@ internal static class TemplateFiles
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Authorization/AuthorizationEndpoints.cs", AuthorizationEndpoints(identifier)) }
                 : Array.Empty<TemplateFile>()),
-            new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier)),
+            new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public)),
             new($"src/{options.Name}.Api/appsettings.json", AppSettings(options.Name, options.Database)),
             new($"src/{options.Name}.Api/appsettings.Development.json", "{\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\",\n      \"Microsoft.AspNetCore\": \"Information\"\n    }\n  }\n}\n"),
             new($"src/{options.Name}.Web/package.json", packageJson),
@@ -132,6 +133,7 @@ internal static class TemplateFiles
         <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" />
         <PackageReference Include="WolverineFx" />
         <PackageReference Include="WolverineFx.EntityFrameworkCore" />
+        <PackageReference Include="WolverineFx.RuntimeCompilation" />
         <PackageReference Include="WolverineFx.{{WolverineProviderPackage(database)}}" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
         {{(authenticationEnabled ? "<PackageReference Include=\"Microsoft.AspNetCore.Identity.EntityFrameworkCore\" />" : string.Empty)}}
@@ -154,10 +156,11 @@ internal static class TemplateFiles
         <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.7" />
         <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.7" />
         <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.7" />
-        <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.7" />
+        <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.9" />
         <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.12" />
         <PackageVersion Include="WolverineFx" Version="6.30.3" />
         <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="6.30.3" />
+        <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="6.30.3" />
         <PackageVersion Include="WolverineFx.Sqlite" Version="6.30.3" />
         <PackageVersion Include="WolverineFx.SqlServer" Version="6.30.3" />
         <PackageVersion Include="WolverineFx.Postgresql" Version="6.30.3" />
@@ -258,8 +261,9 @@ internal static class TemplateFiles
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Routing;
     using Wolverine;
+    using {{identifier}}.Api.Jobs;
 
-    namespace {{identifier}}.Api.Jobs;
+    namespace {{identifier}}.Api.Features.Jobs;
 
     public static class JobEndpoints
     {
@@ -276,6 +280,24 @@ internal static class TemplateFiles
                 await bus.ScheduleAsync(new SampleJob(DateTimeOffset.UtcNow), TimeSpan.FromMinutes(5));
                 return Results.Accepted();
             }).WithName("ScheduleSampleJob").WithTags("Jobs");
+        }
+    }
+    """;
+
+    private static string HealthEndpoints(string identifier) => $$"""
+    using Microsoft.AspNetCore.Builder;
+    using Microsoft.AspNetCore.Http;
+    using Microsoft.AspNetCore.Routing;
+
+    namespace {{identifier}}.Api.Features.Health;
+
+    public static class HealthEndpoints
+    {
+        public static void MapHealthEndpoints(this IEndpointRouteBuilder endpoints)
+        {
+            endpoints.MapGet("/api/health", () => Results.Ok(new { status = "ok" }))
+                .WithName("Health")
+                .WithTags("System");
         }
     }
     """;
@@ -459,10 +481,6 @@ internal static class TemplateFiles
         app.MapOpenApi();
     }
     app.MapDotisanEndpoints();
-    app.MapJobEndpoints();
-    app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }))
-        .WithName("Health")
-        .WithTags("System");
     app.MapFallbackToFile("index.html");
     app.Run();
 
@@ -489,8 +507,6 @@ internal static class TemplateFiles
     using {{identifier}}.Api.Authorization;
     using {{identifier}}.Api.Auditing;
     using {{identifier}}.Api.Data;
-    using {{identifier}}.Api.Features.Account;
-    using {{identifier}}.Api.Features.Authorization;
     using {{identifier}}.Api.Identity;
     using {{identifier}}.Api.Infrastructure;
     using {{identifier}}.Api.Jobs;
@@ -560,12 +576,6 @@ internal static class TemplateFiles
     app.UseAuthorization();
     app.UseAntiforgery();
     app.MapDotisanEndpoints();
-    app.MapJobEndpoints();
-    app.MapAccountEndpoints({{registrationEnabled.ToString().ToLowerInvariant()}});
-    app.MapAuthorizationEndpoints();
-    app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }))
-        .WithName("Health")
-        .WithTags("System");
     app.MapFallbackToFile("index.html");
     app.Run();
 
@@ -944,9 +954,12 @@ internal static class TemplateFiles
     }
     """;
 
-    private static string EndpointExtensions(string identifier) => $$"""
+    private static string EndpointExtensions(string identifier, bool authenticationEnabled, bool registrationEnabled) => $$"""
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Routing;
+    using {{identifier}}.Api.Features.Health;
+    using {{identifier}}.Api.Features.Jobs;
+    {{(authenticationEnabled ? $"using {identifier}.Api.Features.Account;\n    using {identifier}.Api.Features.Authorization;" : string.Empty)}}
 
     namespace {{identifier}}.Api.Infrastructure;
 
@@ -956,6 +969,9 @@ internal static class TemplateFiles
         public static IEndpointRouteBuilder MapDotisanEndpoints(this IEndpointRouteBuilder endpoints)
         {
             // DOTISAN:ENDPOINTS
+            HealthEndpoints.MapHealthEndpoints(endpoints);
+            JobEndpoints.MapJobEndpoints(endpoints);
+            {{(authenticationEnabled ? $"AccountEndpoints.MapAccountEndpoints(endpoints, {registrationEnabled.ToString().ToLowerInvariant()});\n            AuthorizationEndpoints.MapAuthorizationEndpoints(endpoints);" : string.Empty)}}
             return endpoints;
         }
     }
