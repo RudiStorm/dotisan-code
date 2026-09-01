@@ -1,5 +1,6 @@
 using Dotisan.Core;
 using Dotisan.Generators;
+using Dotisan.Cli.Generation;
 
 namespace Dotisan.Cli;
 
@@ -74,6 +75,7 @@ public sealed class DotisanApplication
         registry.Register(new DevCommand());
         registry.Register(new BuildCommand());
         registry.Register(new RunCommand());
+        registry.Register(new GenerateCommand());
         foreach (var command in new[] { "add", "remove", "doctor" })
             registry.Register(new NotImplementedCommand(command));
     }

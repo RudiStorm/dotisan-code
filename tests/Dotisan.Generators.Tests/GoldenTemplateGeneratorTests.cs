@@ -17,6 +17,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(result.Success, result.ErrorMessage);
             Assert.True(File.Exists(Path.Combine(output, "TodoApp.sln")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
+            Assert.True(File.Exists(Path.Combine(output, "dotisan.contract.json")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
             var generatedModels = Path.Combine(output, "src", "TodoApp.Web", "src", "generated", "models.ts");
             Assert.True(File.Exists(generatedModels));

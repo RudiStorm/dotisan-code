@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Dotisan.Core\Dotisan.Core.csproj" />
     <ProjectReference Include="..\Dotisan.Generators\Dotisan.Generators.csproj" />
+    <ProjectReference Include="..\Dotisan.TypeScript\Dotisan.TypeScript.csproj" />
     <None Include="..\..\README.md" Pack="true" PackagePath="README.md" />
   </ItemGroup>
 </Project>

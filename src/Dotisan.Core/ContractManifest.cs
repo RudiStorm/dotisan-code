@@ -9,6 +9,7 @@ public sealed record ContractManifest
 {
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
+    [JsonConstructor]
     public ContractManifest(
         int SchemaVersion,
         IReadOnlyList<EndpointManifestEntry> Endpoints,
@@ -78,6 +79,13 @@ public sealed record ContractManifest
     public IReadOnlyList<ContractModel> Models { get; }
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOptions);
+
+    public static ContractManifest FromJson(string json)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(json);
+        return JsonSerializer.Deserialize<ContractManifest>(json, JsonOptions)
+            ?? throw new JsonException("The contract manifest is empty.");
+    }
 
     [JsonIgnore]
     public string Sha256 => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(ToJson()))).ToLowerInvariant();

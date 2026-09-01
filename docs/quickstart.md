@@ -19,6 +19,8 @@ File.WriteAllText(Path.Combine("src", "generated", files[0].Path), files[0].Cont
 
 `dotisan new` invokes the renderer while scaffolding and writes the initial empty `src/TodoApp.Web/src/generated/models.ts`. A new project has no endpoint contracts yet, so the file contains only its newline terminator. The compiled-manifest export and additional client renderers are subsequent v0.5 work.
 
+After changing contract metadata, run `dotisan generate` from the project root. It builds the solution, reads `dotisan.contract.json`, and refreshes generated files. `dotisan generate --check` verifies that generated output is current without changing files.
+
 This slice does not include OpenAPI, Zod, fetch clients, TanStack Query, CLI generation commands, stale checks, validation-rule extraction, or CRUD scaffolding.
 
 Choose Quick Setup, then accept the defaults:

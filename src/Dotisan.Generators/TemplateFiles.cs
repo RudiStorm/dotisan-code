@@ -63,6 +63,7 @@ internal static class TemplateFiles
                 mail: false
                 workers: false
             """),
+            new("dotisan.contract.json", new ContractManifest(1, [], []).ToJson()),
             new("Dockerfile", Dockerfile(options.Name)),
             ..(options.Database == DatabaseProvider.SQLite
                 ? Array.Empty<TemplateFile>()
