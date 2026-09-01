@@ -368,6 +368,8 @@ internal static class TemplateFiles
 
     Press Ctrl+C once while `dotisan dev` is running to stop the API and frontend together. Dotisan allows graceful shutdown before falling back to process-tree cleanup.
 
+    During `dotisan dev`, the API listens on `http://localhost:5000` and Vite proxies `/api` requests to that address. When running the processes manually, use `dotnet run --project src\{{name}}.Api --urls http://localhost:5000` so the frontend can reach the API.
+
     ## Database provider
 
     {{DatabaseSetup(name, database)}}
@@ -430,6 +432,8 @@ internal static class TemplateFiles
     After the wizard, Dotisan checks the .NET SDK, `dotnet-ef`, and the selected frontend package manager. Missing tools are printed with install and verification commands. A missing npm or pnpm skips only frontend installation; the project remains available for native setup commands.
 
     Press Ctrl+C once while `dotisan dev` is running to stop the API and frontend together. Dotisan allows graceful shutdown before falling back to process-tree cleanup.
+
+    During `dotisan dev`, the API listens on `http://localhost:5000` and Vite proxies `/api` requests to that address. When running the processes manually, use `dotnet run --project src\{{name}}.Api --urls http://localhost:5000` so the frontend can reach the API.
 
     ## Database provider
 
@@ -1316,7 +1320,7 @@ internal static class TemplateFiles
     export default defineConfig({
       plugins: [vue()],
       resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
-      server: { port: 5173, proxy: { '/api': 'https://localhost:5001' } }
+      server: { port: 5173, proxy: { '/api': 'http://localhost:5000' } }
     });
     """;
 

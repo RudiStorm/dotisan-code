@@ -70,6 +70,8 @@ After the wizard choices are accepted, `dotisan new` checks the .NET SDK, `dotne
 
 Press Ctrl+C once while `dotisan dev` is running to stop the API and frontend together. Dotisan gives each service a short graceful-shutdown window and uses process-tree cleanup only if a service does not exit.
 
+The development API listens on `http://localhost:5000`, and the generated Vite proxy targets that same address. If you start Vite manually, start the API with `dotnet run --project src\<Name>.Api --urls http://localhost:5000`.
+
 For the interactive Quick wizard, omit --yes. Each menu is numbered, so you can enter `1`, `2`, or another displayed number instead of typing the full choice. It asks for SQLite/SQL Server/PostgreSQL/MySQL, authentication, registration policy, tenancy, and pnpm/npm. Press Enter to accept each default; the original text choices remain supported. Authentication is opt-in; `--auth yes` generates standard ASP.NET Core Identity endpoints and cookie authentication.
 
 ## Database providers

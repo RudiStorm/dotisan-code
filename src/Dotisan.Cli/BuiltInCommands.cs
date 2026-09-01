@@ -377,7 +377,7 @@ internal sealed class DevCommand : WorkspaceCommand
                 databaseStarted = true;
             }
 
-            processes.Add(await services.StartAsync("dotnet", ["watch", "--project", services.ApiProjectPath, "run", "--", "--environment", environment], services.WorkingDirectory, context.Console, cancellationToken));
+            processes.Add(await services.StartAsync("dotnet", ["watch", "--project", services.ApiProjectPath, "run", "--", "--environment", environment, "--urls", "http://localhost:5000"], services.WorkingDirectory, context.Console, cancellationToken));
             if (!arguments.Contains("--lean", StringComparer.OrdinalIgnoreCase))
             {
                 if (services.FrontendDirectory is null)

@@ -125,6 +125,8 @@ dotisan build
 
 Press Ctrl+C once to stop `dotisan dev`. The CLI coordinates shutdown for both services, then falls back to process-tree cleanup if a child does not exit gracefully.
 
+During `dotisan dev`, the API uses `http://localhost:5000` and Vite proxies `/api` requests there. When running the processes manually, use the same API URL so browser requests resolve correctly.
+
 ## Create a resource
 
 ~~~powershell

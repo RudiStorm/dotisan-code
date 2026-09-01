@@ -28,6 +28,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "routes", "index.ts")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "components", "ui", "Button.vue")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "layouts", "PortalLayout.vue")));
+            Assert.Contains("http://localhost:5000", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "vite.config.ts")));
             var mainTs = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "src", "main.ts"));
             Assert.Contains("VueQueryPlugin", mainTs);
             var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs"));
