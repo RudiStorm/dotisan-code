@@ -19,7 +19,7 @@ public static class FetchClientGenerator
         builder.AppendLine("  }");
         builder.AppendLine("}").AppendLine();
         builder.AppendLine("async function request<T>(url: string, init: RequestInit = {}): Promise<T> {");
-        builder.AppendLine("  const response = await fetch(url, { ...init, credentials: \"include\", signal: init.signal, headers: { Accept: \"application/json\", \"X-Correlation-ID\": crypto.randomUUID(), ...init.headers } });");
+        builder.AppendLine("  const response = await fetch(url, { ...init, credentials: \"include\", signal: init.signal, headers: { Accept: \"application/json\", \"X-Correlation-ID\": crypto.randomUUID(), ...(init.body ? { \"Content-Type\": \"application/json\" } : {}), ...init.headers } });");
         builder.AppendLine("  if (!response.ok) {");
         builder.AppendLine("    const problem = await response.json().catch(() => ({ title: response.statusText }));");
         builder.AppendLine("    throw new ApiError(response.status, problem);");

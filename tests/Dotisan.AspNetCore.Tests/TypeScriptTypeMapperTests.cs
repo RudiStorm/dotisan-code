@@ -50,6 +50,7 @@ public sealed class TypeScriptTypeMapperTests
 
         Assert.Contains("mutationFn: (body: Parameters<typeof services.createProfile>[0]) => services.createProfile(body)", output);
         Assert.Contains("headers: { \"Content-Type\": \"application/json\" },", services);
+        Assert.Contains("...(init.body ? { \"Content-Type\": \"application/json\" } : {}), ...init.headers", services);
     }
 
     [Fact]
