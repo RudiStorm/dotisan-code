@@ -13,7 +13,7 @@ File.WriteAllText(Path.Combine("src", "generated", files[0].Path), files[0].Cont
 
 `dotisan new` now runs the renderer during scaffolding and writes the initial `src/<Name>.Web/src/generated/models.ts` file. The initial manifest is empty because a new application has no endpoint contracts yet; the file is newline-terminated and ready for the compiled-manifest generation flow that follows.
 
-OpenAPI, validation-rule extraction, and CRUD scaffolding remain subsequent v0.5 slices. The TypeScript slice now also emits Zod schemas, fetch services, and TanStack Query composables.
+OpenAPI and CRUD scaffolding remain subsequent v0.5 slices. The TypeScript slice now also emits Zod schemas, fetch services, TanStack Query composables, and portable validation guidance for supported rules.
 
 ## v0.4.0 workflow and audit foundation
 

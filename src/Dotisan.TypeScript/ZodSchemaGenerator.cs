@@ -22,10 +22,12 @@ public static class ZodSchemaGenerator
                 builder.Append("export const ").Append(model.Name).AppendLine("Schema = z.object({");
                 foreach (var property in model.Properties.OrderBy(property => property.Name, StringComparer.Ordinal))
                 {
-                    builder.Append("  ").Append(property.Name).Append(": ").Append(SchemaType(property.Type));
+                    var isRequired = ValidationSchemaGenerator.IsRequired(manifest, model.Name, property.Name);
+                    var propertySchema = ValidationSchemaGenerator.Apply(manifest, model.Name, property, SchemaType(property.Type));
+                    builder.Append("  ").Append(property.Name).Append(": ").Append(propertySchema);
                     if (property.Nullable)
                         builder.Append(".nullable()");
-                    if (property.Optional)
+                    if (property.Optional && !isRequired)
                         builder.Append(".optional()");
                     builder.AppendLine(",");
                 }

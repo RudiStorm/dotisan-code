@@ -407,15 +407,18 @@ public sealed record EndpointValidationMetadata
 
 public sealed record EndpointValidationRuleMetadata
 {
-    public EndpointValidationRuleMetadata(string Target, string Kind)
+    public EndpointValidationRuleMetadata(string Target, string Kind, string? Value = null)
     {
         this.Target = RequireValue(Target, nameof(Target));
         this.Kind = RequireValue(Kind, nameof(Kind));
+        this.Value = Value;
     }
 
     public string Target { get; }
 
     public string Kind { get; }
+
+    public string? Value { get; }
 
     private static string RequireValue(string value, string parameterName)
     {

@@ -21,7 +21,7 @@ File.WriteAllText(Path.Combine("src", "generated", files[0].Path), files[0].Cont
 
 After changing contract metadata, run `dotisan generate` from the project root. It builds the solution, reads `dotisan.contract.json`, and refreshes generated files. `dotisan generate --check` verifies that generated output is current without changing files.
 
-This slice does not include OpenAPI, validation-rule extraction, or CRUD scaffolding. It does include generated Zod schemas, fetch services, and TanStack Query composables.
+This slice does not include OpenAPI or CRUD scaffolding. It does include generated Zod schemas, fetch services, TanStack Query composables, and portable client-side guidance for supported validation rules. FluentValidation remains authoritative on the server.
 
 Choose Quick Setup, then accept the defaults:
 

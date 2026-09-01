@@ -51,6 +51,54 @@ public sealed class TypeScriptTypeMapperTests
         Assert.Equal(first.Sha256, second.Sha256);
     }
 
+    [Fact]
+    public void Zod_schemas_render_portable_validation_rules_and_optional_fields()
+    {
+        var manifest = new ContractManifest(
+            1,
+            [new EndpointManifestEntry("users.create", "Users", "CreateUser", "POST", "/api/users", "User", "User", false, null, null, [], true, false)],
+            [new ContractModel(
+                "User",
+                "global::User",
+                [
+                    new ContractProperty("email", new ContractTypeDescriptor(ContractTypeKind.String), false, false),
+                    new ContractProperty("nickname", new ContractTypeDescriptor(ContractTypeKind.String), true, true)
+                ],
+                [])],
+            [new EndpointContractMetadata(
+                null,
+                [],
+                [],
+                201,
+                [],
+                new EndpointValidationMetadata(true,
+                [
+                    new EndpointValidationRuleMetadata("email", "email"),
+                    new EndpointValidationRuleMetadata("email", "length", "3"),
+                    new EndpointValidationRuleMetadata("nickname", "pattern", "^[a-z]+$")
+                ]))]);
+
+        var output = ZodSchemaGenerator.Generate(manifest).Content;
+
+        Assert.Contains("email: z.string().email().min(3)", output);
+        Assert.Contains("nickname: z.string().regex(/^[a-z]+$/).nullable().optional()", output);
+    }
+
+    [Fact]
+    public void Zod_schemas_reject_unknown_validation_rules()
+    {
+        var manifest = new ContractManifest(
+            1,
+            [new EndpointManifestEntry("users.create", "Users", "CreateUser", "POST", "/api/users", "User", "User", false, null, null, [], true, false)],
+            [new ContractModel("User", "global::User", [new ContractProperty("email", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], [])],
+            [new EndpointContractMetadata(null, [], [], 201, [], new EndpointValidationMetadata(true, [new EndpointValidationRuleMetadata("email", "custom")]))]);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => ZodSchemaGenerator.Generate(manifest));
+
+        Assert.Contains("custom", exception.Message);
+        Assert.Contains("FluentValidation", exception.Message);
+    }
+
     [Theory]
     [InlineData(ContractTypeKind.String, "string")]
     [InlineData(ContractTypeKind.Boolean, "boolean")]
