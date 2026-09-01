@@ -1190,7 +1190,8 @@ internal static class TemplateFiles
         public const string ContractManifestJson = "{{json.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)}}";
     }
     #endif
-    """;
+    """
+    };
 
     private static string RoutesIndex() => """
     import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
