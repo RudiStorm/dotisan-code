@@ -1,114 +1,291 @@
 # Dotisan
 
-Dotisan is a batteries-included application framework for standard ASP.NET Core and Vue applications. The v0.6.0 release adds a Wolverine-backed durable jobs and delayed-scheduling foundation on .NET 10.
+Dotisan is a .NET 10 application scaffolding CLI for building ordinary ASP.NET Core and Vue applications. It gives you a working API, frontend, database wiring, typed frontend contracts, optional authentication, resource scaffolding, and durable background jobs without hiding the generated source code behind a proprietary runtime.
 
-The repository and generated API templates target .NET 10 / ASP.NET Core 10.
+The current release is v0.6.2.
 
-## v0.5 compile-time contract metadata foundation
+## What you get
 
-The v0.5 contract metadata slice adds generated contract APIs to endpoint assemblies. When the source generator runs, `DotisanGeneratedEndpointExtensions` exposes `ContractManifest`, `ContractManifestJson`, and `ContractManifestSha256`. The manifest contains deterministic request/response model metadata that can be passed directly to `TypeScriptContractGenerator.Generate`.
+`dotisan new` creates a full application workspace containing:
 
-~~~csharp
-var files = TypeScriptContractGenerator.Generate(DotisanGeneratedEndpointExtensions.ContractManifest);
-File.WriteAllText(Path.Combine("src", "generated", files[0].Path), files[0].Content);
-~~~
+- An ASP.NET Core 10 Minimal API.
+- A Vue 3 + Vite frontend written in TypeScript.
+- EF Core data access with SQLite by default, or SQL Server, PostgreSQL, or MySQL.
+- Explicit endpoint registration and deterministic API contract metadata.
+- Generated OpenAPI, TypeScript models, Zod schemas, fetch services, and TanStack Query helpers.
+- Optional ASP.NET Core Identity cookie authentication and role-claim authorization.
+- Wolverine-backed durable local queues, delayed messages, recurring sample scheduling, and retries.
+- A solution file, `dotisan.config`, appsettings, local development defaults, and editable source boundaries.
 
-`dotisan new` now runs the renderer during scaffolding and writes the initial Dotisan contract files under `src/<Name>.Web/src/dotisan/`. The initial manifest is empty because a new application has no endpoint contracts yet; the files are deterministic and ready for `dotisan generate` after endpoints are added.
+Dotisan owns the initial scaffold. After that, the generated application is yours: edit the files under `src/<Name>.Api` and `src/<Name>.Web`, use standard .NET and frontend tooling, and keep generated contract output refreshed with `dotisan generate`.
 
-The v0.5 pipeline also emits deterministic OpenAPI, Zod schemas, fetch services, TanStack Query composables, and portable validation guidance for supported rules. `dotisan make:crud <ResourceName>` adds editable Vue list and route scaffolding outside the generated-output directory.
+## Install the CLI
 
-## v0.5.0 workflow and audit foundation
+Install the .NET tool from NuGet:
 
-The repository contains focused projects for:
+```powershell
+dotnet tool install --global Dotisan --version 0.6.2
+dotisan --version
+```
 
-- Dotisan.Cli — command registration, help/version, prompts, console abstraction, exit codes, project creation, scaffolding, migrations, builds, and development supervision.
-- Dotisan.Core — project options, endpoint marker/manifest contracts, and shared CLI contracts.
-- Dotisan.AspNetCore — explicit endpoint mapping helpers built on Minimal APIs.
-- Dotisan.Generators — inspectable ASP.NET Core + Vue/Vite golden template with configurable EF Core providers and vertical resource/endpoint scaffolding.
-- Dotisan.SourceGenerators — Roslyn-generated explicit endpoint registration, DI wiring, and manifest source.
-- Dotisan.TypeScript — initial nullable/optional C# contract type mapping.
-- Dotisan.Testing — reusable test helpers.
+For a locally built package:
 
-The generated app uses normal ASP.NET Core configuration, dependency injection, Minimal APIs, and EF Core. SQLite is the default provider; the Quick wizard can also generate SQL Server, PostgreSQL, or MySQL configuration. When selected, ASP.NET Core Identity uses the same generated provider and standard cookie authentication. Dotisan does not replace those platform features.
+```powershell
+dotnet tool install --global Dotisan --add-source .\artifacts --version 0.6.2
+```
 
-Every new project includes `src/<Name>.Web/src/dotisan/models.ts`, `schemas.ts`, `services.ts`, and `queries.ts`; this confirms the TypeScript generation step ran. It is Dotisan-owned output and should be refreshed as contracts are added.
+Upgrade an existing installation with:
 
-Authenticated projects also include generated client contracts for antiforgery, registration, login, logout, and the current-user probe. These clients use the same standard cookie and antiforgery behavior as the generated API.
+```powershell
+dotnet tool update --global Dotisan --version 0.6.2
+```
 
-Run `dotisan generate` from the generated project root to rebuild contract files and `openapi.json`. The command builds the solution first, reads `dotisan.contract.json`, and writes deterministic files under `src/<Name>.Web/src/dotisan`. Use `dotisan generate --check` in CI to fail when Dotisan output is stale. `--no-openapi` skips the OpenAPI file when needed.
+## Create and run an application
 
-## Run locally
+The shortest useful workflow is:
 
-~~~powershell
-dotnet restore Dotisan.sln
-dotnet build Dotisan.sln
-dotnet test Dotisan.sln
-dotnet run --project src\Dotisan.Cli -- --version
-dotnet run --project src\Dotisan.Cli -- help
-~~~
-
-Create a project without interactive input:
-
-~~~powershell
-dotnet run --project src\Dotisan.Cli -- new MyApp --yes --output .\MyApp
-dotnet build .\MyApp\MyApp.sln
-
-dotnet run --project src\Dotisan.Cli -- new AuthApp --auth yes --registration public --yes --output .\AuthApp
-dotnet build .\AuthApp\AuthApp.sln
-
+```powershell
+dotisan new MyApp
 cd .\MyApp
-dotisan make:resource Customer
-dotisan make:crud Customer
+dotisan dev
+```
+
+The wizard asks for the project name, database provider, authentication, registration policy, and frontend package manager. To use explicit options and skip prompts:
+
+```powershell
+dotisan new MyApp --yes --output .\MyApp
+cd .\MyApp
+dotisan dev
+```
+
+`dotisan dev` runs the API and Vue development server together. The API listens on `http://localhost:5000`; Vite proxies `/api` calls to it. Press Ctrl+C once to stop both processes gracefully.
+
+Useful development variants:
+
+```powershell
+dotisan dev --lean                 # API only
+dotisan dev --environment Staging  # use a different ASP.NET Core environment
+dotisan run                        # run only the API with dotnet run
+dotisan build                      # build the API and frontend
+dotisan build --no-frontend        # build only the .NET solution
+```
+
+For external database providers, `dotisan dev` starts the generated Docker Compose `database` service, waits for its health check, and stops the container when development ends. The named database volume is preserved.
+
+## Command reference
+
+### Project creation
+
+```text
+dotisan new <ProjectName> [options]
+```
+
+Common options include:
+
+```text
+--yes                         accept defaults without prompting
+--output <directory>          choose the destination directory
+--database <sqlite|sqlserver|postgresql|mysql>
+--auth <yes|no>               enable or disable Identity authentication
+--registration <public|invite-only|disabled>
+--package-manager <npm|pnpm>
+--no-restore                  generate files without restoring the solution
+```
+
+`dotisan new` restores the generated .NET solution, installs frontend dependencies, and creates/applies the initial EF Core migration when the required tools are available. Use `--no-restore` to skip setup and run the printed migration commands manually.
+
+### Development and build
+
+```text
+dotisan dev [--lean] [--observability] [--environment <name>]
+dotisan run
+dotisan build [--no-frontend]
+```
+
+Use `dev` for the coordinated API/frontend development experience, `run` for the API alone, and `build` for a production-style compile of the generated projects.
+
+### Frontend contracts
+
+```text
 dotisan generate
+dotisan generate --check
+dotisan generate --no-openapi
+```
+
+`dotisan generate` builds the solution, reads the generated endpoint contract, and refreshes these files:
+
+```text
+src/<Name>.Web/src/dotisan/models.ts
+src/<Name>.Web/src/dotisan/schemas.ts
+src/<Name>.Web/src/dotisan/services.ts
+src/<Name>.Web/src/dotisan/queries.ts
+src/<Name>.Web/src/dotisan/openapi.json
+```
+
+Use `dotisan generate --check` in CI to detect stale generated output. Use `--no-openapi` when only the TypeScript contract files are needed.
+
+### Database migrations
+
+```text
+dotisan migrate
+dotisan migrate status
+dotisan migrate --production
+```
+
+`dotisan migrate` applies existing EF Core migrations. `dotisan new` creates and applies the initial migration automatically; migration authoring remains an explicit developer action after model changes:
+
+```powershell
+dotnet ef migrations add InitialCreate --project src\MyApp.Api
+dotisan migrate
+```
+
+Review generated migrations before applying them. For authenticated projects, use an Identity migration such as `InitialIdentity`; for audit support, use an audit migration such as `InitialAudit`.
+
+### Resource and endpoint scaffolding
+
+```text
+dotisan make:resource Customer
+dotisan make:endpoint HealthCheck
+dotisan make:crud Customer
+```
+
+`make:resource` creates an editable model, EF `DbSet`, and API resource endpoints. `make:endpoint` creates a single-file vertical endpoint. `make:crud` creates Vue list/detail/form and route files outside the generated contract-output directory.
+
+Scaffolding does not create migrations. After changing the data model, author and review a migration with `dotnet ef migrations add`.
+
+### Jobs and scheduling inspection
+
+```text
+dotisan jobs status
+dotisan schedule list
+```
+
+`jobs status` reports whether generated jobs are enabled, the selected persistence provider, and the registration source path. `schedule list` reads explicit `DOTISAN:SCHEDULE` declarations from `Jobs/JobRegistration.cs` and shows the source file to edit. These commands inspect source conventions; they do not rely on private runtime tables.
+
+## Generated application layout
+
+```text
+MyApp/
+├── MyApp.sln
+├── dotisan.config
+├── src/
+│   ├── MyApp.Api/
+│   │   ├── Data/
+│   │   ├── Features/
+│   │   ├── Infrastructure/
+│   │   ├── Jobs/
+│   │   └── Program.cs
+│   └── MyApp.Web/
+│       └── src/
+│           ├── components/
+│           ├── features/
+│           ├── layouts/
+│           ├── pages/
+│           ├── routes/
+│           └── dotisan/
+└── tests/
+    └── MyApp.Api.Tests/
+```
+
+The API uses standard ASP.NET Core dependency injection, configuration, logging, Minimal APIs, EF Core, and middleware. The frontend uses standard Vue, Vite, TypeScript, Pinia, Vue Router, Zod, and TanStack Query. You can replace or extend these pieces with normal ecosystem tooling.
+
+## Durable jobs and scheduling
+
+The generated API integrates Wolverine for background work:
+
+- `Jobs/SampleJob.cs` contains an editable message contract.
+- `Jobs/SampleJobHandler.cs` contains an editable handler with DI and logging.
+- `Features/Jobs/JobEndpoints.cs` demonstrates immediate and delayed dispatch.
+- `Jobs/JobRegistration.cs` configures durable local queues, provider-specific message persistence, EF Core transactions, retries, and the recurring sample starter.
+
+The default configuration is:
+
+```json
+{
+  "Dotisan": {
+    "Jobs": {
+      "Enabled": true,
+      "MaxAttempts": 3,
+      "RetryDelaySeconds": 5
+    }
+  }
+}
+```
+
+Override configuration through normal ASP.NET Core providers, for example:
+
+```powershell
+$env:Dotisan__Jobs__Enabled = "false"
+$env:Dotisan__Jobs__MaxAttempts = "5"
+$env:Dotisan__Jobs__RetryDelaySeconds = "10"
+dotisan dev
+```
+
+Jobs use the same `DefaultConnection` as the application. SQLite uses a file-backed store by default. Wolverine’s storage schema must exist before durable messages can be used; manage it explicitly with Wolverine’s native resource tooling or the provider workflow appropriate to your deployment. Failed messages remain available through Wolverine’s native error-handling and replay tooling.
+
+## Authentication and authorization
+
+Create an authenticated application with:
+
+```powershell
+dotisan new AuthApp --auth yes --registration public
+```
+
+Authenticated projects use standard ASP.NET Core Identity, EF Core stores, cookie authentication, antiforgery, and ProblemDetails. They include account endpoints for registration, login, logout, current-user information, and antiforgery tokens.
+
+Before starting the app, create and apply the Identity schema:
+
+```powershell
+dotnet ef migrations add InitialIdentity --project src\AuthApp.Api
 dotisan migrate
 dotisan dev
-~~~
+```
 
-`dotisan new` restores the generated .NET solution and runs the selected frontend package manager's install command before it reports the project ready. Use `--no-restore` only when you intentionally need offline generation; run `dotnet restore` and `npm install` or `pnpm install` manually afterward.
-
-After the wizard choices are accepted, `dotisan new` checks the .NET SDK, `dotnet-ef`, and the selected frontend package manager. Missing tools are reported with copy-paste install and verification commands. Project creation continues so you can install the missing prerequisite and retry the relevant native command; a missing npm/pnpm installation skips only frontend dependency installation.
-
-Press Ctrl+C once while `dotisan dev` is running to stop the API and frontend together. Dotisan gives each service a short graceful-shutdown window and uses process-tree cleanup only if a service does not exit.
-
-The development API listens on `http://localhost:5000`, and the generated Vite proxy targets that same address. If you start Vite manually, start the API with `dotnet run --project src\<Name>.Api --urls http://localhost:5000`.
-
-For the interactive Quick wizard, omit --yes. Each menu is numbered, so you can enter `1`, `2`, or another displayed number instead of typing the full choice. It asks for SQLite/SQL Server/PostgreSQL/MySQL, authentication, registration policy, tenancy, and pnpm/npm. Press Enter to accept each default; the original text choices remain supported. Authentication is opt-in; `--auth yes` generates standard ASP.NET Core Identity endpoints and cookie authentication.
+The generated authorization foundation uses code-defined permission constants and standard Identity role claims. Generated protected endpoints return `401` for unauthenticated callers and `403` for authenticated callers without the required permission claim. Edit `src\AuthApp.Api\Authorization\Permissions.cs` and the generated endpoint files directly.
 
 ## Database providers
 
-SQLite is the default and uses `Data Source=app.db`, so a new project can run without a separate database service. The other wizard choices generate the matching EF Core provider package, `UseSqlServer`, `UseNpgsql`, or `UseMySql` registration, and a local development connection-string example:
+SQLite is the default and needs no external server. SQL Server, PostgreSQL, and MySQL projects include a provider-specific `compose.yaml` with a health check and named volume:
 
-- SQL Server: `Server=localhost,1433;Database=MyApp;User Id=sa;Password=DotisanDev123!;TrustServerCertificate=True`
-- PostgreSQL: `Host=localhost;Database=myapp;Username=postgres;Password=postgres`
-- MySQL: `Server=localhost;Database=myapp;User=root;Password=root`
+```powershell
+docker compose up -d --wait --wait-timeout 120 database
+dotnet ef migrations add InitialCreate --project src\MyApp.Api
+dotisan migrate
+```
 
-For external providers, `dotisan new` generates a provider-specific `compose.yaml` with a health check and named data volume. Keep Docker Desktop running; `dotisan dev` starts the `database` service before the API and frontend, waits for readiness for up to 120 seconds, and stops the container on exit without deleting the volume. You can start it manually with `docker compose up -d --wait --wait-timeout 120 database`. If Compose reports that the database is unhealthy, inspect it with `docker compose ps`, `docker compose logs database --tail 100`, and `docker inspect (docker compose ps -q database) --format '{{json .State.Health}}'`. Replace development credentials through normal ASP.NET Core configuration or user secrets before authoring and applying migrations. Production database hosting remains your deployment responsibility. Use standard EF Core tooling:
+Replace development credentials through standard ASP.NET Core configuration or user secrets. Do not commit production secrets, connection strings, SQLite files, or data-protection keys.
 
-~~~powershell
-dotnet ef migrations add AddOrders --project src\MyApp.Api
-dotnet ef database update --project src\MyApp.Api
-~~~
+## Troubleshooting
 
-## Global tool packaging
+Check the local prerequisites:
 
-~~~powershell
+```powershell
+dotnet --version
+dotnet ef --version
+npm --version       # or pnpm --version
+docker compose version
+```
+
+Common fixes:
+
+- If `dotisan new` reports a missing tool, install the tool and rerun the relevant native command. Generation still completes where possible.
+- If package restore fails, run `dotnet restore <Name>.sln` from the generated project directory.
+- If frontend dependencies are missing, run `npm install` or `pnpm install` from `src/<Name>.Web`.
+- If generated contract files are stale, run `dotisan generate`.
+- If an external database is unhealthy, inspect it with `docker compose ps` and `docker compose logs database --tail 100`.
+- If registration fails with `SQLite Error 1: 'no such table: AspNetUsers'`, the Identity migration has not been applied. Run `dotnet ef migrations add InitialIdentity --project src\<Name>.Api`, then `dotisan migrate`.
+- If migrations are missing, author them explicitly with `dotnet ef migrations add <Name>` before running `dotisan migrate`.
+- If durable jobs fail during startup, confirm the connection string is valid and the Wolverine storage schema has been provisioned.
+
+## Contributing and repository development
+
+The repository itself targets .NET 10 and contains the CLI, core contracts, generators, ASP.NET integration, source generators, TypeScript generation, and tests. From the repository root:
+
+```powershell
+dotnet restore Dotisan.sln
+dotnet build Dotisan.sln --configuration Release
+dotnet test Dotisan.sln --configuration Release
 dotnet pack src\Dotisan.Cli\Dotisan.Cli.csproj --configuration Release --output .\artifacts
-dotnet tool install --global Dotisan --add-source .\artifacts --version 0.6.0
-dotisan new MyApp
-~~~
+```
 
-`make:resource` creates an editable model, EF `DbSet`, list/create Minimal API endpoint, and explicit registration. It does not create migrations. `dotisan new` also never creates or applies migrations; author and review an initial migration with normal `dotnet ef` tooling, then use `dotisan migrate` to apply it.
-
-Authentication projects use normal ASP.NET Core Identity, cookie authentication, antiforgery, and ProblemDetails. Configure production connection strings and secrets through standard ASP.NET Core providers, serve over HTTPS, and configure durable data-protection keys when running more than one instance.
-
-Authenticated projects also generate an explicit authorization foundation. Edit `src\<Name>.Api\Authorization\Permissions.cs` for code-defined permission names, use standard `IdentityRole` role claims with claim type `permission`, and protect generated endpoints with explicit `RequireAuthorization(...)` calls. The generated profile probe demonstrates `profile.view`; generated resources add `<Resource>View`, `<Resource>Create`, `<Resource>Update`, and `<Resource>Delete` permissions. API callers receive `401` when unauthenticated and `403` when authenticated without the required role claim.
-
-The v0.5.0 audit foundation generates an editable `AuditEntry` model and scoped `IAuditWriter` service for plain and authenticated projects. Auditing is enabled by default through standard `Audit:Enabled` configuration; set `Audit__Enabled=false` to disable writes. Generated resource and authentication operations record actor, resource, action, changed fields, trace ID, and correlation ID. Author the schema with `dotnet ef migrations add InitialAudit`; audit is persistence logging, not event sourcing.
-
-## Deliberately deferred commands
-
-Admin authorization UI/API, tenancy, observability, integrations, UI CRUD generation, audit query UI/API, and production diagnostics remain subsequent feature specifications. Password reset, email confirmation, MFA, and external providers are not generated. Role and permission assignment remains ordinary application code using ASP.NET Core Identity; Dotisan does not add a runtime permission registry or admin surface. `add`, `remove`, and `doctor` intentionally return a helpful exit code 3 until those specifications are implemented.
-
-## Project direction
-
-See Dotisan Spec Kit.md for the constitution, architecture, contracts, and staged roadmap. See docs/quickstart.md for the short developer workflow. See docs/jobs-and-scheduling.md for the v0.6 durable jobs and delayed scheduling workflow.
+The package is a .NET global tool with the command name `dotisan` and is licensed under MIT.

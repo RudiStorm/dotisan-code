@@ -37,7 +37,7 @@ public sealed class GoldenTemplateGeneratorTests
             var export = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Infrastructure", "DotisanContractExport.cs"));
             Assert.Contains("schemaVersion", export);
             Assert.Contains("DOTISAN_CONTRACT_FALLBACK", export);
-            Assert.Contains("\"version\": \"0.6.0\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
+            Assert.Contains("\"version\": \"0.6.2\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditEntry.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "IAuditWriter.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditWriter.cs")));
@@ -68,6 +68,8 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("PersistMessagesWithSqlite", jobs);
             Assert.Contains("DOTISAN:SCHEDULE sample|SampleJob|300|true", jobs);
             Assert.Contains("SampleJobScheduleStarter", jobs);
+            Assert.Contains("IServiceScopeFactory", jobs);
+            Assert.DoesNotContain("SampleJobScheduleStarter(IMessageBus bus", jobs);
             Assert.Contains("if (jobsEnabled)", jobs);
             Assert.Contains("RetryDelaySeconds", jobs);
             var jobHandler = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "SampleJobHandler.cs"));

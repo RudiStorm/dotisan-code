@@ -14,7 +14,7 @@ public sealed class CliApplicationTests
         var exitCode = await app.RunAsync(["--version"]);
 
         Assert.Equal(DotisanExitCode.Success, exitCode);
-        Assert.Contains("dotisan 0.6.0", console.Output);
+        Assert.Contains("dotisan 0.6.2", console.Output);
     }
 
     [Fact]
@@ -165,7 +165,8 @@ public sealed class CliApplicationTests
         var exitCode = await app.RunAsync(["new", "TodoApp", "--yes", "--package-manager", "npm", "--output", outputDirectory]);
 
         Assert.Equal(DotisanExitCode.Success, exitCode);
-        Assert.Equal(5, services.RunRequests.Count);
+        Assert.Contains("Then run: dotisan dev", console.Output);
+        Assert.Equal(7, services.RunRequests.Count);
         Assert.Equal("dotnet", services.RunRequests[0].FileName);
         Assert.Equal(["--version"], services.RunRequests[0].Arguments);
         Assert.Equal("dotnet", services.RunRequests[1].FileName);
@@ -177,6 +178,41 @@ public sealed class CliApplicationTests
         Assert.Equal(OperatingSystem.IsWindows() ? "npm.cmd" : "npm", services.RunRequests[4].FileName);
         Assert.Equal(["install"], services.RunRequests[4].Arguments);
         Assert.Equal(Path.Combine(outputDirectory, "src", "TodoApp.Web"), services.RunRequests[4].WorkingDirectory);
+        Assert.Equal(["ef", "migrations", "add", "InitialCreate", "--project", Path.Combine("src", "TodoApp.Api")], services.RunRequests[5].Arguments);
+        Assert.Equal(["ef", "database", "update", "--project", Path.Combine("src", "TodoApp.Api")], services.RunRequests[6].Arguments);
+    }
+
+    [Fact]
+    public async Task New_authenticated_project_prints_identity_migration_guidance_before_dev()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices();
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "dotisan-new-auth-guidance-" + Guid.NewGuid().ToString("N"));
+
+        var exitCode = await app.RunAsync(["new", "AccountsApp", "--yes", "--auth", "yes", "--no-restore", "--output", outputDirectory]);
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Contains("dotnet ef migrations add InitialIdentity", console.Output);
+        Assert.Contains($"--project {Path.Combine("src", "AccountsApp.Api")}", console.Output);
+        Assert.Contains("dotisan migrate", console.Output);
+        Assert.Contains("Then run: dotisan dev", console.Output);
+    }
+
+    [Fact]
+    public async Task New_applies_the_initial_identity_migration_after_restore()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices();
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "dotisan-new-auth-migration-" + Guid.NewGuid().ToString("N"));
+
+        var exitCode = await app.RunAsync(["new", "AccountsApp", "--yes", "--auth", "yes", "--package-manager", "npm", "--output", outputDirectory]);
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Contains(services.RunRequests, request => request.Arguments.SequenceEqual(["ef", "migrations", "add", "InitialIdentity", "--project", Path.Combine("src", "AccountsApp.Api")]));
+        Assert.Contains(services.RunRequests, request => request.Arguments.SequenceEqual(["ef", "database", "update", "--project", Path.Combine("src", "AccountsApp.Api")]));
+        Assert.Contains("InitialIdentity migration created and applied", console.Output);
     }
 
     [Fact]

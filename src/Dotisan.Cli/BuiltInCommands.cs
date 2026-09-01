@@ -568,6 +568,8 @@ internal sealed class NewCommand : IDotisanCommand
         }
 
         context.Console.WriteLine($"Created {options.Name} in {result.OutputDirectory}.");
+        var migrationName = options.AuthenticationEnabled ? "InitialIdentity" : "InitialCreate";
+        var apiProjectPath = Path.Combine("src", $"{options.Name}.Api");
         if (context.Services is not null)
         {
             var prerequisiteResult = await DefaultPrerequisiteChecker.CheckAsync(options.PackageManager, options.Database, context.Services, cancellationToken);
@@ -625,11 +627,97 @@ internal sealed class NewCommand : IDotisanCommand
                         return DotisanExitCode.GenerationError;
                     }
                 }
+
+                if (!prerequisiteResult.IsMissing(".NET SDK") && !prerequisiteResult.IsMissing("dotnet-ef"))
+                {
+                    var migrationResult = await CreateAndApplyInitialMigrationAsync(
+                        migrationName,
+                        apiProjectPath,
+                        result.OutputDirectory,
+                        options.Database,
+                        context.Services,
+                        context.Console,
+                        cancellationToken);
+                    if (!migrationResult.Success)
+                    {
+                        context.Console.WriteError(migrationResult.ErrorMessage ?? "The project was created, but the initial database migration failed.");
+                        context.Console.WriteError($"You can retry with 'dotnet ef migrations add {migrationName} --project {apiProjectPath}' followed by 'dotisan migrate'.");
+                        return DotisanExitCode.GenerationError;
+                    }
+
+                    context.Console.WriteLine($"{migrationName} migration created and applied.");
+                }
             }
         }
         context.Console.WriteLine($"Next: cd {Path.GetRelativePath(Directory.GetCurrentDirectory(), result.OutputDirectory)}");
-        context.Console.WriteLine("Then run: dotnet build");
+        if (!restore)
+        {
+            context.Console.WriteLine("Before development, create and apply the initial database migration:");
+            context.Console.WriteLine($"  dotnet ef migrations add {migrationName} --project {apiProjectPath}");
+            context.Console.WriteLine("  dotisan migrate");
+        }
+        context.Console.WriteLine("Then run: dotisan dev");
         return DotisanExitCode.Success;
+    }
+
+    private static async Task<DotisanOperationResult> CreateAndApplyInitialMigrationAsync(
+        string migrationName,
+        string apiProjectPath,
+        string workingDirectory,
+        DatabaseProvider database,
+        IDotisanServices services,
+        IConsole console,
+        CancellationToken cancellationToken)
+    {
+        var databaseStarted = false;
+        try
+        {
+            if (database != DatabaseProvider.SQLite)
+            {
+                console.WriteLine("Starting the generated database service...");
+                var startResult = await services.RunAsync(
+                    "docker",
+                    ["compose", "up", "-d", "--wait", "--wait-timeout", "120", "database"],
+                    workingDirectory,
+                    console,
+                    cancellationToken);
+                if (!startResult.Success)
+                    return startResult;
+                databaseStarted = true;
+            }
+
+            console.WriteLine($"Creating {migrationName} database migration...");
+            var addResult = await services.RunAsync(
+                "dotnet",
+                ["ef", "migrations", "add", migrationName, "--project", apiProjectPath],
+                workingDirectory,
+                console,
+                cancellationToken);
+            if (!addResult.Success)
+                return addResult;
+
+            console.WriteLine("Applying the initial database migration...");
+            return await services.RunAsync(
+                "dotnet",
+                ["ef", "database", "update", "--project", apiProjectPath],
+                workingDirectory,
+                console,
+                cancellationToken);
+        }
+        finally
+        {
+            if (databaseStarted)
+            {
+                var stopResult = await services.RunAsync(
+                    "docker",
+                    ["compose", "stop", "database"],
+                    workingDirectory,
+                    console,
+                    CancellationToken.None);
+                if (!stopResult.Success)
+                    console.WriteError(stopResult.ErrorMessage ?? "Could not stop the generated database service.");
+            }
+        }
     }
 
     private static DotisanExitCode UsageError(CommandContext context, string message)

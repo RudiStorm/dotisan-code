@@ -13,7 +13,7 @@ internal static class TemplateFiles
         {
           "name": "{{options.Name.ToLowerInvariant()}}-web",
           "private": true,
-          "version": "0.6.0",
+          "version": "0.6.2",
           "packageManager": "{{packageManager}}",
           "type": "module",
           "scripts": {
@@ -238,12 +238,16 @@ internal static class TemplateFiles
         }
     }
 
-    internal sealed class SampleJobScheduleStarter(IMessageBus bus, IConfiguration configuration) : IHostedService
+    internal sealed class SampleJobScheduleStarter(IServiceScopeFactory scopeFactory, IConfiguration configuration) : IHostedService
     {
         public async Task StartAsync(CancellationToken cancellationToken)
         {
             if (configuration.GetValue("Dotisan:Jobs:Enabled", true))
+            {
+                using var scope = scopeFactory.CreateScope();
+                var bus = scope.ServiceProvider.GetRequiredService<IMessageBus>();
                 await bus.ScheduleAsync(new SampleJob(DateTimeOffset.UtcNow, true), TimeSpan.FromSeconds(300));
+            }
         }
 
         public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -451,7 +455,7 @@ internal static class TemplateFiles
 
     ## Database and migrations
 
-    `dotisan new` never creates or applies migrations. Author and review the first Identity migration explicitly with standard EF Core tooling:
+    `dotisan new` creates and applies the initial Identity migration automatically when restore is enabled. With `--no-restore`, author and apply it manually with standard EF Core tooling:
 
     ~~~powershell
     dotnet ef migrations add InitialIdentity --project src\{{name}}.Api
