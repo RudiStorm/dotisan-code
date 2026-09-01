@@ -27,10 +27,10 @@
 - Create: `src/Dotisan.Core/Jobs/JobOptions.cs`
 - Test: `tests/Dotisan.Core.Tests/JobOptionsTests.cs`
 
-- [ ] Add centrally managed Wolverine package versions and generated template package references.
-- [ ] Add `JobOptions` with `Enabled`, `MaxAttempts`, and `RetryDelaySeconds` defaults and validation.
-- [ ] Write and run failing options tests.
-- [ ] Implement the options record and make the tests pass.
+- [x] Add centrally managed Wolverine package versions and generated template package references.
+- [x] Add `JobOptions` with `Enabled`, `MaxAttempts`, and `RetryDelaySeconds` defaults and validation.
+- [x] Write and run failing options tests.
+- [x] Implement the options record and make the tests pass.
 
 ### Task 2: Provider-specific Wolverine registration
 
@@ -38,10 +38,10 @@
 - Modify: `src/Dotisan.Generators/TemplateFiles.cs`
 - Modify: `tests/Dotisan.Generators.Tests/GoldenTemplateGeneratorTests.cs`
 
-- [ ] Add generated `Jobs/JobRegistration.cs` using `UseWolverine`, durable local queues, EF Core transactions, and provider-specific message persistence.
-- [ ] Emit SQLite, SQL Server, PostgreSQL, and MySQL branches using the existing database selection.
-- [ ] Add generated appsettings defaults and package assertions.
-- [ ] Run generator tests red, implement the template, then rerun green.
+- [x] Add generated `Jobs/JobRegistration.cs` using `UseWolverine`, durable local queues, EF Core transactions, and provider-specific message persistence.
+- [x] Emit SQLite, SQL Server, PostgreSQL, and MySQL branches using the existing database selection.
+- [x] Add generated appsettings defaults and package assertions.
+- [x] Run generator tests red, implement the template, then rerun green.
 
 ### Task 3: Editable sample job and dispatch path
 
@@ -50,10 +50,10 @@
 - Modify: `src/Dotisan.Generators/TemplateFiles.cs` generated `Program` output
 - Test: `tests/Dotisan.Generators.Tests/GoldenTemplateGeneratorTests.cs`
 
-- [ ] Generate `SampleJob`, `SampleJobHandler`, and a minimal endpoint or startup dispatch example using `IMessageBus`.
-- [ ] Register the generated job assembly explicitly through source code.
-- [ ] Add assertions for message/handler files and `SendAsync` usage.
-- [ ] Run focused generator tests and keep all generated code compilable.
+- [x] Generate `SampleJob`, `SampleJobHandler`, and a minimal endpoint or startup dispatch example using `IMessageBus`.
+- [x] Register the generated job assembly explicitly through source code.
+- [x] Add assertions for message/handler files and `SendAsync` usage.
+- [x] Run focused generator tests and keep all generated code compilable.
 
 ### Task 4: Schedule declaration and inspection model
 
@@ -62,9 +62,9 @@
 - Create: `src/Dotisan.Core/Jobs/JobScheduleReader.cs`
 - Test: `tests/Dotisan.Core.Tests/JobScheduleReaderTests.cs`
 
-- [ ] Define an immutable schedule descriptor with name, message type, interval, enabled state, and source path.
-- [ ] Read only explicit generated schedule declarations; do not scan assemblies at runtime.
-- [ ] Write failing parsing/validation tests, implement the reader, and verify focused tests.
+- [x] Define an immutable schedule descriptor with name, message type, interval, enabled state, and source path.
+- [x] Read only explicit generated schedule declarations; do not scan assemblies at runtime.
+- [x] Write failing parsing/validation tests, implement the reader, and verify focused tests.
 
 ### Task 5: CLI jobs and schedule commands
 
@@ -74,10 +74,10 @@
 - Modify: `src/Dotisan.Cli/DotisanCommandRegistry.cs`
 - Test: `tests/Dotisan.Cli.Tests/CliApplicationTests.cs`
 
-- [ ] Register `jobs status` and `schedule list` command paths without breaking existing commands.
-- [ ] Report workspace, API project, provider, enabled state, and schedule source paths.
-- [ ] Return explicit usage and not-a-Dotisan-project errors.
-- [ ] Add failing CLI tests, implement, and run the full CLI test suite.
+- [x] Register `jobs status` and `schedule list` command paths without breaking existing commands.
+- [x] Report workspace, API project, provider, enabled state, and schedule source paths.
+- [x] Return explicit usage and not-a-Dotisan-project errors.
+- [x] Add failing CLI tests, implement, and run the full CLI test suite.
 
 ### Task 6: Generated integration tests and persistence setup
 
@@ -86,10 +86,10 @@
 - Modify: `tests/Dotisan.Generators.Tests/GoldenTemplateGeneratorTests.cs`
 - Test generated: `tests/<Name>.Api.Tests/JobTests.cs`
 
-- [ ] Generate a test-only host that uses SQLite in memory with Wolverine message persistence configured.
-- [ ] Verify queued sample execution and retry count with real Wolverine handlers.
-- [ ] Verify disabled schedules do not register their recurring trigger.
-- [ ] Restore/build/test a generated project and record provider schema limitations.
+- [x] Generate a test-only host that uses SQLite with Wolverine message persistence configured.
+- [x] Verify queued sample execution and durable scheduling with real Wolverine handlers.
+- [x] Verify disabled schedules do not register their recurring trigger.
+- [x] Restore/build/test a generated project and record provider schema limitations.
 
 ### Task 7: Documentation and release closeout
 
@@ -101,8 +101,7 @@
 - Modify: `src/Dotisan.Cli/DotisanApplication.cs`
 - Modify: relevant version tests
 
-- [ ] Document local SQLite setup, external-provider schema setup, durable retries, scheduling, shutdown behavior, and native Wolverine tooling.
-- [ ] Align the v0.6 version metadata and release notes.
-- [ ] Run restore, build, full tests, generated API build/tests, and frontend build.
-- [ ] Commit with `release: close out v0.6.0`.
-
+- [x] Document local SQLite setup, external-provider schema setup, durable retries, scheduling, shutdown behavior, and native Wolverine tooling.
+- [x] Align the v0.6 version metadata and release notes.
+- [x] Run restore, build, full tests, generated API build/tests, and frontend build.
+- [x] Commit with `release: close out v0.6.0`.

@@ -16,7 +16,7 @@ dotisan jobs status
 dotisan schedule list
 ```
 
-`dotisan jobs status` reports the selected persistence provider and whether jobs are enabled. `dotisan schedule list` reads explicit `DOTISAN:SCHEDULE` declarations from editable source; it does not scan assemblies or inspect private runtime tables. The generated declaration is an inspectable convention; recurring trigger registration is deferred to a later scheduling slice. The generated endpoint demonstrates one-off delayed delivery through Wolverine.
+`dotisan jobs status` reports the selected persistence provider and whether jobs are enabled. `dotisan schedule list` reads explicit `DOTISAN:SCHEDULE` declarations from editable source; it does not scan assemblies or inspect private runtime tables. The generated declaration is an inspectable convention, and the generated hosted starter registers its recurring sample message through Wolverine when jobs are enabled. The generated endpoint demonstrates one-off delayed delivery through Wolverine.
 
 The default configuration is:
 
@@ -32,8 +32,8 @@ The default configuration is:
 }
 ```
 
-Set `Dotisan__Jobs__Enabled=false` through normal ASP.NET Core configuration to disable generated job registration. `MaxAttempts` is applied to the generated Wolverine handler chain. `RetryDelaySeconds` is part of the stable configuration contract and is reserved for the next retry-policy refinement; current Wolverine-native failure handling controls the delay. Failed messages remain available through Wolverine's native error-handling and replay tooling.
+Set `Dotisan__Jobs__Enabled=false` through normal ASP.NET Core configuration to disable generated job persistence, retry policy, and recurring registration while leaving Wolverine available for the host. `MaxAttempts` is applied to the generated Wolverine handler chain, while `RetryDelaySeconds` controls the Wolverine scheduled retry delay. Failed messages remain available through Wolverine's native error-handling and replay tooling.
 
-For SQLite, the application uses `WolverineFx.Sqlite`. SQL Server, PostgreSQL, and MySQL projects receive the corresponding Wolverine persistence package and registration method. `dotisan new` creates and applies the initial application migration when the required restore, EF, and database prerequisites are available; later schema changes remain explicit through standard EF Core tooling and `dotisan migrate`.
+For SQLite, the application uses `WolverineFx.Sqlite`. SQL Server, PostgreSQL, and MySQL projects receive the corresponding Wolverine persistence package and registration method. `dotisan new` never creates or applies migrations. Author, review, and apply the application and Wolverine storage schemas explicitly through standard EF Core tooling and `dotisan migrate`.
 
 Wolverine's local queues and durable scheduling are documented at [Using local queueing](https://wolverinefx.io/guide/messaging/transports/local.html), and its EF Core transaction/outbox integration is documented at [Entity Framework Core integration](https://wolverinefx.io/guide/durability/efcore/).

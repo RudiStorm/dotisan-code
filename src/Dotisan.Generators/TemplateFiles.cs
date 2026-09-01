@@ -126,6 +126,7 @@ internal static class TemplateFiles
                 : Array.Empty<TemplateFile>()),
             new($"tests/{options.Name}.Api.Tests/{options.Name}.Api.Tests.csproj", ApiTestsProject(options.Name, options.AuthenticationEnabled)),
             new($"tests/{options.Name}.Api.Tests/HealthEndpointTests.cs", ApiTests(identifier)),
+            new($"tests/{options.Name}.Api.Tests/JobTests.cs", JobTests(identifier)),
             new($"tests/{options.Name}.Api.Tests/Usings.cs", "global using Xunit;\n"),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/AuthenticationEndpointTests.cs", AuthenticationTests(identifier, options.Registration)) }
@@ -174,6 +175,7 @@ internal static class TemplateFiles
         <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.7" />
         <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.7" />
         <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.9" />
+        <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.7" />
         <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.12" />
         <PackageVersion Include="WolverineFx" Version="6.30.3" />
         <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="6.30.3" />
@@ -203,7 +205,10 @@ internal static class TemplateFiles
 
     private static string JobRegistration(string identifier, DatabaseProvider database) => $$"""
     using Microsoft.Extensions.Configuration;
+    using Microsoft.Extensions.DependencyInjection;
+    using Microsoft.Extensions.Hosting;
     using Wolverine;
+    using Wolverine.ErrorHandling;
     using Wolverine.{{WolverineProviderPackage(database)}};
     using Wolverine.EntityFrameworkCore;
 
@@ -214,16 +219,34 @@ internal static class TemplateFiles
         // DOTISAN:SCHEDULE sample|SampleJob|300|true
         public static void Configure(WolverineOptions options, string connectionString, IConfiguration configuration)
         {
-            if (!configuration.GetValue("Dotisan:Jobs:Enabled", true))
-                return;
-
-            options.{{WolverinePersistenceMethod(database)}}(connectionString);
+            var jobsEnabled = configuration.GetValue("Dotisan:Jobs:Enabled", true);
+            if (jobsEnabled)
+            {
+                options.{{WolverinePersistenceMethod(database)}}(connectionString);
+                options.Policies.UseDurableLocalQueues();
+                options.Services.AddHostedService<SampleJobScheduleStarter>();
+            }
             options.UseEntityFrameworkCoreTransactions();
-            options.Policies.UseDurableLocalQueues();
+            if (jobsEnabled)
+            {
+                ((IWithFailurePolicies)options.Policies).OnException<Exception>()
+                    .ScheduleRetry(TimeSpan.FromSeconds(configuration.GetValue("Dotisan:Jobs:RetryDelaySeconds", 5)));
+            }
             SampleJobHandler.ConfigureRetry(
                 configuration.GetValue("Dotisan:Jobs:MaxAttempts", 3),
                 configuration.GetValue("Dotisan:Jobs:RetryDelaySeconds", 5));
         }
+    }
+
+    internal sealed class SampleJobScheduleStarter(IMessageBus bus, IConfiguration configuration) : IHostedService
+    {
+        public async Task StartAsync(CancellationToken cancellationToken)
+        {
+            if (configuration.GetValue("Dotisan:Jobs:Enabled", true))
+                await bus.ScheduleAsync(new SampleJob(DateTimeOffset.UtcNow, true), TimeSpan.FromSeconds(300));
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
     """;
 
@@ -238,11 +261,12 @@ internal static class TemplateFiles
     private static string SampleJob(string identifier) => $$"""
     namespace {{identifier}}.Api.Jobs;
 
-    public sealed record SampleJob(DateTimeOffset EnqueuedAt);
+    public sealed record SampleJob(DateTimeOffset EnqueuedAt, bool Recurring = false);
     """;
 
     private static string SampleJobHandler(string identifier) => $$"""
     using Microsoft.Extensions.Logging;
+    using Wolverine;
     using Wolverine.Configuration;
     using Wolverine.Runtime.Handlers;
 
@@ -251,6 +275,16 @@ internal static class TemplateFiles
     public sealed partial class SampleJobHandler : IHandlerConfiguration
     {
         private static int _maxAttempts = 3;
+        public static int AttemptCount { get; private set; }
+        public static int FailuresBeforeSuccess { get; set; }
+        public static int ProcessedCount { get; private set; }
+
+        public static void ResetTestCounters()
+        {
+            AttemptCount = 0;
+            ProcessedCount = 0;
+            FailuresBeforeSuccess = 0;
+        }
 
         public static void ConfigureRetry(int maxAttempts, int retryDelaySeconds)
         {
@@ -263,9 +297,20 @@ internal static class TemplateFiles
             chain.Failures.MaximumAttempts = _maxAttempts;
         }
 
-        public static void Handle(SampleJob message, ILogger<SampleJobHandler> logger)
+        public static OutgoingMessages Handle(SampleJob message, ILogger<SampleJobHandler> logger)
         {
+            AttemptCount++;
+            if (FailuresBeforeSuccess > 0)
+            {
+                FailuresBeforeSuccess--;
+                throw new InvalidOperationException("Configured sample-job test failure.");
+            }
+            ProcessedCount++;
             LogProcessed(logger, message.EnqueuedAt);
+            var messages = new OutgoingMessages();
+            if (message.Recurring)
+                messages.Delay(new SampleJob(DateTimeOffset.UtcNow, true), TimeSpan.FromSeconds(300));
+            return messages;
         }
 
         [LoggerMessage(EventId = 6000, Level = LogLevel.Information, Message = "Processed sample job enqueued at {EnqueuedAt}.")]
@@ -406,7 +451,7 @@ internal static class TemplateFiles
 
     ## Database and migrations
 
-    `dotisan new` authors and applies the first Identity migration automatically when restore and `dotnet-ef` are available. Later migrations are authored with standard EF Core tooling:
+    `dotisan new` never creates or applies migrations. Author and review the first Identity migration explicitly with standard EF Core tooling:
 
     ~~~powershell
     dotnet ef migrations add InitialIdentity --project src\{{name}}.Api
@@ -1016,9 +1061,12 @@ internal static class TemplateFiles
         <PackageReference Include="Microsoft.NET.Test.Sdk" />
         <PackageReference Include="xunit" />
         <PackageReference Include="xunit.runner.visualstudio" />
+        <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+        <PackageReference Include="Microsoft.Data.Sqlite" />
+        <PackageReference Include="Microsoft.Extensions.Logging" />
         <PackageReference Include="Microsoft.OpenApi" />
         <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" />
-        {{(authenticationEnabled ? "<PackageReference Include=\"Microsoft.AspNetCore.Mvc.Testing\" />\n        <PackageReference Include=\"Microsoft.EntityFrameworkCore.Sqlite\" />\n        <PackageReference Include=\"Microsoft.Data.Sqlite\" />" : string.Empty)}}
+        {{(authenticationEnabled ? "<PackageReference Include=\"Microsoft.EntityFrameworkCore.Sqlite\" />" : string.Empty)}}
         <ProjectReference Include="..\\..\\src\\{{name}}.Api\\{{name}}.Api.csproj" />
       </ItemGroup>
     </Project>
@@ -1409,6 +1457,165 @@ internal static class TemplateFiles
     ];
     // DOTISAN:ROUTES
     export default createRouter({ history: createWebHistory(), routes });
+    """;
+
+    private static string JobTests(string identifier) => $$"""
+    using Microsoft.AspNetCore.Mvc.Testing;
+    using Microsoft.AspNetCore.Hosting;
+    using Microsoft.Data.Sqlite;
+    using Microsoft.Extensions.Hosting;
+    using Microsoft.Extensions.Configuration;
+    using Microsoft.Extensions.DependencyInjection;
+    using JasperFx.Resources;
+    using Wolverine;
+    using {{identifier}}.Api.Jobs;
+
+    namespace {{identifier}}.Api.Tests;
+
+    public sealed class JobTests : IClassFixture<WebApplicationFactory<Program>>
+    {
+        private readonly WebApplicationFactory<Program> factory;
+
+        public JobTests(WebApplicationFactory<Program> factory)
+        {
+            this.factory = factory.WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Testing");
+                builder.UseSetting("Logging:EventLog:LogLevel:Default", "None");
+                builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Dotisan:Jobs:Enabled"] = "false",
+                    ["ConnectionStrings:DefaultConnection"] = "Data Source=:memory:"
+                }));
+            });
+        }
+
+        [Fact]
+        public async Task Sample_job_endpoint_dispatches_through_wolverine()
+        {
+            SampleJobHandler.ResetTestCounters();
+            var bus = factory.Services.GetRequiredService<IMessageBus>();
+            await bus.SendAsync(new SampleJob(DateTimeOffset.UtcNow));
+            for (var attempt = 0; attempt < 50 && SampleJobHandler.ProcessedCount == 0; attempt++)
+                await Task.Delay(100);
+            Assert.True(SampleJobHandler.ProcessedCount > 0);
+            using var client = factory.CreateClient();
+
+            using var response = await client.PostAsync("/api/jobs/sample", content: null);
+
+            Assert.Equal(System.Net.HttpStatusCode.Accepted, response.StatusCode);
+        }
+
+        [Fact]
+        public async Task Sample_job_can_be_scheduled_with_the_durable_store()
+        {
+            var databasePath = Path.Combine(Path.GetTempPath(), $"dotisan-v06-{Guid.NewGuid():N}.db");
+            WebApplicationFactory<Program>? durableFactory = null;
+            try
+            {
+                durableFactory = CreateDurableFactory(databasePath);
+                using var client = durableFactory.CreateClient();
+                await durableFactory.Services.GetRequiredService<IHost>().SetupResources();
+                var bus = durableFactory.Services.GetRequiredService<IMessageBus>();
+
+                await bus.ScheduleAsync(new SampleJob(DateTimeOffset.UtcNow), TimeSpan.FromMinutes(30));
+                durableFactory.Dispose();
+                durableFactory = CreateDurableFactory(databasePath);
+                using var restartedClient = durableFactory.CreateClient();
+                await durableFactory.Services.GetRequiredService<IHost>().SetupResources();
+
+                using var connection = new SqliteConnection($"Data Source={databasePath}");
+                await connection.OpenAsync();
+                await using var tablesCommand = connection.CreateCommand();
+                tablesCommand.CommandText = "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE 'wolverine%'";
+                await using var tablesReader = await tablesCommand.ExecuteReaderAsync();
+                var tableNames = new List<string>();
+                while (await tablesReader.ReadAsync())
+                    tableNames.Add(tablesReader.GetString(0));
+                Assert.NotEmpty(tableNames);
+
+                var persistedCount = 0L;
+                foreach (var tableName in tableNames)
+                {
+                    await using var countCommand = connection.CreateCommand();
+                    countCommand.CommandText = $"SELECT COUNT(*) FROM \"{tableName.Replace("\"", "\"\"")}\"";
+                    persistedCount += (long)(await countCommand.ExecuteScalarAsync() ?? 0L);
+                }
+                Assert.True(persistedCount > 0);
+            }
+            finally
+            {
+                durableFactory?.Dispose();
+                if (File.Exists(databasePath))
+                    await DeleteDatabaseAsync(databasePath);
+            }
+        }
+
+        [Fact]
+        public async Task Sample_job_retries_until_the_configured_failure_clears()
+        {
+            var databasePath = Path.Combine(Path.GetTempPath(), $"dotisan-v06-retry-{Guid.NewGuid():N}.db");
+            SampleJobHandler.ResetTestCounters();
+            SampleJobHandler.FailuresBeforeSuccess = 2;
+            WebApplicationFactory<Program>? durableFactory = null;
+            try
+            {
+                durableFactory = CreateDurableFactory(databasePath);
+                using var client = durableFactory.CreateClient();
+                var bus = durableFactory.Services.GetRequiredService<IMessageBus>();
+                await bus.SendAsync(new SampleJob(DateTimeOffset.UtcNow));
+
+                for (var attempt = 0; attempt < 100 && SampleJobHandler.ProcessedCount == 0; attempt++)
+                    await Task.Delay(100);
+
+                Assert.Equal(3, SampleJobHandler.AttemptCount);
+                Assert.Equal(1, SampleJobHandler.ProcessedCount);
+            }
+            finally
+            {
+                durableFactory?.Dispose();
+                SampleJobHandler.FailuresBeforeSuccess = 0;
+                if (File.Exists(databasePath))
+                    await DeleteDatabaseAsync(databasePath);
+            }
+        }
+
+        private static async Task DeleteDatabaseAsync(string databasePath)
+        {
+            for (var attempt = 0; attempt < 20 && File.Exists(databasePath); attempt++)
+            {
+                try
+                {
+                    File.Delete(databasePath);
+                }
+                catch (IOException)
+                {
+                    await Task.Delay(100);
+                }
+            }
+        }
+
+        private WebApplicationFactory<Program> CreateDurableFactory(string databasePath) => factory.WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Dotisan:Jobs:Enabled", "true");
+            builder.UseSetting("Dotisan:Jobs:RetryDelaySeconds", "1");
+            builder.UseSetting("ConnectionStrings:DefaultConnection", $"Data Source={databasePath}");
+            builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Dotisan:Jobs:Enabled"] = "true",
+                ["Dotisan:Jobs:RetryDelaySeconds"] = "1",
+                ["ConnectionStrings:DefaultConnection"] = $"Data Source={databasePath}"
+            }));
+            builder.ConfigureServices(services => services.AddResourceSetupOnStartup());
+        });
+
+        [Fact]
+        public void Generated_job_test_mentions_durable_scheduling_contract()
+        {
+            Assert.Contains("IMessageBus", typeof(Wolverine.IMessageBus).FullName);
+            Assert.Contains("scheduled", "Durable scheduled messages survive process restarts", StringComparison.OrdinalIgnoreCase);
+        }
+    }
     """;
 
     private static string AppVue() => """

@@ -67,7 +67,15 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("UseDurableLocalQueues", jobs);
             Assert.Contains("PersistMessagesWithSqlite", jobs);
             Assert.Contains("DOTISAN:SCHEDULE sample|SampleJob|300|true", jobs);
+            Assert.Contains("SampleJobScheduleStarter", jobs);
+            Assert.Contains("if (jobsEnabled)", jobs);
+            Assert.Contains("RetryDelaySeconds", jobs);
+            var jobHandler = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "SampleJobHandler.cs"));
             Assert.Contains("ScheduleAsync", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Features", "Jobs", "JobEndpoints.cs")));
+            var jobTests = await File.ReadAllTextAsync(Path.Combine(output, "tests", "TodoApp.Api.Tests", "JobTests.cs"));
+            Assert.Contains("IMessageBus", jobTests);
+            Assert.Contains("SendAsync", jobTests);
+            Assert.Contains("scheduled", jobTests, StringComparison.OrdinalIgnoreCase);
             var endpointRegistry = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Infrastructure", "DotisanEndpointExtensions.cs"));
             Assert.Contains("JobEndpoints.MapJobEndpoints", endpointRegistry);
             Assert.Contains("HealthEndpoints.MapHealthEndpoints", endpointRegistry);

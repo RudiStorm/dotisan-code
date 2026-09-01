@@ -97,7 +97,7 @@ dotnet tool install --global Dotisan --add-source .\artifacts --version 0.6.0
 dotisan new MyApp
 ~~~
 
-`make:resource` creates an editable model, EF `DbSet`, list/create Minimal API endpoint, and explicit registration. It does not create migrations; use `dotisan migrate` only after reviewing and authoring later migrations with normal `dotnet ef` tooling. Authenticated projects receive an `InitialIdentity` migration during `dotisan new` when prerequisites are available.
+`make:resource` creates an editable model, EF `DbSet`, list/create Minimal API endpoint, and explicit registration. It does not create migrations. `dotisan new` also never creates or applies migrations; author and review an initial migration with normal `dotnet ef` tooling, then use `dotisan migrate` to apply it.
 
 Authentication projects use normal ASP.NET Core Identity, cookie authentication, antiforgery, and ProblemDetails. Configure production connection strings and secrets through standard ASP.NET Core providers, serve over HTTPS, and configure durable data-protection keys when running more than one instance.
 
@@ -107,7 +107,7 @@ The v0.5.0 audit foundation generates an editable `AuditEntry` model and scoped 
 
 ## Deliberately deferred commands
 
-Admin authorization UI/API, tenancy, recurring scheduling, observability, integrations, UI CRUD generation, audit query UI/API, and production diagnostics remain subsequent feature specifications. Password reset, email confirmation, MFA, and external providers are not generated. Role and permission assignment remains ordinary application code using ASP.NET Core Identity; Dotisan does not add a runtime permission registry or admin surface. `add`, `remove`, and `doctor` intentionally return a helpful exit code 3 until those specifications are implemented.
+Admin authorization UI/API, tenancy, observability, integrations, UI CRUD generation, audit query UI/API, and production diagnostics remain subsequent feature specifications. Password reset, email confirmation, MFA, and external providers are not generated. Role and permission assignment remains ordinary application code using ASP.NET Core Identity; Dotisan does not add a runtime permission registry or admin surface. `add`, `remove`, and `doctor` intentionally return a helpful exit code 3 until those specifications are implemented.
 
 ## Project direction
 
