@@ -34,6 +34,6 @@ The default configuration is:
 
 Set `Dotisan__Jobs__Enabled=false` through normal ASP.NET Core configuration to disable generated job registration. `MaxAttempts` is applied to the generated Wolverine handler chain. `RetryDelaySeconds` is part of the stable configuration contract and is reserved for the next retry-policy refinement; current Wolverine-native failure handling controls the delay. Failed messages remain available through Wolverine's native error-handling and replay tooling.
 
-For SQLite, the application uses `WolverineFx.Sqlite`. SQL Server, PostgreSQL, and MySQL projects receive the corresponding Wolverine persistence package and registration method. Allow the application or deployment process to provision the Wolverine schema; `dotisan new` never applies application or message-store migrations silently.
+For SQLite, the application uses `WolverineFx.Sqlite`. SQL Server, PostgreSQL, and MySQL projects receive the corresponding Wolverine persistence package and registration method. `dotisan new` creates and applies the initial application migration when the required restore, EF, and database prerequisites are available; later schema changes remain explicit through standard EF Core tooling and `dotisan migrate`.
 
 Wolverine's local queues and durable scheduling are documented at [Using local queueing](https://wolverinefx.io/guide/messaging/transports/local.html), and its EF Core transaction/outbox integration is documented at [Entity Framework Core integration](https://wolverinefx.io/guide/durability/efcore/).
