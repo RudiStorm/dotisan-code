@@ -18,20 +18,46 @@ public static class ContractGenerationService
         string projectRoot,
         bool check,
         CancellationToken cancellationToken,
-        bool noOpenApi = false)
+        bool noOpenApi = false,
+        IDotisanServices? services = null,
+        IConsole? console = null)
     {
         var root = Path.GetFullPath(projectRoot);
         var manifestPath = Path.Combine(root, "dotisan.contract.json");
-        if (!File.Exists(manifestPath))
-        {
-            return ContractGenerationResult.Failed(
-                $"Could not find '{manifestPath}'. Build the generated API first so its contract manifest can be exported.");
-        }
+        var exportPath = Path.Combine(root, ".dotisan", "contract.manifest.json");
 
         ContractManifest manifest;
         try
         {
-            var json = await File.ReadAllTextAsync(manifestPath, cancellationToken);
+            string json;
+            if (services is not null)
+            {
+                if (services.ApiProjectPath is null)
+                    return ContractGenerationResult.Failed("Could not find an API project. Run this command from a generated Dotisan project.");
+
+                Directory.CreateDirectory(Path.GetDirectoryName(exportPath)!);
+                var export = await services.RunAsync(
+                    "dotnet",
+                    ["run", "--project", services.ApiProjectPath, "--no-build", "--", "--dotisan-export-contract", exportPath],
+                    root,
+                    console ?? new NullConsole(),
+                    cancellationToken);
+                if (!export.Success)
+                    return ContractGenerationResult.Failed(export.ErrorMessage ?? "The generated API could not export its contract manifest.");
+
+                json = await File.ReadAllTextAsync(exportPath, cancellationToken);
+                if (check && (!File.Exists(manifestPath) || !string.Equals(await File.ReadAllTextAsync(manifestPath, cancellationToken), json, StringComparison.Ordinal)))
+                    return ContractGenerationResult.Failed($"The compiled contract manifest is stale: {manifestPath}. Run 'dotisan generate'.");
+                if (!check)
+                    await File.WriteAllTextAsync(manifestPath, json, cancellationToken);
+            }
+            else
+            {
+                if (!File.Exists(manifestPath))
+                    return ContractGenerationResult.Failed($"Could not find '{manifestPath}'. Build the generated API first so its contract manifest can be exported.");
+                json = await File.ReadAllTextAsync(manifestPath, cancellationToken);
+            }
+
             manifest = ContractManifest.FromJson(json);
         }
         catch (Exception exception) when (exception is System.Text.Json.JsonException or ArgumentException or NotSupportedException)
@@ -88,6 +114,25 @@ public static class ContractGenerationService
             }
         }
 
+        TryDeleteExport(exportPath);
         return ContractGenerationResult.Succeeded();
+    }
+
+    private static void TryDeleteExport(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch (IOException)
+        {
+        }
+    }
+
+    private sealed class NullConsole : IConsole
+    {
+        public void WriteLine(string message) { }
+        public void WriteError(string message) { }
     }
 }

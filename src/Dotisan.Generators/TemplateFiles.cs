@@ -304,6 +304,9 @@ internal static class TemplateFiles
     using {{identifier}}.Api.Data;
     using {{identifier}}.Api.Infrastructure;
 
+    if (TryExportDotisanContract(args))
+        return;
+
     var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddProblemDetails();
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -323,6 +326,21 @@ internal static class TemplateFiles
     app.MapFallbackToFile("index.html");
     app.Run();
 
+    static bool TryExportDotisanContract(string[] arguments)
+    {
+        const string option = "--dotisan-export-contract";
+        var index = Array.IndexOf(arguments, option);
+        if (index < 0)
+            return false;
+        if (index + 1 >= arguments.Length || string.IsNullOrWhiteSpace(arguments[index + 1]))
+            throw new InvalidOperationException($"{option} requires an output path.");
+
+        var outputPath = Path.GetFullPath(arguments[index + 1]);
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        File.WriteAllText(outputPath, Dotisan.Generated.DotisanGeneratedEndpointExtensions.ContractManifestJson);
+        return true;
+    }
+
     public partial class Program { }
     """;
 
@@ -339,6 +357,9 @@ internal static class TemplateFiles
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Identity;
     using Microsoft.EntityFrameworkCore;
+
+    if (TryExportDotisanContract(args))
+        return;
 
     var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddProblemDetails();
@@ -398,6 +419,21 @@ internal static class TemplateFiles
         .WithTags("System");
     app.MapFallbackToFile("index.html");
     app.Run();
+
+    static bool TryExportDotisanContract(string[] arguments)
+    {
+        const string option = "--dotisan-export-contract";
+        var index = Array.IndexOf(arguments, option);
+        if (index < 0)
+            return false;
+        if (index + 1 >= arguments.Length || string.IsNullOrWhiteSpace(arguments[index + 1]))
+            throw new InvalidOperationException($"{option} requires an output path.");
+
+        var outputPath = Path.GetFullPath(arguments[index + 1]);
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        File.WriteAllText(outputPath, Dotisan.Generated.DotisanGeneratedEndpointExtensions.ContractManifestJson);
+        return true;
+    }
 
     public partial class Program { }
     """;

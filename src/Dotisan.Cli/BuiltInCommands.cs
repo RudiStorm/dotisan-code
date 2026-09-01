@@ -218,7 +218,7 @@ internal sealed class GenerateCommand : WorkspaceCommand
         if (!build.Success)
             return Fail(context.Console, build.ErrorMessage ?? "The API build failed; contract generation was not run.");
 
-        var result = await ContractGenerationService.GenerateAsync(services.WorkingDirectory, check, cancellationToken, noOpenApi);
+        var result = await ContractGenerationService.GenerateAsync(services.WorkingDirectory, check, cancellationToken, noOpenApi, services, context.Console);
         if (!result.Success)
             return Fail(context.Console, result.ErrorMessage ?? "Contract generation failed.");
 
