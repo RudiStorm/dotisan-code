@@ -10,14 +10,16 @@ dotnet run --project src\Dotisan.Cli -- new TodoApp
 
 ## v0.5 contract metadata foundation
 
-The v0.5 contract metadata foundation exposes generated contract APIs from endpoint assemblies. After the source generator runs, `DotisanGeneratedEndpointExtensions` includes `ContractManifest`, `ContractManifestJson`, and `ContractManifestSha256`. The manifest carries deterministic request/response model metadata, and `TypeScriptContractGenerator.Generate` returns `models.ts` in memory.
+The v0.5 contract metadata foundation exposes generated contract APIs from endpoint assemblies. After the source generator runs, `DotisanGeneratedEndpointExtensions` includes `ContractManifest`, `ContractManifestJson`, and `ContractManifestSha256`. The manifest carries deterministic request/response model metadata, and `TypeScriptContractGenerator.Generate` renders `models.ts`.
 
 ~~~csharp
 var files = TypeScriptContractGenerator.Generate(DotisanGeneratedEndpointExtensions.ContractManifest);
 File.WriteAllText(Path.Combine("src", "generated", files[0].Path), files[0].Content);
 ~~~
 
-This slice does not include OpenAPI, Zod, fetch clients, TanStack Query, Vue-template wiring, CLI commands, stale checks, validation-rule extraction, or CRUD scaffolding.
+`dotisan new` invokes the renderer while scaffolding and writes the initial empty `src/TodoApp.Web/src/generated/models.ts`. A new project has no endpoint contracts yet, so the file contains only its newline terminator. The compiled-manifest export and additional client renderers are subsequent v0.5 work.
+
+This slice does not include OpenAPI, Zod, fetch clients, TanStack Query, CLI generation commands, stale checks, validation-rule extraction, or CRUD scaffolding.
 
 Choose Quick Setup, then accept the defaults:
 

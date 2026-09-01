@@ -4,14 +4,16 @@ Dotisan is a batteries-included application framework for standard ASP.NET Core 
 
 ## v0.5 compile-time contract metadata foundation
 
-The v0.5 contract metadata slice adds generated contract APIs to endpoint assemblies. When the source generator runs, `DotisanGeneratedEndpointExtensions` exposes `ContractManifest`, `ContractManifestJson`, and `ContractManifestSha256`. The manifest contains deterministic request/response model metadata that can be passed directly to `TypeScriptContractGenerator.Generate`, and the renderer returns `models.ts` in memory rather than writing to disk.
+The v0.5 contract metadata slice adds generated contract APIs to endpoint assemblies. When the source generator runs, `DotisanGeneratedEndpointExtensions` exposes `ContractManifest`, `ContractManifestJson`, and `ContractManifestSha256`. The manifest contains deterministic request/response model metadata that can be passed directly to `TypeScriptContractGenerator.Generate`.
 
 ~~~csharp
 var files = TypeScriptContractGenerator.Generate(DotisanGeneratedEndpointExtensions.ContractManifest);
 File.WriteAllText(Path.Combine("src", "generated", files[0].Path), files[0].Content);
 ~~~
 
-This slice is intentionally narrow. OpenAPI, Zod, fetch clients, TanStack Query, Vue-template wiring, CLI commands, stale checks, validation-rule extraction, and CRUD scaffolding are not part of it.
+`dotisan new` now runs the renderer during scaffolding and writes the initial `src/<Name>.Web/src/generated/models.ts` file. The initial manifest is empty because a new application has no endpoint contracts yet; the file is newline-terminated and ready for the compiled-manifest generation flow that follows.
+
+OpenAPI, Zod, fetch clients, TanStack Query, stale checks, validation-rule extraction, and CRUD scaffolding remain subsequent v0.5 slices.
 
 ## v0.4.0 workflow and audit foundation
 
@@ -26,6 +28,8 @@ The repository contains focused projects for:
 - Dotisan.Testing — reusable test helpers.
 
 The generated app uses normal ASP.NET Core configuration, dependency injection, Minimal APIs, and EF Core. SQLite is the default provider; the Quick wizard can also generate SQL Server, PostgreSQL, or MySQL configuration. When selected, ASP.NET Core Identity uses the same generated provider and standard cookie authentication. Dotisan does not replace those platform features.
+
+Every new project includes `src/<Name>.Web/src/generated/models.ts`; this confirms the TypeScript generation step ran. It is generated-owned output and should be refreshed from the compiled endpoint manifest as contracts are added.
 
 ## Run locally
 

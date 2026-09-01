@@ -29,6 +29,12 @@ public sealed class GoldenTemplateGenerator : IProjectGenerator
 
                 await File.WriteAllTextAsync(path, file.Content, cancellationToken);
             }
+
+            var frontendDirectory = Path.Combine(outputDirectory, "src", $"{options.Name}.Web");
+            await GeneratedContractWriter.WriteAsync(
+                frontendDirectory,
+                new ContractManifest(1, [], []),
+                cancellationToken);
         }
         catch (OperationCanceledException)
         {
