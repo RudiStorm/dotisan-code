@@ -85,7 +85,7 @@ SQLite is the default and uses `Data Source=app.db`, so a new project can run wi
 For external providers, `dotisan new` generates a provider-specific `compose.yaml` with a health check and named data volume. Keep Docker Desktop running; `dotisan dev` starts the `database` service before the API and frontend, waits for readiness for up to 120 seconds, and stops the container on exit without deleting the volume. You can start it manually with `docker compose up -d --wait --wait-timeout 120 database`. If Compose reports that the database is unhealthy, inspect it with `docker compose ps`, `docker compose logs database --tail 100`, and `docker inspect (docker compose ps -q database) --format '{{json .State.Health}}'`. Replace development credentials through normal ASP.NET Core configuration or user secrets before authoring and applying migrations. Production database hosting remains your deployment responsibility. Use standard EF Core tooling:
 
 ~~~powershell
-dotnet ef migrations add InitialCreate --project src\MyApp.Api
+dotnet ef migrations add AddOrders --project src\MyApp.Api
 dotnet ef database update --project src\MyApp.Api
 ~~~
 
@@ -97,7 +97,7 @@ dotnet tool install --global Dotisan --add-source .\artifacts --version 0.6.0
 dotisan new MyApp
 ~~~
 
-`make:resource` creates an editable model, EF `DbSet`, list/create Minimal API endpoint, and explicit registration. It does not create migrations; use `dotisan migrate` only after reviewing and authoring migrations with normal `dotnet ef` tooling. For an authenticated project, author the initial Identity migration with `dotnet ef migrations add InitialIdentity --project src\AuthApp.Api`.
+`make:resource` creates an editable model, EF `DbSet`, list/create Minimal API endpoint, and explicit registration. It does not create migrations; use `dotisan migrate` only after reviewing and authoring later migrations with normal `dotnet ef` tooling. Authenticated projects receive an `InitialIdentity` migration during `dotisan new` when prerequisites are available.
 
 Authentication projects use normal ASP.NET Core Identity, cookie authentication, antiforgery, and ProblemDetails. Configure production connection strings and secrets through standard ASP.NET Core providers, serve over HTTPS, and configure durable data-protection keys when running more than one instance.
 

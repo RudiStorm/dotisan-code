@@ -602,6 +602,16 @@ internal sealed class NewCommand : IDotisanCommand
                         context.Console.WriteError("You can retry with 'dotnet restore' from the generated project directory.");
                         return DotisanExitCode.GenerationError;
                     }
+
+                    if (!prerequisiteResult.IsMissing("dotnet-ef"))
+                    {
+                        var initializationResult = await InitializeDatabaseAsync(options, result.OutputDirectory, context.Services, context.Console, cancellationToken);
+                        if (!initializationResult.Success)
+                        {
+                            context.Console.WriteError(initializationResult.ErrorMessage ?? "The project was created, but the initial EF database setup could not be completed.");
+                            return DotisanExitCode.GenerationError;
+                        }
+                    }
                 }
 
                 var packageManagerName = options.PackageManager == PackageManager.Npm ? "npm" : "pnpm";
@@ -629,6 +639,49 @@ internal sealed class NewCommand : IDotisanCommand
         context.Console.WriteLine($"Next: cd {Path.GetRelativePath(Directory.GetCurrentDirectory(), result.OutputDirectory)}");
         context.Console.WriteLine("Then run: dotnet build");
         return DotisanExitCode.Success;
+    }
+
+    private static async Task<DotisanOperationResult> InitializeDatabaseAsync(
+        ProjectOptions options,
+        string outputDirectory,
+        IDotisanServices services,
+        IConsole console,
+        CancellationToken cancellationToken)
+    {
+        var apiProjectPath = Path.Combine(outputDirectory, "src", $"{options.Name}.Api", $"{options.Name}.Api.csproj");
+        var databaseStarted = false;
+        try
+        {
+            if (options.Database != DatabaseProvider.SQLite)
+            {
+                var startResult = await services.RunAsync(
+                    "docker",
+                    ["compose", "up", "-d", "--wait", "--wait-timeout", "120", "database"],
+                    outputDirectory,
+                    console,
+                    cancellationToken);
+                if (!startResult.Success)
+                    return DotisanOperationResult.Failed("Could not start the database service for initial EF setup. " + startResult.ErrorMessage);
+                databaseStarted = true;
+            }
+
+            var migrationName = options.AuthenticationEnabled ? "InitialIdentity" : "InitialCreate";
+            string[] migrationArguments = ["ef", "migrations", "add", migrationName, "--project", apiProjectPath, "--startup-project", apiProjectPath];
+            var migrationResult = await services.RunAsync("dotnet", migrationArguments, outputDirectory, console, cancellationToken);
+            if (!migrationResult.Success)
+                return DotisanOperationResult.Failed("The initial EF migration could not be authored. " + migrationResult.ErrorMessage);
+
+            string[] updateArguments = ["ef", "database", "update", "--project", apiProjectPath, "--startup-project", apiProjectPath];
+            var updateResult = await services.RunAsync("dotnet", updateArguments, outputDirectory, console, cancellationToken);
+            return updateResult.Success
+                ? DotisanOperationResult.Succeeded()
+                : DotisanOperationResult.Failed("The initial EF database update could not be applied. " + updateResult.ErrorMessage);
+        }
+        finally
+        {
+            if (databaseStarted)
+                await services.RunAsync("docker", ["compose", "stop", "database"], outputDirectory, console, CancellationToken.None);
+        }
     }
 
     private static DotisanExitCode UsageError(CommandContext context, string message)

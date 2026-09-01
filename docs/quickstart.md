@@ -100,7 +100,7 @@ PostgreSQL: Host=localhost;Database=todoapp;Username=postgres;Password=postgres
 MySQL:      Server=localhost;Database=todoapp;User=root;Password=root
 ~~~
 
-The API uses `UseSqlite`, `UseSqlServer`, `UseNpgsql`, or `UseMySql` according to the wizard choice. Author and apply migrations with the standard EF Core CLI:
+The API uses `UseSqlite`, `UseSqlServer`, `UseNpgsql`, or `UseMySql` according to the wizard choice. `dotisan new` authors and applies the initial migration automatically when restore and `dotnet-ef` are available. Author and apply later migrations with the standard EF Core CLI:
 
 ~~~powershell
 dotnet ef migrations add InitialCreate --project src\TodoApp.Api

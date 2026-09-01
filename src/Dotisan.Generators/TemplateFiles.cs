@@ -339,7 +339,7 @@ internal static class TemplateFiles
     ~~~powershell
     dotnet build {{name}}.sln
     dotnet run --project src\{{name}}.Api
-    dotnet ef migrations add InitialCreate --project src\{{name}}.Api
+    dotnet ef migrations add AddOrders --project src\{{name}}.Api
     dotnet ef database update --project src\{{name}}.Api
     ~~~
 
@@ -406,7 +406,7 @@ internal static class TemplateFiles
 
     ## Database and migrations
 
-    The first Identity migration is authored with standard EF Core tooling:
+    `dotisan new` authors and applies the first Identity migration automatically when restore and `dotnet-ef` are available. Later migrations are authored with standard EF Core tooling:
 
     ~~~powershell
     dotnet ef migrations add InitialIdentity --project src\{{name}}.Api

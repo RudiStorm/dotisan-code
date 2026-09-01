@@ -165,7 +165,7 @@ public sealed class CliApplicationTests
         var exitCode = await app.RunAsync(["new", "TodoApp", "--yes", "--package-manager", "npm", "--output", outputDirectory]);
 
         Assert.Equal(DotisanExitCode.Success, exitCode);
-        Assert.Equal(5, services.RunRequests.Count);
+        Assert.Equal(7, services.RunRequests.Count);
         Assert.Equal("dotnet", services.RunRequests[0].FileName);
         Assert.Equal(["--version"], services.RunRequests[0].Arguments);
         Assert.Equal("dotnet", services.RunRequests[1].FileName);
@@ -174,9 +174,13 @@ public sealed class CliApplicationTests
         Assert.Equal(["--version"], services.RunRequests[2].Arguments);
         Assert.Equal("dotnet", services.RunRequests[3].FileName);
         Assert.Equal(["restore", Path.Combine(outputDirectory, "TodoApp.sln")], services.RunRequests[3].Arguments);
-        Assert.Equal(OperatingSystem.IsWindows() ? "npm.cmd" : "npm", services.RunRequests[4].FileName);
-        Assert.Equal(["install"], services.RunRequests[4].Arguments);
-        Assert.Equal(Path.Combine(outputDirectory, "src", "TodoApp.Web"), services.RunRequests[4].WorkingDirectory);
+        Assert.Equal("dotnet", services.RunRequests[4].FileName);
+        Assert.Contains("migrations", services.RunRequests[4].Arguments);
+        Assert.Equal("dotnet", services.RunRequests[5].FileName);
+        Assert.Contains("database", services.RunRequests[5].Arguments);
+        Assert.Equal(OperatingSystem.IsWindows() ? "npm.cmd" : "npm", services.RunRequests[6].FileName);
+        Assert.Equal(["install"], services.RunRequests[6].Arguments);
+        Assert.Equal(Path.Combine(outputDirectory, "src", "TodoApp.Web"), services.RunRequests[6].WorkingDirectory);
     }
 
     [Fact]
@@ -209,8 +213,10 @@ public sealed class CliApplicationTests
         Assert.Equal(DotisanExitCode.Success, exitCode);
         Assert.Equal(OperatingSystem.IsWindows() ? "pnpm.cmd" : "pnpm", services.RunRequests[2].FileName);
         Assert.Equal(["--version"], services.RunRequests[2].Arguments);
-        Assert.Equal(OperatingSystem.IsWindows() ? "pnpm.cmd" : "pnpm", services.RunRequests[4].FileName);
-        Assert.Equal(["install"], services.RunRequests[4].Arguments);
+        Assert.Equal("dotnet", services.RunRequests[4].FileName);
+        Assert.Equal("dotnet", services.RunRequests[5].FileName);
+        Assert.Equal(OperatingSystem.IsWindows() ? "pnpm.cmd" : "pnpm", services.RunRequests[6].FileName);
+        Assert.Equal(["install"], services.RunRequests[6].Arguments);
     }
 
     [Fact]
