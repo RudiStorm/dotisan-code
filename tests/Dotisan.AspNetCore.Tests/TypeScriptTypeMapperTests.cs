@@ -46,8 +46,10 @@ public sealed class TypeScriptTypeMapperTests
             [new EndpointContractMetadata(null, [], [], 201, ["Profiles"], new EndpointValidationMetadata(true, []))]);
 
         var output = TypeScriptContractGenerator.GenerateAll(manifest).Single(file => file.Path == "queries.ts").Content;
+        var services = TypeScriptContractGenerator.GenerateAll(manifest).Single(file => file.Path == "services.ts").Content;
 
         Assert.Contains("mutationFn: (body: Parameters<typeof services.createProfile>[0]) => services.createProfile(body)", output);
+        Assert.Contains("headers: { \"Content-Type\": \"application/json\" },", services);
     }
 
     [Fact]

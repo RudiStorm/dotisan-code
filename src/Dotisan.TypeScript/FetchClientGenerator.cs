@@ -46,6 +46,8 @@ public static class FetchClientGenerator
             builder.Append("  return request<").Append(responseType).Append(">(").Append(BuildUrl(endpoint.Route)).AppendLine(", {");
             builder.Append("    method: \"").Append(endpoint.Method.ToUpperInvariant()).AppendLine("\",");
             if (UsesBody(endpoint.Method) && requestType != "void")
+                builder.AppendLine("    headers: { \"Content-Type\": \"application/json\" },");
+            if (UsesBody(endpoint.Method) && requestType != "void")
                 builder.AppendLine("    body: JSON.stringify(body),");
             builder.AppendLine("    ...options");
             builder.AppendLine("  });");
