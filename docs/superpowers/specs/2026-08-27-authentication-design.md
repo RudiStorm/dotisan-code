@@ -102,7 +102,7 @@ The authenticated template adds the EF Core Identity package and a design-time p
 
 Existing unauthenticated projects are not mutated by this feature. New authenticated projects require an initial Identity migration before the database is used. The CLI does not silently create migrations.
 
-The generated API remains .NET 8/net8.0 because the repository pins that target. Package versions remain centrally managed in the generated project and in the repository where applicable.
+The generated API targets .NET 10/net10.0. Package versions remain centrally managed in the generated project and in the repository where applicable.
 
 ## Acceptance criteria
 

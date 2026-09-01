@@ -19,7 +19,7 @@ internal static class DefaultPrerequisiteChecker
     {
         var checks = new List<ToolCheck>
         {
-            new ToolCheck(".NET SDK", "dotnet", ["--version"], "Install the .NET 8 SDK from https://dotnet.microsoft.com/download/dotnet/8.0", "dotnet --version"),
+            new ToolCheck(".NET SDK", "dotnet", ["--version"], "Install the .NET 10 SDK from https://dotnet.microsoft.com/download/dotnet/10.0", "dotnet --version"),
             new ToolCheck("dotnet-ef", "dotnet", ["ef", "--version"], "dotnet tool install --global dotnet-ef", "dotnet ef --version"),
             CreatePackageManagerCheck(packageManager)
         };

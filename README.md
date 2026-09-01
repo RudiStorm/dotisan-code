@@ -2,6 +2,8 @@
 
 Dotisan is a batteries-included application framework for standard ASP.NET Core and Vue applications. The v0.5.0 release adds compile-time contracts, OpenAPI, TypeScript clients, validation guidance, and editable Vue CRUD scaffolding.
 
+The repository and generated API templates target .NET 10 / ASP.NET Core 10.
+
 ## v0.5 compile-time contract metadata foundation
 
 The v0.5 contract metadata slice adds generated contract APIs to endpoint assemblies. When the source generator runs, `DotisanGeneratedEndpointExtensions` exposes `ContractManifest`, `ContractManifestJson`, and `ContractManifestSha256`. The manifest contains deterministic request/response model metadata that can be passed directly to `TypeScriptContractGenerator.Generate`.

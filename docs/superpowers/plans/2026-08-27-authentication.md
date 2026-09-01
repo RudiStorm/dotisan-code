@@ -17,7 +17,7 @@
 - Generated code must remain ordinary, editable ASP.NET Core source and must not create migrations automatically.
 - Registration policy is controlled by `ProjectOptions.Registration`; public permits registration, invite-only and disabled reject it with a safe `403` ProblemDetails response.
 - Cookie mutations require the standard ASP.NET Core antiforgery service and request-token header flow.
-- Keep the repository’s existing `net8.0` target and centrally managed package versions.
+- Use the repository’s `net10.0` target and centrally managed package versions.
 - Every implementation task follows RED → GREEN → REFACTOR and ends with a focused test run.
 
 ---

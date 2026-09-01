@@ -1,5 +1,7 @@
 # Dotisan Development Quickstart
 
+The repository and generated API templates target .NET 10 / ASP.NET Core 10.
+
 ## Create an application
 
 From this repository:

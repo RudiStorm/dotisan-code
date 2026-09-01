@@ -43,7 +43,7 @@ internal static class TemplateFiles
         return
         [
             new(".gitignore", "bin/\nobj/\nwwwroot/\nnode_modules/\ndist/\n*.db\n"),
-            new("global.json", "{\n  \"sdk\": {\n    \"version\": \"8.0.100\",\n    \"rollForward\": \"latestMajor\"\n  }\n}\n"),
+            new("global.json", "{\n  \"sdk\": {\n    \"version\": \"10.0.100\",\n    \"rollForward\": \"latestMajor\"\n  }\n}\n"),
             new(".node-version", "22\n"),
             new("Directory.Packages.props", PackageVersions()),
             new("README.md", ProjectReadme(options.Name, options.Database, options.AuthenticationEnabled)),
@@ -115,7 +115,7 @@ internal static class TemplateFiles
     private static string ApiProject(string name, DatabaseProvider database, bool authenticationEnabled) => $$"""
     <Project Sdk="Microsoft.NET.Sdk.Web">
       <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <RootNamespace>{{name.Replace('-', '_')}}</RootNamespace>
@@ -123,6 +123,9 @@ internal static class TemplateFiles
       </PropertyGroup>
       <ItemGroup>
         <PackageReference Include="{{DatabasePackage(database)}}" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+        <PackageReference Include="Microsoft.OpenApi" />
+        <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
         {{(authenticationEnabled ? "<PackageReference Include=\"Microsoft.AspNetCore.Identity.EntityFrameworkCore\" />" : string.Empty)}}
       </ItemGroup>
@@ -135,14 +138,17 @@ internal static class TemplateFiles
         <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
       </PropertyGroup>
       <ItemGroup>
-        <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
-        <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.11" />
-        <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.8" />
-        <PackageVersion Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.2" />
-        <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11" />
-        <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.11" />
-        <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.11" />
-        <PackageVersion Include="Microsoft.Data.Sqlite" Version="8.0.11" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
+        <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.7" />
+        <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+        <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
+        <PackageVersion Include="Pomelo.EntityFrameworkCore.MySql" Version="10.0.0" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
+        <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.0" />
+        <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
+        <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.0" />
+        <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.12" />
         <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
         <PackageVersion Include="xunit" Version="2.9.2" />
         <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
@@ -313,6 +319,7 @@ internal static class TemplateFiles
         return;
 
     var builder = WebApplication.CreateBuilder(args);
+    builder.Services.AddOpenApi();
     builder.Services.AddProblemDetails();
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
         ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required.");
@@ -324,6 +331,10 @@ internal static class TemplateFiles
     app.UseExceptionHandler();
     app.UseDefaultFiles();
     app.UseStaticFiles();
+    if (app.Environment.IsDevelopment())
+    {
+        app.MapOpenApi();
+    }
     app.MapDotisanEndpoints();
     app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }))
         .WithName("Health")
@@ -367,6 +378,7 @@ internal static class TemplateFiles
         return;
 
     var builder = WebApplication.CreateBuilder(args);
+    builder.Services.AddOpenApi();
     builder.Services.AddProblemDetails();
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
         ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required.");
@@ -413,6 +425,10 @@ internal static class TemplateFiles
     app.UseExceptionHandler();
     app.UseDefaultFiles();
     app.UseStaticFiles();
+    if (app.Environment.IsDevelopment())
+    {
+        app.MapOpenApi();
+    }
     app.UseAuthentication();
     app.UseAuthorization();
     app.UseAntiforgery();
@@ -813,7 +829,7 @@ internal static class TemplateFiles
     private static string ApiTestsProject(string name, bool authenticationEnabled) => $$"""
     <Project Sdk="Microsoft.NET.Sdk">
       <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFramework>net10.0</TargetFramework>
         <IsPackable>false</IsPackable>
         <IsTestProject>true</IsTestProject>
         <Nullable>enable</Nullable>
@@ -824,6 +840,8 @@ internal static class TemplateFiles
         <PackageReference Include="Microsoft.NET.Test.Sdk" />
         <PackageReference Include="xunit" />
         <PackageReference Include="xunit.runner.visualstudio" />
+        <PackageReference Include="Microsoft.OpenApi" />
+        <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" />
         {{(authenticationEnabled ? "<PackageReference Include=\"Microsoft.AspNetCore.Mvc.Testing\" />\n        <PackageReference Include=\"Microsoft.EntityFrameworkCore.Sqlite\" />\n        <PackageReference Include=\"Microsoft.Data.Sqlite\" />" : string.Empty)}}
         <ProjectReference Include="..\\..\\src\\{{name}}.Api\\{{name}}.Api.csproj" />
       </ItemGroup>
@@ -1227,7 +1245,7 @@ internal static class TemplateFiles
     COPY src/{{name}}.Web/ ./
     RUN npm run build
 
-    FROM mcr.microsoft.com/dotnet/sdk:8.0 AS api-build
+    FROM mcr.microsoft.com/dotnet/sdk:10.0 AS api-build
     WORKDIR /src
     COPY src/{{name}}.Api/{{name}}.Api.csproj src/{{name}}.Api/
     RUN dotnet restore src/{{name}}.Api/{{name}}.Api.csproj
@@ -1235,7 +1253,7 @@ internal static class TemplateFiles
     COPY --from=web-build /src/dist src/{{name}}.Api/wwwroot
     RUN dotnet publish src/{{name}}.Api/{{name}}.Api.csproj -c Release -o /app/publish /p:UseAppHost=false
 
-    FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS final
+    FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
     WORKDIR /app
     COPY --from=api-build /app/publish .
     USER $APP_UID
