@@ -31,6 +31,8 @@ The generated app uses normal ASP.NET Core configuration, dependency injection, 
 
 Every new project includes `src/<Name>.Web/src/generated/models.ts`, `schemas.ts`, `services.ts`, and `queries.ts`; this confirms the TypeScript generation step ran. It is generated-owned output and should be refreshed as contracts are added.
 
+Authenticated projects also include generated client contracts for antiforgery, registration, login, logout, and the current-user probe. These clients use the same standard cookie and antiforgery behavior as the generated API.
+
 Run `dotisan generate` from the generated project root to rebuild contract files and `openapi.json`. The command builds the solution first, reads `dotisan.contract.json`, and writes deterministic files under `src/<Name>.Web/src/generated`. Use `dotisan generate --check` in CI to fail when generated output is stale. `--no-openapi` skips the OpenAPI file when needed.
 
 ## Run locally

@@ -44,6 +44,8 @@ dotnet run --project src\Dotisan.Cli -- new AuthApp --auth yes --registration pu
 
 This adds standard ASP.NET Core Identity with EF Core, cookie authentication, antiforgery protection, and explicit account endpoints. Registration can be `public`, `invite-only`, or `disabled`; invite-only and disabled projects return a clear `registration_unavailable` ProblemDetails response until an invitation workflow is added. Authenticated projects also generate `Authorization/Permissions.cs`, a protected `/api/authorization/profile` probe, and explicit policy registration from standard ASP.NET Core authorization.
 
+Authenticated projects also generate typed frontend clients for the antiforgery, register, login, logout, and current-user endpoints under `src/TodoApp.Web/src/generated`.
+
 For scripts and CI, use the non-interactive equivalent:
 
 ~~~powershell
