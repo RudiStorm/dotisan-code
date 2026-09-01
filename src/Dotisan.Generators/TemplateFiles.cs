@@ -97,6 +97,7 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/vite.config.ts", ViteConfig()),
             new($"src/{options.Name}.Web/src/env.d.ts", "/// <reference types=\"vite/client\" />\n"),
             new($"src/{options.Name}.Web/src/main.ts", MainTs()),
+            new($"src/{options.Name}.Web/src/routes/index.ts", RoutesIndex()),
             new($"src/{options.Name}.Web/src/App.vue", AppVue(options.Name)),
             new($"src/{options.Name}.Web/src/style.css", StyleCss()),
             new($"src/{options.Name}.Web/src/generated/.gitkeep", string.Empty),
@@ -179,6 +180,8 @@ internal static class TemplateFiles
 
     ~~~powershell
     dotisan make:resource Customer
+    dotisan make:crud Customer
+    dotisan generate
     dotisan migrate
     dotisan dev
     ~~~
@@ -1129,11 +1132,24 @@ internal static class TemplateFiles
     import { createApp } from 'vue';
     import { createPinia } from 'pinia';
     import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query';
+    import router from './routes';
     import App from './App.vue';
     import './style.css';
 
     const queryClient = new QueryClient();
-    createApp(App).use(createPinia()).use(VueQueryPlugin, { queryClient }).mount('#app');
+    createApp(App).use(createPinia()).use(VueQueryPlugin, { queryClient }).use(router).mount('#app');
+    """;
+
+    private static string RoutesIndex() => """
+    import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
+
+    const routes: RouteRecordRaw[] = [];
+    // DOTISAN:ROUTES
+
+    export default createRouter({
+      history: createWebHistory(),
+      routes
+    });
     """;
 
     private static string AppVue(string name) => """
@@ -1147,6 +1163,7 @@ internal static class TemplateFiles
         <h1>__PROJECT_NAME__</h1>
         <p>Your ASP.NET Core API and Vue frontend are ready for feature work.</p>
         <span class="status">API scaffold {{apiStatus}}</span>
+        <RouterView />
       </main>
     </template>
     """.Replace("__PROJECT_NAME__", name, StringComparison.Ordinal);

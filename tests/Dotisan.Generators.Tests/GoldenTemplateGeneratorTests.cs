@@ -25,6 +25,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "generated", "schemas.ts")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "generated", "services.ts")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "generated", "queries.ts")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "routes", "index.ts")));
             var mainTs = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "src", "main.ts"));
             Assert.Contains("VueQueryPlugin", mainTs);
             var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs"));
@@ -54,6 +55,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("AuditEntry", readme);
             Assert.Contains("Audit__Enabled", readme);
             Assert.Contains("InitialAudit", readme);
+            Assert.Contains("make:crud", readme);
             Assert.Contains("checks the .NET SDK", readme);
             Assert.Contains("Press Ctrl+C once", readme);
         }
@@ -202,7 +204,16 @@ public sealed class GoldenTemplateGeneratorTests
 
             Assert.True(result.Success, result.ErrorMessage);
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "features", "Customers", "CustomerList.vue")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "features", "Customers", "CustomerDetail.vue")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "features", "Customers", "CustomerForm.vue")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "routes", "customers.ts")));
+            var routeRegistry = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "src", "routes", "index.ts"));
+            Assert.Contains("customersRoutes", routeRegistry);
+            Assert.Contains("routes.push(...customersRoutes)", routeRegistry);
+            var listPage = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "src", "features", "Customers", "CustomerList.vue"));
+            Assert.Contains("Delete", listPage);
+            Assert.Contains("Loading", listPage);
+            Assert.Contains("No customers yet", listPage);
             Assert.All(result.CreatedFiles, file => Assert.DoesNotContain("generated", file, StringComparison.OrdinalIgnoreCase));
         }
         finally
