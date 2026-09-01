@@ -123,7 +123,6 @@ internal static class TemplateFiles
       </PropertyGroup>
       <ItemGroup>
         <PackageReference Include="{{DatabasePackage(database)}}" />
-        <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
         {{(authenticationEnabled ? "<PackageReference Include=\"Microsoft.AspNetCore.Identity.EntityFrameworkCore\" />" : string.Empty)}}
       </ItemGroup>
@@ -137,7 +136,6 @@ internal static class TemplateFiles
       </PropertyGroup>
       <ItemGroup>
         <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
-        <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="8.0.11" />
         <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.11" />
         <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.8" />
         <PackageVersion Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.2" />
@@ -315,7 +313,6 @@ internal static class TemplateFiles
         return;
 
     var builder = WebApplication.CreateBuilder(args);
-    builder.Services.AddOpenApi();
     builder.Services.AddProblemDetails();
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
         ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required.");
@@ -327,10 +324,6 @@ internal static class TemplateFiles
     app.UseExceptionHandler();
     app.UseDefaultFiles();
     app.UseStaticFiles();
-    if (app.Environment.IsDevelopment())
-    {
-        app.MapOpenApi();
-    }
     app.MapDotisanEndpoints();
     app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }))
         .WithName("Health")
@@ -374,7 +367,6 @@ internal static class TemplateFiles
         return;
 
     var builder = WebApplication.CreateBuilder(args);
-    builder.Services.AddOpenApi();
     builder.Services.AddProblemDetails();
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
         ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required.");
@@ -421,10 +413,6 @@ internal static class TemplateFiles
     app.UseExceptionHandler();
     app.UseDefaultFiles();
     app.UseStaticFiles();
-    if (app.Environment.IsDevelopment())
-    {
-        app.MapOpenApi();
-    }
     app.UseAuthentication();
     app.UseAuthorization();
     app.UseAntiforgery();
