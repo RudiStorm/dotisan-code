@@ -6,7 +6,7 @@ namespace Dotisan.Cli;
 
 public sealed class DotisanApplication
 {
-    public const string Version = "0.5.0";
+    public const string Version = "0.6.0";
 
     private readonly DotisanCommandRegistry registry;
     private readonly CommandContext context;
@@ -77,6 +77,8 @@ public sealed class DotisanApplication
         registry.Register(new BuildCommand());
         registry.Register(new RunCommand());
         registry.Register(new GenerateCommand());
+        registry.Register(new JobsCommand());
+        registry.Register(new ScheduleCommand());
         foreach (var command in new[] { "add", "remove", "doctor" })
             registry.Register(new NotImplementedCommand(command));
     }

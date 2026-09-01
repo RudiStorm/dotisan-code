@@ -34,7 +34,7 @@ public sealed class GoldenTemplateGeneratorTests
             var export = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Infrastructure", "DotisanContractExport.cs"));
             Assert.Contains("schemaVersion", export);
             Assert.Contains("DOTISAN_CONTRACT_FALLBACK", export);
-            Assert.Contains("\"version\": \"0.5.0\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
+            Assert.Contains("\"version\": \"0.6.0\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditEntry.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "IAuditWriter.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditWriter.cs")));
@@ -55,6 +55,17 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("Microsoft.AspNetCore.OpenApi", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "TodoApp.Api.csproj")));
             Assert.Contains("AddOpenApi", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.Contains("MapOpenApi", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "JobRegistration.cs")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "SampleJob.cs")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "SampleJobHandler.cs")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "JobEndpoints.cs")));
+            var jobs = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "JobRegistration.cs"));
+            Assert.Contains("UseDurableLocalQueues", jobs);
+            Assert.Contains("PersistMessagesWithSqlite", jobs);
+            Assert.Contains("DOTISAN:SCHEDULE sample|SampleJob|300|true", jobs);
+            Assert.Contains("ScheduleAsync", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "JobEndpoints.cs")));
+            Assert.Contains("UseWolverine", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
+            Assert.Contains("\"Jobs\":", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
             Assert.Contains("Data Source=app.db", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
             Assert.Contains("profile: quick", await File.ReadAllTextAsync(Path.Combine(output, "dotisan.config")));
             var readme = await File.ReadAllTextAsync(Path.Combine(output, "README.md"));

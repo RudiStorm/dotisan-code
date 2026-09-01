@@ -14,7 +14,7 @@ public sealed class CliApplicationTests
         var exitCode = await app.RunAsync(["--version"]);
 
         Assert.Equal(DotisanExitCode.Success, exitCode);
-        Assert.Contains("dotisan 0.5.0", console.Output);
+        Assert.Contains("dotisan 0.6.0", console.Output);
     }
 
     [Fact]
@@ -55,6 +55,59 @@ public sealed class CliApplicationTests
 
         Assert.Equal(DotisanExitCode.NotImplemented, exitCode);
         Assert.Contains("doctor is not implemented yet", console.ErrorOutput);
+    }
+
+    [Fact]
+    public async Task Jobs_status_reports_the_generated_jobs_registration()
+    {
+        var root = CreateJobsWorkspace();
+        try
+        {
+            var console = new MemoryConsole();
+            var app = DotisanApplication.CreateDefault(console, new DefaultDotisanServices(root));
+
+            var exitCode = await app.RunAsync(["jobs", "status"]);
+
+            Assert.Equal(DotisanExitCode.Success, exitCode);
+            Assert.Contains("Jobs are enabled", console.Output);
+            Assert.Contains("JobRegistration.cs", console.Output);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Schedule_list_reports_when_no_schedules_are_declared()
+    {
+        var root = CreateJobsWorkspace();
+        try
+        {
+            var console = new MemoryConsole();
+            var app = DotisanApplication.CreateDefault(console, new DefaultDotisanServices(root));
+
+            var exitCode = await app.RunAsync(["schedule", "list"]);
+
+            Assert.Equal(DotisanExitCode.Success, exitCode);
+            Assert.Contains("No recurring schedules are declared", console.Output);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static string CreateJobsWorkspace()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "dotisan-jobs-cli-" + Guid.NewGuid().ToString("N"));
+        var api = Path.Combine(root, "src", "App.Api");
+        Directory.CreateDirectory(Path.Combine(api, "Jobs"));
+        File.WriteAllText(Path.Combine(root, "App.sln"), string.Empty);
+        File.WriteAllText(Path.Combine(api, "App.Api.csproj"), "<Project />");
+        File.WriteAllText(Path.Combine(api, "Jobs", "JobRegistration.cs"), "// DOTISAN:JOB-REGISTRATION\n");
+        File.WriteAllText(Path.Combine(root, "appsettings.json"), "{\"Dotisan\":{\"Jobs\":{\"Enabled\":true}}}");
+        return root;
     }
 
     [Fact]

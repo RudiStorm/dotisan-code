@@ -1,6 +1,6 @@
 # Dotisan
 
-Dotisan is a batteries-included application framework for standard ASP.NET Core and Vue applications. The v0.5.0 release adds compile-time contracts, OpenAPI, TypeScript clients, validation guidance, and editable Vue CRUD scaffolding.
+Dotisan is a batteries-included application framework for standard ASP.NET Core and Vue applications. The v0.6.0 release adds a Wolverine-backed durable jobs and delayed-scheduling foundation on .NET 10.
 
 The repository and generated API templates target .NET 10 / ASP.NET Core 10.
 
@@ -91,7 +91,7 @@ dotnet ef database update --project src\MyApp.Api
 
 ~~~powershell
 dotnet pack src\Dotisan.Cli\Dotisan.Cli.csproj --configuration Release --output .\artifacts
-dotnet tool install --global Dotisan --add-source .\artifacts --version 0.5.0
+dotnet tool install --global Dotisan --add-source .\artifacts --version 0.6.0
 dotisan new MyApp
 ~~~
 
@@ -105,8 +105,8 @@ The v0.5.0 audit foundation generates an editable `AuditEntry` model and scoped 
 
 ## Deliberately deferred commands
 
-Admin authorization UI/API, tenancy, jobs, observability, integrations, UI CRUD generation, audit query UI/API, and production diagnostics remain subsequent feature specifications. Password reset, email confirmation, MFA, and external providers are not generated. Role and permission assignment remains ordinary application code using ASP.NET Core Identity; Dotisan does not add a runtime permission registry or admin surface. `add`, `remove`, and `doctor` intentionally return a helpful exit code 3 until those specifications are implemented.
+Admin authorization UI/API, tenancy, recurring scheduling, observability, integrations, UI CRUD generation, audit query UI/API, and production diagnostics remain subsequent feature specifications. Password reset, email confirmation, MFA, and external providers are not generated. Role and permission assignment remains ordinary application code using ASP.NET Core Identity; Dotisan does not add a runtime permission registry or admin surface. `add`, `remove`, and `doctor` intentionally return a helpful exit code 3 until those specifications are implemented.
 
 ## Project direction
 
-See Dotisan Spec Kit.md for the constitution, architecture, contracts, and staged roadmap. See docs/quickstart.md for the short developer workflow.
+See Dotisan Spec Kit.md for the constitution, architecture, contracts, and staged roadmap. See docs/quickstart.md for the short developer workflow. See docs/jobs-and-scheduling.md for the v0.6 durable jobs and delayed scheduling workflow.

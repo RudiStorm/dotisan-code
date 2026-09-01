@@ -13,7 +13,7 @@ internal static class TemplateFiles
         {
           "name": "{{options.Name.ToLowerInvariant()}}-web",
           "private": true,
-          "version": "0.5.0",
+          "version": "0.6.0",
           "packageManager": "{{packageManager}}",
           "type": "module",
           "scripts": {
@@ -75,6 +75,10 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Api/Auditing/AuditEntry.cs", AuditEntry(identifier)),
             new($"src/{options.Name}.Api/Auditing/IAuditWriter.cs", AuditWriterContract(identifier)),
             new($"src/{options.Name}.Api/Auditing/AuditWriter.cs", AuditWriter(identifier)),
+            new($"src/{options.Name}.Api/Jobs/JobRegistration.cs", JobRegistration(identifier, options.Database)),
+            new($"src/{options.Name}.Api/Jobs/SampleJob.cs", SampleJob(identifier)),
+            new($"src/{options.Name}.Api/Jobs/SampleJobHandler.cs", SampleJobHandler(identifier)),
+            new($"src/{options.Name}.Api/Jobs/JobEndpoints.cs", JobEndpoints(identifier)),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationUser.cs", ApplicationUser(identifier)) }
                 : Array.Empty<TemplateFile>()),
@@ -126,6 +130,9 @@ internal static class TemplateFiles
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Microsoft.OpenApi" />
         <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" />
+        <PackageReference Include="WolverineFx" />
+        <PackageReference Include="WolverineFx.EntityFrameworkCore" />
+        <PackageReference Include="WolverineFx.{{WolverineProviderPackage(database)}}" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
         {{(authenticationEnabled ? "<PackageReference Include=\"Microsoft.AspNetCore.Identity.EntityFrameworkCore\" />" : string.Empty)}}
       </ItemGroup>
@@ -138,17 +145,23 @@ internal static class TemplateFiles
         <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
       </PropertyGroup>
       <ItemGroup>
-        <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.7" />
         <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.7" />
         <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
-        <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
-        <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
-        <PackageVersion Include="Pomelo.EntityFrameworkCore.MySql" Version="10.0.0" />
-        <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
-        <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.0" />
-        <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.0" />
-        <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.0" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.7" />
+        <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.7" />
+        <PackageVersion Include="Pomelo.EntityFrameworkCore.MySql" Version="10.0.7" />
+        <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.7" />
+        <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.7" />
+        <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.7" />
+        <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.7" />
         <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.12" />
+        <PackageVersion Include="WolverineFx" Version="6.30.3" />
+        <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="6.30.3" />
+        <PackageVersion Include="WolverineFx.Sqlite" Version="6.30.3" />
+        <PackageVersion Include="WolverineFx.SqlServer" Version="6.30.3" />
+        <PackageVersion Include="WolverineFx.Postgresql" Version="6.30.3" />
+        <PackageVersion Include="WolverineFx.MySql" Version="6.30.3" />
         <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
         <PackageVersion Include="xunit" Version="2.9.2" />
         <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
@@ -159,6 +172,113 @@ internal static class TemplateFiles
     private static string ProjectReadme(string name, DatabaseProvider database, bool authenticationEnabled) => authenticationEnabled
         ? AuthenticatedProjectReadme(name, database)
         : PlainProjectReadme(name, database);
+
+    private static string WolverineProviderPackage(DatabaseProvider database) => database switch
+    {
+        DatabaseProvider.SqlServer => "SqlServer",
+        DatabaseProvider.PostgreSQL => "Postgresql",
+        DatabaseProvider.MySQL => "MySql",
+        _ => "Sqlite"
+    };
+
+    private static string JobRegistration(string identifier, DatabaseProvider database) => $$"""
+    using Microsoft.Extensions.Configuration;
+    using Wolverine;
+    using Wolverine.{{WolverineProviderPackage(database)}};
+    using Wolverine.EntityFrameworkCore;
+
+    namespace {{identifier}}.Api.Jobs;
+
+    public static class JobRegistration
+    {
+        // DOTISAN:SCHEDULE sample|SampleJob|300|true
+        public static void Configure(WolverineOptions options, string connectionString, IConfiguration configuration)
+        {
+            if (!configuration.GetValue("Dotisan:Jobs:Enabled", true))
+                return;
+
+            options.{{WolverinePersistenceMethod(database)}}(connectionString);
+            options.UseEntityFrameworkCoreTransactions();
+            options.Policies.UseDurableLocalQueues();
+            SampleJobHandler.ConfigureRetry(
+                configuration.GetValue("Dotisan:Jobs:MaxAttempts", 3),
+                configuration.GetValue("Dotisan:Jobs:RetryDelaySeconds", 5));
+        }
+    }
+    """;
+
+    private static string WolverinePersistenceMethod(DatabaseProvider database) => database switch
+    {
+        DatabaseProvider.SqlServer => "PersistMessagesWithSqlServer",
+        DatabaseProvider.PostgreSQL => "PersistMessagesWithPostgresql",
+        DatabaseProvider.MySQL => "PersistMessagesWithMySql",
+        _ => "PersistMessagesWithSqlite"
+    };
+
+    private static string SampleJob(string identifier) => $$"""
+    namespace {{identifier}}.Api.Jobs;
+
+    public sealed record SampleJob(DateTimeOffset EnqueuedAt);
+    """;
+
+    private static string SampleJobHandler(string identifier) => $$"""
+    using Microsoft.Extensions.Logging;
+    using Wolverine.Configuration;
+    using Wolverine.Runtime.Handlers;
+
+    namespace {{identifier}}.Api.Jobs;
+
+    public sealed partial class SampleJobHandler : IHandlerConfiguration
+    {
+        private static int _maxAttempts = 3;
+
+        public static void ConfigureRetry(int maxAttempts, int retryDelaySeconds)
+        {
+            _ = retryDelaySeconds;
+            _maxAttempts = Math.Max(1, maxAttempts);
+        }
+
+        public static void Configure(HandlerChain chain)
+        {
+            chain.Failures.MaximumAttempts = _maxAttempts;
+        }
+
+        public static void Handle(SampleJob message, ILogger<SampleJobHandler> logger)
+        {
+            LogProcessed(logger, message.EnqueuedAt);
+        }
+
+        [LoggerMessage(EventId = 6000, Level = LogLevel.Information, Message = "Processed sample job enqueued at {EnqueuedAt}.")]
+        private static partial void LogProcessed(ILogger logger, DateTimeOffset enqueuedAt);
+    }
+    """;
+
+    private static string JobEndpoints(string identifier) => $$"""
+    using Microsoft.AspNetCore.Builder;
+    using Microsoft.AspNetCore.Http;
+    using Microsoft.AspNetCore.Routing;
+    using Wolverine;
+
+    namespace {{identifier}}.Api.Jobs;
+
+    public static class JobEndpoints
+    {
+        public static void MapJobEndpoints(this IEndpointRouteBuilder endpoints)
+        {
+            endpoints.MapPost("/api/jobs/sample", async (IMessageBus bus, CancellationToken cancellationToken) =>
+            {
+                await bus.SendAsync(new SampleJob(DateTimeOffset.UtcNow));
+                return Results.Accepted();
+            }).WithName("EnqueueSampleJob").WithTags("Jobs");
+
+            endpoints.MapPost("/api/jobs/sample/schedule", async (IMessageBus bus, CancellationToken cancellationToken) =>
+            {
+                await bus.ScheduleAsync(new SampleJob(DateTimeOffset.UtcNow), TimeSpan.FromMinutes(5));
+                return Results.Accepted();
+            }).WithName("ScheduleSampleJob").WithTags("Jobs");
+        }
+    }
+    """;
 
     private static string Permissions(string identifier) => $$"""
     namespace {{identifier}}.Api.Authorization;
@@ -314,6 +434,8 @@ internal static class TemplateFiles
     using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Data;
     using {{identifier}}.Api.Infrastructure;
+    using {{identifier}}.Api.Jobs;
+    using Wolverine;
 
     if (TryExportDotisanContract(args))
         return;
@@ -326,6 +448,7 @@ internal static class TemplateFiles
     builder.Services.AddDbContext<AppDbContext>(options =>
         {{DatabaseRegistration(database)}});
     builder.Services.AddScoped<IAuditWriter, AuditWriter>();
+    builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));
 
     var app = builder.Build();
     app.UseExceptionHandler();
@@ -336,6 +459,7 @@ internal static class TemplateFiles
         app.MapOpenApi();
     }
     app.MapDotisanEndpoints();
+    app.MapJobEndpoints();
     app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }))
         .WithName("Health")
         .WithTags("System");
@@ -369,6 +493,8 @@ internal static class TemplateFiles
     using {{identifier}}.Api.Features.Authorization;
     using {{identifier}}.Api.Identity;
     using {{identifier}}.Api.Infrastructure;
+    using {{identifier}}.Api.Jobs;
+    using Wolverine;
     using Microsoft.AspNetCore.Authentication.Cookies;
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Identity;
@@ -385,6 +511,7 @@ internal static class TemplateFiles
     builder.Services.AddDbContext<AppDbContext>(options =>
         {{DatabaseRegistration(database)}});
     builder.Services.AddScoped<IAuditWriter, AuditWriter>();
+    builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));
     builder.Services.AddIdentityCore<ApplicationUser>(options =>
     {
         options.User.RequireUniqueEmail = true;
@@ -433,6 +560,7 @@ internal static class TemplateFiles
     app.UseAuthorization();
     app.UseAntiforgery();
     app.MapDotisanEndpoints();
+    app.MapJobEndpoints();
     app.MapAccountEndpoints({{registrationEnabled.ToString().ToLowerInvariant()}});
     app.MapAuthorizationEndpoints();
     app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }))
@@ -508,6 +636,13 @@ internal static class TemplateFiles
           },
           "Audit": {
             "Enabled": true
+          },
+          "Dotisan": {
+            "Jobs": {
+              "Enabled": true,
+              "MaxAttempts": 3,
+              "RetryDelaySeconds": 5
+            }
           },
           "Logging": {
             "LogLevel": {

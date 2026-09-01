@@ -38,7 +38,7 @@ All wizard menus show numbered choices. Enter `1`, `2`, or another displayed num
 
 SQLite is the default because it is file-based and requires no separate database service. The wizard also supports SQL Server, PostgreSQL, and MySQL. Each choice generates the matching EF Core package, provider registration, and local connection-string example in `src/TodoApp.Api/appsettings.json`.
 
-Authentication is opt-in. To generate the v0.5.0 authentication and authorization foundation non-interactively:
+Authentication is opt-in. To generate the authentication and authorization foundation non-interactively:
 
 ~~~powershell
 dotnet run --project src\Dotisan.Cli -- new AuthApp --auth yes --registration public --yes --output .\AuthApp
