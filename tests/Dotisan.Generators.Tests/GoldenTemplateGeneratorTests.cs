@@ -19,13 +19,15 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.True(File.Exists(Path.Combine(output, "dotisan.contract.json")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
-            var generatedModels = Path.Combine(output, "src", "TodoApp.Web", "src", "generated", "models.ts");
+            var generatedModels = Path.Combine(output, "src", "TodoApp.Web", "src", "dotisan", "models.ts");
             Assert.True(File.Exists(generatedModels));
             Assert.Equal(Environment.NewLine, await File.ReadAllTextAsync(generatedModels));
-            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "generated", "schemas.ts")));
-            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "generated", "services.ts")));
-            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "generated", "queries.ts")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "dotisan", "schemas.ts")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "dotisan", "services.ts")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "dotisan", "queries.ts")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "routes", "index.ts")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "components", "ui", "Button.vue")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "layouts", "PortalLayout.vue")));
             var mainTs = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "src", "main.ts"));
             Assert.Contains("VueQueryPlugin", mainTs);
             var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs"));
@@ -82,6 +84,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("make:crud", readme);
             Assert.Contains("checks the .NET SDK", readme);
             Assert.Contains("Press Ctrl+C once", readme);
+            Assert.Contains("componentized dashboard shell", readme);
         }
         finally
         {
@@ -89,6 +92,31 @@ public sealed class GoldenTemplateGeneratorTests
             {
                 Directory.Delete(output, recursive: true);
             }
+        }
+    }
+
+    [Fact]
+    public async Task Authenticated_template_includes_componentized_auth_pages_and_portal_routes()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-auth-vue-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var result = await new GoldenTemplateGenerator().GenerateAsync(
+                ProjectOptions.Quick("AuthApp", output) with { AuthenticationEnabled = true }, CancellationToken.None);
+
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.True(File.Exists(Path.Combine(output, "src", "AuthApp.Web", "src", "pages", "auth", "LoginPage.vue")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "AuthApp.Web", "src", "pages", "account", "ProfilePage.vue")));
+            var routes = await File.ReadAllTextAsync(Path.Combine(output, "src", "AuthApp.Web", "src", "routes", "index.ts"));
+            Assert.Contains("requiresAuth", routes);
+            Assert.Contains("path: 'login'", routes);
+            var readme = await File.ReadAllTextAsync(Path.Combine(output, "README.md"));
+            Assert.Contains("login, registration, forgot-password, and profile pages", readme);
+        }
+        finally
+        {
+            if (Directory.Exists(output))
+                Directory.Delete(output, recursive: true);
         }
     }
 
@@ -307,12 +335,12 @@ public sealed class GoldenTemplateGeneratorTests
 
             Assert.True(authenticated.Success, authenticated.ErrorMessage);
             Assert.True(plain.Success, plain.ErrorMessage);
-            var authServices = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Web", "src", "generated", "services.ts"));
+            var authServices = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Web", "src", "dotisan", "services.ts"));
             Assert.Contains("login", authServices);
             Assert.Contains("register", authServices);
             Assert.Contains("logout", authServices);
             Assert.Contains("me", authServices);
-            Assert.DoesNotContain("login", await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Web", "src", "generated", "services.ts")));
+            Assert.DoesNotContain("login", await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Web", "src", "dotisan", "services.ts")));
             var apiProject = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "AuthApp.Api.csproj"));
             var testProject = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "tests", "AuthApp.Api.Tests", "AuthApp.Api.Tests.csproj"));
             var plainApiProject = await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Api", "PlainApp.Api.csproj"));

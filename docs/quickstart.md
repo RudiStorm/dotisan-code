@@ -23,7 +23,7 @@ File.WriteAllText(Path.Combine("src", "generated", files[0].Path), files[0].Cont
 
 After changing contract metadata, run `dotisan generate` from the project root. It builds the solution, reads `dotisan.contract.json`, and refreshes generated files. `dotisan generate --check` verifies that generated output is current without changing files.
 
-The pipeline also writes deterministic `openapi.json` output and `dotisan make:crud <ResourceName>` adds editable Vue list and route scaffolding outside `src/generated`. It includes generated Zod schemas, fetch services, TanStack Query composables, and portable client-side guidance for supported validation rules. FluentValidation remains authoritative on the server.
+The pipeline also writes deterministic `openapi.json` output and `dotisan make:crud <ResourceName>` adds editable Vue list and route scaffolding outside `src/dotisan`. It includes Dotisan-owned Zod schemas, fetch services, TanStack Query composables, and portable client-side guidance for supported validation rules. FluentValidation remains authoritative on the server.
 
 Choose Quick Setup, then accept the defaults:
 
@@ -46,7 +46,7 @@ dotnet run --project src\Dotisan.Cli -- new AuthApp --auth yes --registration pu
 
 This adds standard ASP.NET Core Identity with EF Core, cookie authentication, antiforgery protection, and explicit account endpoints. Registration can be `public`, `invite-only`, or `disabled`; invite-only and disabled projects return a clear `registration_unavailable` ProblemDetails response until an invitation workflow is added. Authenticated projects also generate `Authorization/Permissions.cs`, a protected `/api/authorization/profile` probe, and explicit policy registration from standard ASP.NET Core authorization.
 
-Authenticated projects also generate typed frontend clients for the antiforgery, register, login, logout, and current-user endpoints under `src/TodoApp.Web/src/generated`.
+Authenticated projects also generate typed frontend clients for the antiforgery, register, login, logout, and current-user endpoints under `src/TodoApp.Web/src/dotisan`.
 
 For scripts and CI, use the non-interactive equivalent:
 

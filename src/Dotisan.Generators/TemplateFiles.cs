@@ -103,10 +103,27 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/vite.config.ts", ViteConfig()),
             new($"src/{options.Name}.Web/src/env.d.ts", "/// <reference types=\"vite/client\" />\n"),
             new($"src/{options.Name}.Web/src/main.ts", MainTs()),
-            new($"src/{options.Name}.Web/src/routes/index.ts", RoutesIndex()),
-            new($"src/{options.Name}.Web/src/App.vue", AppVue(options.Name)),
+            new($"src/{options.Name}.Web/src/routes/index.ts", RoutesIndex(options.AuthenticationEnabled)),
+            new($"src/{options.Name}.Web/src/App.vue", AppVue()),
             new($"src/{options.Name}.Web/src/style.css", StyleCss()),
-            new($"src/{options.Name}.Web/src/generated/.gitkeep", string.Empty),
+            new($"src/{options.Name}.Web/src/dotisan/.gitkeep", string.Empty),
+            new($"src/{options.Name}.Web/src/components/ui/Button.vue", UiButton()),
+            new($"src/{options.Name}.Web/src/components/ui/Input.vue", UiInput()),
+            new($"src/{options.Name}.Web/src/components/ui/Card.vue", UiCard()),
+            new($"src/{options.Name}.Web/src/components/ui/Badge.vue", UiBadge()),
+            new($"src/{options.Name}.Web/src/components/AppSidebar.vue", AppSidebar(options.Name, options.AuthenticationEnabled)),
+            new($"src/{options.Name}.Web/src/components/AppHeader.vue", AppHeader(options.Name, options.AuthenticationEnabled)),
+            new($"src/{options.Name}.Web/src/layouts/PortalLayout.vue", PortalLayout()),
+            new($"src/{options.Name}.Web/src/layouts/AuthLayout.vue", AuthLayout()),
+            new($"src/{options.Name}.Web/src/pages/DashboardPage.vue", DashboardPage(options.Name)),
+            ..(options.AuthenticationEnabled
+                ? new[] {
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/auth/LoginPage.vue", LoginPage()),
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/auth/RegisterPage.vue", RegisterPage()),
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/auth/ForgotPasswordPage.vue", ForgotPasswordPage()),
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/account/ProfilePage.vue", ProfilePage())
+                }
+                : Array.Empty<TemplateFile>()),
             new($"tests/{options.Name}.Api.Tests/{options.Name}.Api.Tests.csproj", ApiTestsProject(options.Name, options.AuthenticationEnabled)),
             new($"tests/{options.Name}.Api.Tests/HealthEndpointTests.cs", ApiTests(identifier)),
             new($"tests/{options.Name}.Api.Tests/Usings.cs", "global using Xunit;\n"),
@@ -343,6 +360,8 @@ internal static class TemplateFiles
     npm run dev
     ~~~
 
+    The Vue portal starts with a componentized dashboard shell, sidebar, header, and local shadcn-vue-style primitives under `src\{{name}}.Web\src\components`. Contract output is kept in `src\{{name}}.Web\src\dotisan` so generated API clients stay separate from application UI code.
+
     `dotisan new` installs frontend dependencies before reporting success. If the project was generated with `--no-restore`, run `npm install` or `pnpm install` before `npm run dev`.
 
     After the wizard, Dotisan checks the .NET SDK, `dotnet-ef`, and the selected frontend package manager. Missing tools are printed with install and verification commands. A missing npm or pnpm skips only frontend installation; the project remains available for native setup commands.
@@ -380,6 +399,8 @@ internal static class TemplateFiles
     - `GET /api/account/me` for the current authenticated user.
 
     The generated code uses normal ASP.NET Core Identity, EF Core, cookie authentication, dependency injection, and ProblemDetails. Review and extend these source files directly; Dotisan does not hide the authentication implementation behind a runtime framework.
+
+    The Vue portal includes ready-to-edit login, registration, forgot-password, and profile pages under `src\{{name}}.Web\src\pages`, composed from local shadcn-vue-style primitives. The authenticated portal shell keeps generated API contracts in `src\{{name}}.Web\src\dotisan` and application UI in `components`, `layouts`, and `pages`.
 
     ## Database and migrations
 
@@ -1350,42 +1371,227 @@ internal static class TemplateFiles
     """
     };
 
-    private static string RoutesIndex() => """
+    private static string RoutesIndex(bool authenticationEnabled) => authenticationEnabled
+        ? """
     import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
+    import { me } from '../dotisan/services';
+    import PortalLayout from '../layouts/PortalLayout.vue';
+    import AuthLayout from '../layouts/AuthLayout.vue';
+    import DashboardPage from '../pages/DashboardPage.vue';
+    import LoginPage from '../pages/auth/LoginPage.vue';
+    import RegisterPage from '../pages/auth/RegisterPage.vue';
+    import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage.vue';
+    import ProfilePage from '../pages/account/ProfilePage.vue';
 
-    const routes: RouteRecordRaw[] = [];
+    const routes: RouteRecordRaw[] = [
+      { path: '/', component: PortalLayout, meta: { requiresAuth: true }, children: [{ path: '', component: DashboardPage }, { path: 'profile', component: ProfilePage }] },
+      { path: '/auth', component: AuthLayout, children: [{ path: 'login', name: 'login', component: LoginPage }, { path: 'register', name: 'register', component: RegisterPage }, { path: 'forgot-password', component: ForgotPasswordPage }] }
+    ];
     // DOTISAN:ROUTES
-
-    export default createRouter({
-      history: createWebHistory(),
-      routes
+    const router = createRouter({ history: createWebHistory(), routes });
+    router.beforeEach(async (to) => {
+      if (!to.meta.requiresAuth) return true;
+      try { await me(); return true; } catch { return { name: 'login', query: { redirect: to.fullPath } }; }
     });
+    export default router;
+    """
+        : """
+    import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
+    import PortalLayout from '../layouts/PortalLayout.vue';
+    import DashboardPage from '../pages/DashboardPage.vue';
+
+    const routes: RouteRecordRaw[] = [
+      { path: '/', component: PortalLayout, children: [{ path: '', component: DashboardPage }] }
+    ];
+    // DOTISAN:ROUTES
+    export default createRouter({ history: createWebHistory(), routes });
     """;
 
-    private static string AppVue(string name) => """
-    <script setup lang="ts">
-    const apiStatus = 'ready';
-    </script>
+    private static string AppVue() => """
+    <template><RouterView /></template>
+    """;
 
+    private static string UiButton() => """
+    <script setup lang="ts">
+    withDefaults(defineProps<{ variant?: 'default' | 'outline' | 'ghost' | 'destructive'; type?: 'button' | 'submit' | 'reset'; disabled?: boolean }>(), { variant: 'default', type: 'button' });
+    </script>
+    <template><button :type="type" :disabled="disabled" class="ui-button" :class="`ui-button--${variant}`"><slot /></button></template>
+    """;
+
+    private static string UiInput() => """
+    <script setup lang="ts">
+    defineProps<{ modelValue?: string; type?: string; placeholder?: string; autocomplete?: string; required?: boolean; disabled?: boolean }>();
+    const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
+    </script>
+    <template><input :value="modelValue" :type="type ?? 'text'" :placeholder="placeholder" :autocomplete="autocomplete" :required="required" :disabled="disabled" class="ui-input" @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)" /></template>
+    """;
+
+    private static string UiCard() => """
+    <template><section class="ui-card"><div v-if="$slots.header" class="ui-card__header"><slot name="header" /></div><div class="ui-card__content"><slot /></div><div v-if="$slots.footer" class="ui-card__footer"><slot name="footer" /></div></section></template>
+    """;
+
+    private static string UiBadge() => """
+    <template><span class="ui-badge"><slot /></span></template>
+    """;
+
+    private static string AppSidebar(string name, bool authenticationEnabled) => $$"""
+    <script setup lang="ts">
+    defineProps<{ open?: boolean }>();
+    const links = [
+      { label: 'Dashboard', to: '/' },
+      {{(authenticationEnabled ? "{ label: 'Profile', to: '/profile' }," : string.Empty)}}
+    ];
+    </script>
     <template>
-      <main class="shell">
-        <p class="eyebrow">Dotisan foundation</p>
-        <h1>__PROJECT_NAME__</h1>
-        <p>Your ASP.NET Core API and Vue frontend are ready for feature work.</p>
-        <span class="status">API scaffold {{apiStatus}}</span>
-        <RouterView />
-      </main>
+      <aside class="app-sidebar" :class="{ 'app-sidebar--open': open }" aria-label="Primary navigation">
+        <RouterLink to="/" class="brand"><span class="brand-mark">D</span><span>{{name}}</span></RouterLink>
+        <nav><RouterLink v-for="link in links" :key="link.to" :to="link.to" class="nav-link" active-class="nav-link--active" v-text="link.label"></RouterLink></nav>
+        <div class="sidebar-footer"><span class="sidebar-caption">Built with Dotisan</span></div>
+      </aside>
     </template>
-    """.Replace("__PROJECT_NAME__", name, StringComparison.Ordinal);
+    """;
+
+    private static string AppHeader(string name, bool authenticationEnabled) => $$"""
+    <script setup lang="ts">
+    import { ref } from 'vue';
+    import UiButton from './ui/Button.vue';
+    {{(authenticationEnabled ? "import { logout } from '../dotisan/services';" : string.Empty)}}
+    const menuOpen = ref(false);
+    {{(authenticationEnabled ? "async function signOut() { await logout(); window.location.assign('/auth/login'); }" : string.Empty)}}
+    </script>
+    <template>
+      <header class="app-header">
+        <div><p class="header-kicker">Workspace</p><h1>{{name}}</h1></div>
+        {{(authenticationEnabled ? "<div class=\"user-menu\"><UiButton variant=\"ghost\" @click=\"menuOpen = !menuOpen\">Account ▾</UiButton><div v-if=\"menuOpen\" class=\"user-menu__panel\"><RouterLink to=\"/profile\">Profile</RouterLink><UiButton variant=\"ghost\" @click=\"signOut\">Sign out</UiButton></div></div>" : string.Empty)}}
+      </header>
+    </template>
+    """;
+
+    private static string PortalLayout() => """
+    <script setup lang="ts">
+    import AppSidebar from '../components/AppSidebar.vue';
+    import AppHeader from '../components/AppHeader.vue';
+    </script>
+    <template><div class="portal-layout"><AppSidebar /><div class="portal-main"><AppHeader /><main class="portal-content"><RouterView /></main></div></div></template>
+    """;
+
+    private static string AuthLayout() => """
+    <template><main class="auth-layout"><div class="auth-brand"><span class="brand-mark">D</span><span>Dotisan</span></div><RouterView /></main></template>
+    """;
+
+    private static string DashboardPage(string name) => $$"""
+    <script setup lang="ts">
+    import UiBadge from '../components/ui/Badge.vue';
+    import UiCard from '../components/ui/Card.vue';
+    </script>
+    <template>
+      <section class="page-stack">
+        <div class="page-heading"><div><p class="eyebrow">Overview</p><h2>Welcome to {{name}}</h2><p class="page-lede">Your application workspace is ready. Start by adding your first feature.</p></div><UiBadge>Ready</UiBadge></div>
+        <div class="dashboard-grid"><UiCard><template #header><h3>Application status</h3></template><p class="metric">Online</p><p class="muted">The API and Vue portal are connected.</p></UiCard><UiCard><template #header><h3>Next step</h3></template><p class="metric">Build a feature</p><p class="muted">Use <code>dotisan make:resource</code> to create your first vertical slice.</p></UiCard></div>
+      </section>
+    </template>
+    """;
+
+    private static string LoginPage() => """
+    <script setup lang="ts">
+    import { ref } from 'vue'; import { useRoute, useRouter } from 'vue-router'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue'; import { issueAntiforgery, login } from '../../dotisan/services';
+    const router = useRouter(); const route = useRoute(); const email = ref(''); const password = ref(''); const rememberMe = ref(false); const error = ref(''); const pending = ref(false);
+    async function submit() { pending.value = true; error.value = ''; try { const token = await issueAntiforgery(); await login({ email: email.value, password: password.value, rememberMe: rememberMe.value }, { headers: { 'X-XSRF-TOKEN': token.token } }); await router.push(String(route.query.redirect ?? '/')); } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Unable to sign in.'; } finally { pending.value = false; } }
+    </script>
+    <template>
+    <UiCard><div class="auth-card-heading"><p class="eyebrow">Welcome back</p><h1>Sign in</h1><p class="muted">Continue to your workspace.</p></div><form class="form-stack" @submit.prevent="submit"><p v-if="error" class="form-error" role="alert" v-text="error"></p><label>Email<UiInput v-model="email" type="email" autocomplete="email" required /></label><label>Password<UiInput v-model="password" type="password" autocomplete="current-password" required /></label><label class="checkbox"><input v-model="rememberMe" type="checkbox" /> Remember me</label><UiButton type="submit" :disabled="pending"><span v-text="pending ? 'Signing in...' : 'Sign in'"></span></UiButton></form><p class="form-links"><RouterLink to="/auth/register">Create an account</RouterLink><RouterLink to="/auth/forgot-password">Forgot password?</RouterLink></p></UiCard>
+    </template>
+    """;
+
+    private static string RegisterPage() => """
+    <script setup lang="ts">
+    import { ref } from 'vue'; import { useRouter } from 'vue-router'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue'; import { issueAntiforgery, register } from '../../dotisan/services';
+    const router = useRouter(); const email = ref(''); const password = ref(''); const error = ref(''); const pending = ref(false);
+    async function submit() { pending.value = true; error.value = ''; try { const token = await issueAntiforgery(); await register({ email: email.value, password: password.value }, { headers: { 'X-XSRF-TOKEN': token.token } }); await router.push('/'); } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Unable to create your account.'; } finally { pending.value = false; } }
+    </script>
+    <template>
+    <UiCard><div class="auth-card-heading"><p class="eyebrow">Get started</p><h1>Create account</h1><p class="muted">Set up your workspace access.</p></div><form class="form-stack" @submit.prevent="submit"><p v-if="error" class="form-error" role="alert" v-text="error"></p><label>Email<UiInput v-model="email" type="email" autocomplete="email" required /></label><label>Password<UiInput v-model="password" type="password" autocomplete="new-password" required /></label><UiButton type="submit" :disabled="pending"><span v-text="pending ? 'Creating...' : 'Create account'"></span></UiButton></form><p class="form-links"><RouterLink to="/auth/login">Already have an account?</RouterLink></p></UiCard>
+    </template>
+    """;
+
+    private static string ForgotPasswordPage() => """
+    <template>
+    <UiCard><div class="auth-card-heading"><p class="eyebrow">Account recovery</p><h1>Forgot password?</h1><p class="muted">Password reset delivery is not configured yet. Add your mail provider and endpoint when you are ready.</p></div><p class="form-links"><RouterLink to="/auth/login">Return to sign in</RouterLink></p></UiCard>
+    </template>
+    """;
+
+    private static string ProfilePage() => """
+    <script setup lang="ts">
+    import { onMounted, ref } from 'vue'; import UiCard from '../../components/ui/Card.vue'; import { me } from '../../dotisan/services'; const profile = ref<{ id: string; email: string }>(); const error = ref(''); onMounted(async () => { try { profile.value = await me(); } catch { error.value = 'Could not load your profile.'; } });
+    </script>
+    <template>
+    <section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Account</p><h2>Your profile</h2></div></div><UiCard><p v-if="error" class="form-error" role="alert" v-text="error"></p><dl v-else-if="profile" class="profile-list"><div><dt>Email</dt><dd v-text="profile.email"></dd></div><div><dt>User ID</dt><dd class="mono" v-text="profile.id"></dd></div></dl><p v-else class="muted">Loading profile...</p></UiCard></section>
+    </template>
+    """;
 
     private static string StyleCss() => """
-    :root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #172033; background: #f6f8fb; }
-    body { margin: 0; }
-    .shell { max-width: 720px; margin: 12vh auto; padding: 3rem; background: white; border: 1px solid #e2e8f0; border-radius: 1.25rem; box-shadow: 0 1rem 3rem #17203312; }
-    .eyebrow { color: #2563eb; font-size: .8rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
-    h1 { margin: .5rem 0; font-size: clamp(2.25rem, 6vw, 4rem); }
-    p { color: #526071; line-height: 1.6; }
-    .status { display: inline-block; margin-top: 1.25rem; padding: .5rem .75rem; color: #166534; background: #dcfce7; border-radius: 999px; font-size: .9rem; font-weight: 600; }
+    :root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: oklch(24% .03 255); background: oklch(97% .012 255); font-synthesis: none; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-width: 320px; background: oklch(97% .012 255); }
+    button, input { font: inherit; }
+    a { color: inherit; text-decoration: none; }
+    .portal-layout { display: flex; min-height: 100vh; }
+    .app-sidebar { display: flex; width: 16rem; flex-direction: column; gap: 2.5rem; padding: 1.5rem 1rem; background: oklch(24% .03 255); color: oklch(96% .01 255); }
+    .brand, .auth-brand { display: flex; align-items: center; gap: .7rem; font-weight: 750; letter-spacing: -.02em; }
+    .brand-mark { display: grid; width: 2rem; height: 2rem; place-items: center; border-radius: .6rem; background: oklch(76% .15 75); color: oklch(24% .03 255); font-weight: 850; }
+    nav { display: grid; gap: .35rem; }
+    .nav-link { border-radius: .6rem; padding: .7rem .8rem; color: oklch(82% .02 255); font-size: .9rem; transition: background .18s ease, color .18s ease; }
+    .nav-link:hover, .nav-link--active { background: oklch(34% .04 255); color: oklch(99% .005 255); }
+    .sidebar-footer { margin-top: auto; }
+    .sidebar-caption, .muted { color: oklch(58% .025 255); font-size: .875rem; line-height: 1.55; }
+    .app-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border-bottom: 1px solid oklch(88% .02 255); padding: 1.4rem clamp(1.25rem, 4vw, 3rem); background: oklch(99% .004 255); }
+    .app-header h1, .app-header p { margin: 0; }
+    .app-header h1 { font-size: 1rem; }
+    .header-kicker, .eyebrow { margin: 0 0 .4rem; color: oklch(55% .12 75); font-size: .72rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .portal-main { flex: 1; min-width: 0; }
+    .portal-content { width: min(100%, 80rem); margin: 0 auto; padding: clamp(1.5rem, 4vw, 3rem); }
+    .page-stack { display: grid; gap: 1.5rem; }
+    .page-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+    .page-heading h2 { margin: 0; font-size: clamp(1.8rem, 4vw, 2.7rem); letter-spacing: -.04em; }
+    .page-lede { max-width: 60ch; margin: .65rem 0 0; color: oklch(52% .03 255); line-height: 1.6; }
+    .dashboard-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+    .ui-card { border: 1px solid oklch(88% .02 255); border-radius: .9rem; background: oklch(99% .004 255); box-shadow: 0 .8rem 2.5rem oklch(24% .03 255 / .05); }
+    .ui-card__header, .ui-card__content, .ui-card__footer { padding: 1.25rem; }
+    .ui-card__header { border-bottom: 1px solid oklch(92% .015 255); }
+    .ui-card__footer { border-top: 1px solid oklch(92% .015 255); }
+    .ui-card h1, .ui-card h3 { margin: 0; }
+    .ui-card h1 { font-size: 1.7rem; letter-spacing: -.035em; }
+    .metric { margin: 0; font-size: 1.5rem; font-weight: 750; letter-spacing: -.03em; }
+    .ui-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: .35rem .65rem; background: oklch(92% .06 75); color: oklch(38% .08 75); font-size: .75rem; font-weight: 750; }
+    .ui-button { display: inline-flex; min-height: 2.5rem; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: .55rem; padding: .55rem .85rem; cursor: pointer; font-size: .875rem; font-weight: 700; transition: background .18s ease, border-color .18s ease, opacity .18s ease; }
+    .ui-button:disabled { cursor: not-allowed; opacity: .55; }
+    .ui-button--default { background: oklch(30% .04 255); color: oklch(98% .005 255); }
+    .ui-button--default:hover { background: oklch(38% .05 255); }
+    .ui-button--outline { border-color: oklch(84% .02 255); background: transparent; color: oklch(30% .04 255); }
+    .ui-button--ghost { background: transparent; color: inherit; }
+    .ui-button--ghost:hover { background: oklch(92% .02 255 / .6); }
+    .ui-button--destructive { background: oklch(54% .16 25); color: oklch(98% .005 25); }
+    .ui-input { width: 100%; border: 1px solid oklch(82% .025 255); border-radius: .55rem; background: oklch(100% 0 0); padding: .65rem .75rem; color: oklch(24% .03 255); outline: none; }
+    .ui-input:focus { border-color: oklch(55% .12 75); box-shadow: 0 0 0 .2rem oklch(76% .15 75 / .22); }
+    .auth-layout { display: grid; min-height: 100vh; place-items: center; align-content: center; gap: 2rem; padding: 2rem 1rem; background: oklch(96% .018 255); }
+    .auth-layout > .ui-card { width: min(100%, 28rem); }
+    .auth-brand { color: oklch(30% .04 255); }
+    .form-stack { display: grid; gap: 1rem; }
+    .form-stack label { display: grid; gap: .4rem; color: oklch(35% .03 255); font-size: .875rem; font-weight: 650; }
+    .checkbox { display: flex !important; grid-template-columns: auto 1fr; align-items: center; gap: .5rem !important; font-weight: 500 !important; }
+    .form-error { margin: 0; border-radius: .55rem; padding: .7rem .8rem; background: oklch(94% .045 25); color: oklch(40% .12 25); font-size: .875rem; }
+    .form-links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem; margin: 0; color: oklch(45% .08 75); font-size: .8rem; font-weight: 700; }
+    .user-menu { position: relative; }
+    .user-menu__panel { position: absolute; z-index: 2; right: 0; display: grid; min-width: 9rem; gap: .2rem; margin-top: .25rem; border: 1px solid oklch(88% .02 255); border-radius: .6rem; padding: .35rem; background: oklch(99% .004 255); box-shadow: 0 .8rem 2rem oklch(24% .03 255 / .12); }
+    .user-menu__panel a { padding: .5rem; font-size: .85rem; }
+    .user-menu__panel .ui-button { justify-content: flex-start; }
+    .profile-list { display: grid; gap: 1rem; margin: 0; }
+    .profile-list div { display: grid; gap: .25rem; }
+    .profile-list dt { color: oklch(55% .025 255); font-size: .75rem; font-weight: 750; text-transform: uppercase; }
+    .profile-list dd { margin: 0; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; overflow-wrap: anywhere; }
+    code { border-radius: .3rem; background: oklch(93% .015 255); padding: .15rem .3rem; }
+    @media (max-width: 720px) { .portal-layout { display: block; } .app-sidebar { width: auto; gap: 1rem; padding: 1rem; } .app-sidebar nav { display: flex; overflow-x: auto; } .app-sidebar .sidebar-footer { display: none; } .dashboard-grid { grid-template-columns: 1fr; } .page-heading { display: grid; } }
     """;
 
     private static string Dockerfile(string name) => $$"""

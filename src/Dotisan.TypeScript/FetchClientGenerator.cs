@@ -8,7 +8,11 @@ public static class FetchClientGenerator
     public static GeneratedTypeScriptFile Generate(ContractManifest manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);
-        var builder = new StringBuilder("export type ProblemDetails = { title?: string; detail?: string; status?: number; errors?: Record<string, string[]>; };\n\n");
+        var builder = new StringBuilder();
+        var models = manifest.Models.Select(model => model.Name).OrderBy(name => name, StringComparer.Ordinal).ToArray();
+        if (models.Length > 0)
+            builder.Append("import type { ").Append(string.Join(", ", models)).AppendLine(" } from \"./models\";\n");
+        builder.AppendLine("export type ProblemDetails = { title?: string; detail?: string; status?: number; errors?: Record<string, string[]>; };\n");
         builder.AppendLine("export class ApiError extends Error {");
         builder.AppendLine("  constructor(public readonly status: number, public readonly problem: ProblemDetails) {");
         builder.AppendLine("    super(problem.detail ?? problem.title ?? \"Request failed\");");

@@ -78,7 +78,7 @@ public static class ContractGenerationService
             return ContractGenerationResult.Failed("Could not find the generated Vue frontend. Run this command from a generated Dotisan project.");
         }
 
-        var generatedDirectory = Path.Combine(frontendDirectory, "src", "generated");
+        var generatedDirectory = Path.Combine(frontendDirectory, "src", "dotisan");
         foreach (var file in TypeScriptContractGenerator.GenerateAll(manifest))
         {
             cancellationToken.ThrowIfCancellationRequested();

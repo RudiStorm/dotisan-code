@@ -13,7 +13,7 @@ var files = TypeScriptContractGenerator.Generate(DotisanGeneratedEndpointExtensi
 File.WriteAllText(Path.Combine("src", "generated", files[0].Path), files[0].Content);
 ~~~
 
-`dotisan new` now runs the renderer during scaffolding and writes the initial generated contract files under `src/<Name>.Web/src/generated/`. The initial manifest is empty because a new application has no endpoint contracts yet; the files are deterministic and ready for `dotisan generate` after endpoints are added.
+`dotisan new` now runs the renderer during scaffolding and writes the initial Dotisan contract files under `src/<Name>.Web/src/dotisan/`. The initial manifest is empty because a new application has no endpoint contracts yet; the files are deterministic and ready for `dotisan generate` after endpoints are added.
 
 The v0.5 pipeline also emits deterministic OpenAPI, Zod schemas, fetch services, TanStack Query composables, and portable validation guidance for supported rules. `dotisan make:crud <ResourceName>` adds editable Vue list and route scaffolding outside the generated-output directory.
 
@@ -31,11 +31,11 @@ The repository contains focused projects for:
 
 The generated app uses normal ASP.NET Core configuration, dependency injection, Minimal APIs, and EF Core. SQLite is the default provider; the Quick wizard can also generate SQL Server, PostgreSQL, or MySQL configuration. When selected, ASP.NET Core Identity uses the same generated provider and standard cookie authentication. Dotisan does not replace those platform features.
 
-Every new project includes `src/<Name>.Web/src/generated/models.ts`, `schemas.ts`, `services.ts`, and `queries.ts`; this confirms the TypeScript generation step ran. It is generated-owned output and should be refreshed as contracts are added.
+Every new project includes `src/<Name>.Web/src/dotisan/models.ts`, `schemas.ts`, `services.ts`, and `queries.ts`; this confirms the TypeScript generation step ran. It is Dotisan-owned output and should be refreshed as contracts are added.
 
 Authenticated projects also include generated client contracts for antiforgery, registration, login, logout, and the current-user probe. These clients use the same standard cookie and antiforgery behavior as the generated API.
 
-Run `dotisan generate` from the generated project root to rebuild contract files and `openapi.json`. The command builds the solution first, reads `dotisan.contract.json`, and writes deterministic files under `src/<Name>.Web/src/generated`. Use `dotisan generate --check` in CI to fail when generated output is stale. `--no-openapi` skips the OpenAPI file when needed.
+Run `dotisan generate` from the generated project root to rebuild contract files and `openapi.json`. The command builds the solution first, reads `dotisan.contract.json`, and writes deterministic files under `src/<Name>.Web/src/dotisan`. Use `dotisan generate --check` in CI to fail when Dotisan output is stale. `--no-openapi` skips the OpenAPI file when needed.
 
 ## Run locally
 

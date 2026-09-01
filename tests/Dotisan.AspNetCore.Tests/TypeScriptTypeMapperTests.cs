@@ -33,6 +33,21 @@ public sealed class TypeScriptTypeMapperTests
         Assert.Contains("export const ProfileSchema = z.object", files.Single(file => file.Path == "schemas.ts").Content);
         Assert.Contains("export async function listProfiles", files.Single(file => file.Path == "services.ts").Content);
         Assert.Contains("useListProfilesQuery", files.Single(file => file.Path == "queries.ts").Content);
+        Assert.Contains("import type { Profile } from \"./models\";", files.Single(file => file.Path == "services.ts").Content);
+    }
+
+    [Fact]
+    public void Generated_mutation_hooks_accept_only_the_request_body()
+    {
+        var manifest = new ContractManifest(
+            1,
+            [new EndpointManifestEntry("profiles.create", "Profiles", "CreateProfile", "POST", "/api/profiles", "Profile", "void", false, null, null, ["Profiles"], true, false)],
+            [new ContractModel("Profile", "global::Profile", [new ContractProperty("name", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], [])],
+            [new EndpointContractMetadata(null, [], [], 201, ["Profiles"], new EndpointValidationMetadata(true, []))]);
+
+        var output = TypeScriptContractGenerator.GenerateAll(manifest).Single(file => file.Path == "queries.ts").Content;
+
+        Assert.Contains("mutationFn: (body: Parameters<typeof services.createProfile>[0]) => services.createProfile(body)", output);
     }
 
     [Fact]

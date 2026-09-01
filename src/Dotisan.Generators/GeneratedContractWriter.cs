@@ -13,7 +13,7 @@ public static class GeneratedContractWriter
         ArgumentException.ThrowIfNullOrWhiteSpace(frontendDirectory);
         ArgumentNullException.ThrowIfNull(manifest);
 
-        var generatedDirectory = Path.Combine(frontendDirectory, "src", "generated");
+        var generatedDirectory = Path.Combine(frontendDirectory, "src", "dotisan");
         Directory.CreateDirectory(generatedDirectory);
 
         foreach (var file in TypeScriptContractGenerator.GenerateAll(manifest))

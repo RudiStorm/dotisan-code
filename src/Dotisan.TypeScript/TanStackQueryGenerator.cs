@@ -21,8 +21,12 @@ public static class TanStackQueryGenerator
             }
             else
             {
+                var requestType = NormalizeType(endpoint.Request);
                 builder.Append("export function ").Append(hookName).AppendLine("Mutation() {");
-                builder.Append("  return useMutation({ mutationFn: (...args: Parameters<typeof services.").Append(functionName).AppendLine(">) => services." + functionName + "(...args) });");
+                if (UsesBody(endpoint.Method) && requestType != "void")
+                    builder.Append("  return useMutation({ mutationFn: (body: Parameters<typeof services.").Append(functionName).AppendLine(">[0]) => services." + functionName + "(body) });");
+                else
+                    builder.Append("  return useMutation({ mutationFn: () => services.").Append(functionName).AppendLine("() });");
                 builder.AppendLine("}").AppendLine();
             }
         }
@@ -31,4 +35,6 @@ public static class TanStackQueryGenerator
     }
 
     private static string ToCamelCase(string value) => string.IsNullOrEmpty(value) ? "request" : char.ToLowerInvariant(value[0]) + value[1..];
+    private static bool UsesBody(string method) => method.ToUpperInvariant() is "POST" or "PUT" or "PATCH";
+    private static string NormalizeType(string type) => string.IsNullOrWhiteSpace(type) || type == "System.Void" ? "void" : type.Replace("global::", string.Empty, StringComparison.Ordinal);
 }

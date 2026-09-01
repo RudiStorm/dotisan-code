@@ -28,7 +28,7 @@ public sealed class GenerationCommandTests
 
             Assert.True(result.Success, result.ErrorMessage);
             Assert.Equal("export interface Profile {" + Environment.NewLine + "  name: string;" + Environment.NewLine + "}" + Environment.NewLine,
-                await File.ReadAllTextAsync(Path.Combine(frontend, "src", "generated", "models.ts")));
+                await File.ReadAllTextAsync(Path.Combine(frontend, "src", "dotisan", "models.ts")));
             Assert.True(File.Exists(Path.Combine(root, "openapi.json")));
         }
         finally
@@ -44,10 +44,10 @@ public sealed class GenerationCommandTests
         var root = Path.Combine(Path.GetTempPath(), "dotisan-generate-check-" + Guid.NewGuid().ToString("N"));
         try
         {
-            Directory.CreateDirectory(Path.Combine(root, "src", "App.Web", "src", "generated"));
+            Directory.CreateDirectory(Path.Combine(root, "src", "App.Web", "src", "dotisan"));
             await File.WriteAllTextAsync(Path.Combine(root, "src", "App.Web", "package.json"), "{}\n");
             await File.WriteAllTextAsync(Path.Combine(root, "dotisan.contract.json"), new ContractManifest(1, [], []).ToJson());
-            await File.WriteAllTextAsync(Path.Combine(root, "src", "App.Web", "src", "generated", "models.ts"), "stale\n");
+            await File.WriteAllTextAsync(Path.Combine(root, "src", "App.Web", "src", "dotisan", "models.ts"), "stale\n");
 
             var result = await ContractGenerationService.GenerateAsync(root, check: true, CancellationToken.None);
 
