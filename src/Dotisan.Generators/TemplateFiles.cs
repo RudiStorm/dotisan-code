@@ -63,14 +63,14 @@ internal static class TemplateFiles
                 mail: false
                 workers: false
             """),
-            new("dotisan.contract.json", new ContractManifest(1, [], []).ToJson()),
+            new("dotisan.contract.json", InitialContractManifest(options.AuthenticationEnabled).ToJson()),
             new("Dockerfile", Dockerfile(options.Name)),
             ..(options.Database == DatabaseProvider.SQLite
                 ? Array.Empty<TemplateFile>()
                 : new[] { new TemplateFile("compose.yaml", DatabaseCompose(options.Name, options.Database)) }),
             new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.Database, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public)),
-            new($"src/{options.Name}.Api/Infrastructure/DotisanContractExport.cs", ContractExport()),
+            new($"src/{options.Name}.Api/Infrastructure/DotisanContractExport.cs", ContractExport(options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Auditing/AuditEntry.cs", AuditEntry(identifier)),
             new($"src/{options.Name}.Api/Auditing/IAuditWriter.cs", AuditWriterContract(identifier)),
@@ -1154,16 +1154,44 @@ internal static class TemplateFiles
     createApp(App).use(createPinia()).use(VueQueryPlugin, { queryClient }).use(router).mount('#app');
     """;
 
-    private static string ContractExport() => """
+    internal static ContractManifest InitialContractManifest(bool authenticationEnabled) => authenticationEnabled
+        ? new ContractManifest(
+            1,
+            [
+                new("account.antiforgery", "Account", "IssueAntiforgery", "GET", "/api/account/antiforgery", "System.Void", "AntiforgeryResponse", false, null, null, ["Account"], false, false),
+                new("account.login", "Account", "Login", "POST", "/api/account/login", "LoginRequest", "System.Void", false, null, null, ["Account"], true, false),
+                new("account.logout", "Account", "Logout", "POST", "/api/account/logout", "System.Void", "System.Void", true, "authenticated", null, ["Account"], false, false),
+                new("account.me", "Account", "Me", "GET", "/api/account/me", "System.Void", "CurrentUserResponse", true, "authenticated", null, ["Account"], false, false),
+                new("account.register", "Account", "Register", "POST", "/api/account/register", "RegisterRequest", "System.Void", false, null, null, ["Account"], true, false)
+            ],
+            [
+                new("AntiforgeryResponse", "AntiforgeryResponse", [new ContractProperty("token", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], []),
+                new("CurrentUserResponse", "CurrentUserResponse", [new ContractProperty("id", new ContractTypeDescriptor(ContractTypeKind.String), false, false), new ContractProperty("email", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], []),
+                new("LoginRequest", "LoginRequest", [new ContractProperty("email", new ContractTypeDescriptor(ContractTypeKind.String), false, false), new ContractProperty("password", new ContractTypeDescriptor(ContractTypeKind.String), false, false), new ContractProperty("rememberMe", new ContractTypeDescriptor(ContractTypeKind.Boolean), false, false)], []),
+                new("RegisterRequest", "RegisterRequest", [new ContractProperty("email", new ContractTypeDescriptor(ContractTypeKind.String), false, false), new ContractProperty("password", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], [])
+            ],
+            [
+                EndpointContractMetadata.Create("GET", "/api/account/antiforgery", null, [], ["Account"], false),
+                EndpointContractMetadata.Create("POST", "/api/account/login", new EndpointRequestBodyMetadata(new ContractTypeDescriptor(ContractTypeKind.Object, "LoginRequest")), [], ["Account"], true),
+                EndpointContractMetadata.Create("POST", "/api/account/logout", null, [], ["Account"], false),
+                EndpointContractMetadata.Create("GET", "/api/account/me", null, [], ["Account"], false),
+                EndpointContractMetadata.Create("POST", "/api/account/register", new EndpointRequestBodyMetadata(new ContractTypeDescriptor(ContractTypeKind.Object, "RegisterRequest")), [], ["Account"], true)
+            ])
+        : new ContractManifest(1, [], []);
+
+    private static string ContractExport(bool authenticationEnabled) => (authenticationEnabled ? InitialContractManifest(true) : InitialContractManifest(false)).ToJson() switch
+    {
+        var json => $$"""
     namespace Dotisan.Generated;
 
     #if DOTISAN_CONTRACT_FALLBACK
     public static class DotisanContractExport
     {
-        public const string ContractManifestJson = "{\"schemaVersion\":1,\"endpoints\":[],\"models\":[]}";
+        public const string ContractManifestJson = "{{json.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)}}";
     }
     #endif
-    """;
+    """
+    };
 
     private static string RoutesIndex() => """
     import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';

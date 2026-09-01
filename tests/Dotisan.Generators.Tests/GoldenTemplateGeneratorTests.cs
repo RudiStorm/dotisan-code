@@ -289,6 +289,12 @@ public sealed class GoldenTemplateGeneratorTests
 
             Assert.True(authenticated.Success, authenticated.ErrorMessage);
             Assert.True(plain.Success, plain.ErrorMessage);
+            var authServices = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Web", "src", "generated", "services.ts"));
+            Assert.Contains("login", authServices);
+            Assert.Contains("register", authServices);
+            Assert.Contains("logout", authServices);
+            Assert.Contains("me", authServices);
+            Assert.DoesNotContain("login", await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Web", "src", "generated", "services.ts")));
             var apiProject = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "AuthApp.Api.csproj"));
             var testProject = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "tests", "AuthApp.Api.Tests", "AuthApp.Api.Tests.csproj"));
             var plainApiProject = await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Api", "PlainApp.Api.csproj"));
