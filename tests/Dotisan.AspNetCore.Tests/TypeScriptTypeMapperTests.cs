@@ -5,6 +5,52 @@ namespace Dotisan.AspNetCore.Tests;
 
 public sealed class TypeScriptTypeMapperTests
 {
+    private static readonly string[] GeneratedFileNames = ["models.ts", "schemas.ts", "services.ts", "queries.ts"];
+    private static readonly string[] StableFileNames = ["models.ts", "queries.ts"];
+
+    [Fact]
+    public void Generates_models_schemas_services_and_queries_for_a_contract_manifest()
+    {
+        var manifest = new ContractManifest(
+            1,
+            [new EndpointManifestEntry("profiles.list", "Profiles", "ListProfiles", "GET", "/api/profiles", "void", "Profile[]", false, null, "v1", ["Profiles"], false, false)],
+            [new ContractModel(
+                "Profile",
+                "global::Profile",
+                [new ContractProperty("name", new ContractTypeDescriptor(ContractTypeKind.String), false, false)],
+                [])],
+            [new EndpointContractMetadata(
+                null,
+                [],
+                [],
+                200,
+                ["Profiles"],
+                new EndpointValidationMetadata(false, []))]);
+
+        var files = TypeScriptContractGenerator.GenerateAll(manifest);
+
+        Assert.Equal(GeneratedFileNames, files.Select(file => file.Path).ToArray());
+        Assert.Contains("export const ProfileSchema = z.object", files.Single(file => file.Path == "schemas.ts").Content);
+        Assert.Contains("export async function listProfiles", files.Single(file => file.Path == "services.ts").Content);
+        Assert.Contains("useListProfilesQuery", files.Single(file => file.Path == "queries.ts").Content);
+    }
+
+    [Fact]
+    public void Generated_file_manifest_hash_is_stable_for_file_order()
+    {
+        var files = new[]
+        {
+            new GeneratedTypeScriptFile("queries.ts", "queries\n"),
+            new GeneratedTypeScriptFile("models.ts", "models\n")
+        };
+
+        var first = GeneratedFileManifest.Create(files);
+        var second = GeneratedFileManifest.Create(files.AsEnumerable().Reverse().ToArray());
+
+        Assert.Equal(StableFileNames, first.Files.Select(file => file.Path).ToArray());
+        Assert.Equal(first.Sha256, second.Sha256);
+    }
+
     [Theory]
     [InlineData(ContractTypeKind.String, "string")]
     [InlineData(ContractTypeKind.Boolean, "boolean")]

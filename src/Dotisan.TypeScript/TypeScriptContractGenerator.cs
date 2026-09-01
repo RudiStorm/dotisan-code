@@ -7,6 +7,18 @@ public sealed record GeneratedTypeScriptFile(string Path, string Content);
 
 public static class TypeScriptContractGenerator
 {
+    public static IReadOnlyList<GeneratedTypeScriptFile> GenerateAll(ContractManifest manifest)
+    {
+        ArgumentNullException.ThrowIfNull(manifest);
+        return
+        [
+            Generate(manifest)[0],
+            ZodSchemaGenerator.Generate(manifest),
+            FetchClientGenerator.Generate(manifest),
+            TanStackQueryGenerator.Generate(manifest)
+        ];
+    }
+
     public static IReadOnlyList<GeneratedTypeScriptFile> Generate(ContractManifest manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);

@@ -51,7 +51,7 @@ public static class ContractGenerationService
         }
 
         var generatedDirectory = Path.Combine(frontendDirectory, "src", "generated");
-        foreach (var file in TypeScriptContractGenerator.Generate(manifest))
+        foreach (var file in TypeScriptContractGenerator.GenerateAll(manifest))
         {
             cancellationToken.ThrowIfCancellationRequested();
             var path = Path.Combine(generatedDirectory, file.Path.Replace('/', Path.DirectorySeparatorChar));

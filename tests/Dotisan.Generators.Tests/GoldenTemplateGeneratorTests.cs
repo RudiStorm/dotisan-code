@@ -22,6 +22,9 @@ public sealed class GoldenTemplateGeneratorTests
             var generatedModels = Path.Combine(output, "src", "TodoApp.Web", "src", "generated", "models.ts");
             Assert.True(File.Exists(generatedModels));
             Assert.Equal(Environment.NewLine, await File.ReadAllTextAsync(generatedModels));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "generated", "schemas.ts")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "generated", "services.ts")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "generated", "queries.ts")));
             Assert.Contains("\"version\": \"0.4.0\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditEntry.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "IAuditWriter.cs")));
