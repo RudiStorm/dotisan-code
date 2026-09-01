@@ -323,6 +323,34 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task Dev_migrates_the_legacy_vite_proxy_before_starting_services()
+    {
+        var frontend = Path.Combine(Path.GetTempPath(), "dotisan-vite-migration-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(frontend);
+        await File.WriteAllTextAsync(Path.Combine(frontend, "vite.config.ts"), "proxy: { '/api': 'https://localhost:5001' }\n");
+        var console = new MemoryConsole();
+        var services = new RecordingServices { FrontendDirectory = frontend, BlockProcesses = true };
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        using var cancellation = new CancellationTokenSource();
+
+        try
+        {
+            var runTask = app.RunAsync(["dev"], cancellation.Token);
+            await services.BothProcessesStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            cancellation.Cancel();
+
+            Assert.Equal(DotisanExitCode.Success, await runTask.WaitAsync(TimeSpan.FromSeconds(2)));
+            Assert.Contains("http://localhost:5000", await File.ReadAllTextAsync(Path.Combine(frontend, "vite.config.ts")));
+            Assert.Contains("Updated the legacy Dotisan Vite proxy", console.Output);
+        }
+        finally
+        {
+            if (Directory.Exists(frontend))
+                Directory.Delete(frontend, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Dev_cancellation_stops_both_development_services_and_exits_cleanly()
     {
         var console = new MemoryConsole();
@@ -438,7 +466,7 @@ public sealed class CliApplicationTests
         public DatabaseProvider Database { get; init; } = DatabaseProvider.SQLite;
         public string? SolutionPath => "C:\\work\\App.sln";
         public string? ApiProjectPath => "C:\\work\\src\\App.Api\\App.Api.csproj";
-        public string? FrontendDirectory => "C:\\work\\src\\App.Web";
+        public string? FrontendDirectory { get; init; } = "C:\\work\\src\\App.Web";
         public string? ResourceName { get; private set; }
         public string? FileName { get; private set; }
         public IReadOnlyList<string> Arguments { get; private set; } = [];

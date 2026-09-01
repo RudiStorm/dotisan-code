@@ -352,6 +352,10 @@ internal sealed class DevCommand : WorkspaceCommand
         var databaseStarted = false;
         try
         {
+            var proxyMigration = await MigrateLegacyViteProxyAsync(services.FrontendDirectory, context.Console, cancellationToken);
+            if (!proxyMigration.Success)
+                return Fail(context.Console, proxyMigration.ErrorMessage ?? "Could not prepare the Vue development proxy.");
+
             if (services.Database != DatabaseProvider.SQLite)
             {
                 databaseStartAttempted = true;
@@ -421,6 +425,36 @@ internal sealed class DevCommand : WorkspaceCommand
                 if (!stopResult.Success)
                     context.Console.WriteError(stopResult.ErrorMessage ?? "Could not stop the Docker database service.");
             }
+        }
+    }
+
+    private static async Task<DotisanOperationResult> MigrateLegacyViteProxyAsync(
+        string? frontendDirectory,
+        IConsole console,
+        CancellationToken cancellationToken)
+    {
+        if (frontendDirectory is null)
+            return DotisanOperationResult.Succeeded();
+
+        var viteConfigPath = Path.Combine(frontendDirectory, "vite.config.ts");
+        if (!File.Exists(viteConfigPath))
+            return DotisanOperationResult.Succeeded();
+
+        try
+        {
+            var content = await File.ReadAllTextAsync(viteConfigPath, cancellationToken);
+            const string legacyTarget = "https://localhost:5001";
+            const string developmentTarget = "http://localhost:5000";
+            if (!content.Contains(legacyTarget, StringComparison.Ordinal))
+                return DotisanOperationResult.Succeeded();
+
+            await File.WriteAllTextAsync(viteConfigPath, content.Replace(legacyTarget, developmentTarget, StringComparison.Ordinal), cancellationToken);
+            console.WriteLine("Updated the legacy Dotisan Vite proxy to http://localhost:5000.");
+            return DotisanOperationResult.Succeeded();
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            return DotisanOperationResult.Failed($"Could not update {viteConfigPath}: {exception.Message}");
         }
     }
 }
