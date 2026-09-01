@@ -16,7 +16,9 @@ public static class OpenApiDocumentGenerator
         ArgumentNullException.ThrowIfNull(manifest);
 
         var metadata = manifest.EndpointMetadata
-            ?? throw new InvalidOperationException("Contract manifest endpoint metadata is required for OpenAPI generation.");
+            ?? (manifest.Endpoints.Count == 0
+                ? Array.Empty<EndpointContractMetadata>()
+                : throw new InvalidOperationException("Contract manifest endpoint metadata is required for OpenAPI generation."));
 
         if (metadata.Count != manifest.Endpoints.Count)
         {

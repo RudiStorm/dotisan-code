@@ -1,5 +1,6 @@
 using Dotisan.Core;
 using Dotisan.Generators;
+using Dotisan.OpenApi;
 using Dotisan.TypeScript;
 
 namespace Dotisan.Cli.Generation;
@@ -16,7 +17,8 @@ public static class ContractGenerationService
     public static async Task<ContractGenerationResult> GenerateAsync(
         string projectRoot,
         bool check,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool noOpenApi = false)
     {
         var root = Path.GetFullPath(projectRoot);
         var manifestPath = Path.Combine(root, "dotisan.contract.json");
@@ -67,6 +69,23 @@ public static class ContractGenerationService
         if (!check)
         {
             await GeneratedContractWriter.WriteAsync(frontendDirectory, manifest, cancellationToken);
+            if (!noOpenApi)
+            {
+                var title = Path.GetFileName(root);
+                await File.WriteAllTextAsync(
+                    Path.Combine(root, "openapi.json"),
+                    OpenApiDocumentGenerator.Generate(manifest, title, "v1").Json,
+                    cancellationToken);
+            }
+        }
+        else if (!noOpenApi)
+        {
+            var expectedOpenApi = OpenApiDocumentGenerator.Generate(manifest, Path.GetFileName(root), "v1").Json;
+            var openApiPath = Path.Combine(root, "openapi.json");
+            if (!File.Exists(openApiPath) || !string.Equals(await File.ReadAllTextAsync(openApiPath, cancellationToken), expectedOpenApi, StringComparison.Ordinal))
+            {
+                return ContractGenerationResult.Failed($"Generated output is stale: {openApiPath}. Run 'dotisan generate'.");
+            }
         }
 
         return ContractGenerationResult.Succeeded();

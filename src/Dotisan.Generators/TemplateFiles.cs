@@ -13,7 +13,7 @@ internal static class TemplateFiles
         {
           "name": "{{options.Name.ToLowerInvariant()}}-web",
           "private": true,
-          "version": "0.4.0",
+          "version": "0.5.0",
           "packageManager": "{{packageManager}}",
           "type": "module",
           "scripts": {
@@ -1092,10 +1092,12 @@ internal static class TemplateFiles
     private static string MainTs() => """
     import { createApp } from 'vue';
     import { createPinia } from 'pinia';
+    import { VueQueryPlugin, QueryClient } from '@tanstack/vue-query';
     import App from './App.vue';
     import './style.css';
 
-    createApp(App).use(createPinia()).mount('#app');
+    const queryClient = new QueryClient();
+    createApp(App).use(createPinia()).use(VueQueryPlugin, { queryClient }).mount('#app');
     """;
 
     private static string AppVue(string name) => """

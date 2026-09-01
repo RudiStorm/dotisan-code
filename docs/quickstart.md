@@ -17,11 +17,11 @@ var files = TypeScriptContractGenerator.Generate(DotisanGeneratedEndpointExtensi
 File.WriteAllText(Path.Combine("src", "generated", files[0].Path), files[0].Content);
 ~~~
 
-`dotisan new` invokes the renderer while scaffolding and writes the initial empty `src/TodoApp.Web/src/generated/models.ts`. A new project has no endpoint contracts yet, so the file contains only its newline terminator. The compiled-manifest export and additional client renderers are subsequent v0.5 work.
+`dotisan new` invokes the renderer while scaffolding and writes the initial deterministic `models.ts`, `schemas.ts`, `services.ts`, and `queries.ts` files. A new project has no endpoint contracts yet, so these files contain only their empty-module output.
 
 After changing contract metadata, run `dotisan generate` from the project root. It builds the solution, reads `dotisan.contract.json`, and refreshes generated files. `dotisan generate --check` verifies that generated output is current without changing files.
 
-This slice does not include OpenAPI or CRUD scaffolding. It does include generated Zod schemas, fetch services, TanStack Query composables, and portable client-side guidance for supported validation rules. FluentValidation remains authoritative on the server.
+The pipeline also writes deterministic `openapi.json` output and `dotisan make:crud <ResourceName>` adds editable Vue list and route scaffolding outside `src/generated`. It includes generated Zod schemas, fetch services, TanStack Query composables, and portable client-side guidance for supported validation rules. FluentValidation remains authoritative on the server.
 
 Choose Quick Setup, then accept the defaults:
 
@@ -36,7 +36,7 @@ All wizard menus show numbered choices. Enter `1`, `2`, or another displayed num
 
 SQLite is the default because it is file-based and requires no separate database service. The wizard also supports SQL Server, PostgreSQL, and MySQL. Each choice generates the matching EF Core package, provider registration, and local connection-string example in `src/TodoApp.Api/appsettings.json`.
 
-Authentication is opt-in. To generate the v0.4.0 authentication and authorization foundation non-interactively:
+Authentication is opt-in. To generate the v0.5.0 authentication and authorization foundation non-interactively:
 
 ~~~powershell
 dotnet run --project src\Dotisan.Cli -- new AuthApp --auth yes --registration public --yes --output .\AuthApp
@@ -125,6 +125,8 @@ Press Ctrl+C once to stop `dotisan dev`. The CLI coordinates shutdown for both s
 
 ~~~powershell
 dotisan make:resource TodoItem
+dotisan make:crud TodoItem
+dotisan generate
 dotnet build TodoApp.sln
 dotnet ef migrations add AddTodoItem --project src\TodoApp.Api
 dotisan migrate

@@ -1,6 +1,6 @@
 # Dotisan
 
-Dotisan is a batteries-included application framework for standard ASP.NET Core and Vue applications. The v0.4.0 release provides a testable CLI foundation, authentication/authorization primitives, an inspectable audit foundation, and a deterministic golden template.
+Dotisan is a batteries-included application framework for standard ASP.NET Core and Vue applications. The v0.5.0 release adds compile-time contracts, OpenAPI, TypeScript clients, validation guidance, and editable Vue CRUD scaffolding.
 
 ## v0.5 compile-time contract metadata foundation
 
@@ -11,11 +11,11 @@ var files = TypeScriptContractGenerator.Generate(DotisanGeneratedEndpointExtensi
 File.WriteAllText(Path.Combine("src", "generated", files[0].Path), files[0].Content);
 ~~~
 
-`dotisan new` now runs the renderer during scaffolding and writes the initial `src/<Name>.Web/src/generated/models.ts` file. The initial manifest is empty because a new application has no endpoint contracts yet; the file is newline-terminated and ready for the compiled-manifest generation flow that follows.
+`dotisan new` now runs the renderer during scaffolding and writes the initial generated contract files under `src/<Name>.Web/src/generated/`. The initial manifest is empty because a new application has no endpoint contracts yet; the files are deterministic and ready for `dotisan generate` after endpoints are added.
 
-OpenAPI and CRUD scaffolding remain subsequent v0.5 slices. The TypeScript slice now also emits Zod schemas, fetch services, TanStack Query composables, and portable validation guidance for supported rules.
+The v0.5 pipeline also emits deterministic OpenAPI, Zod schemas, fetch services, TanStack Query composables, and portable validation guidance for supported rules. `dotisan make:crud <ResourceName>` adds editable Vue list and route scaffolding outside the generated-output directory.
 
-## v0.4.0 workflow and audit foundation
+## v0.5.0 workflow and audit foundation
 
 The repository contains focused projects for:
 
@@ -29,9 +29,9 @@ The repository contains focused projects for:
 
 The generated app uses normal ASP.NET Core configuration, dependency injection, Minimal APIs, and EF Core. SQLite is the default provider; the Quick wizard can also generate SQL Server, PostgreSQL, or MySQL configuration. When selected, ASP.NET Core Identity uses the same generated provider and standard cookie authentication. Dotisan does not replace those platform features.
 
-Every new project includes `src/<Name>.Web/src/generated/models.ts`; this confirms the TypeScript generation step ran. It is generated-owned output and should be refreshed from the compiled endpoint manifest as contracts are added.
+Every new project includes `src/<Name>.Web/src/generated/models.ts`, `schemas.ts`, `services.ts`, and `queries.ts`; this confirms the TypeScript generation step ran. It is generated-owned output and should be refreshed as contracts are added.
 
-Run `dotisan generate` from the generated project root to rebuild contract files. The command builds the solution first, reads the generated-owned `dotisan.contract.json` export, and writes deterministic files under `src/<Name>.Web/src/generated`. Use `dotisan generate --check` in CI to fail when generated output is stale. `--no-openapi` is accepted for forward compatibility while OpenAPI output is being completed.
+Run `dotisan generate` from the generated project root to rebuild contract files and `openapi.json`. The command builds the solution first, reads `dotisan.contract.json`, and writes deterministic files under `src/<Name>.Web/src/generated`. Use `dotisan generate --check` in CI to fail when generated output is stale. `--no-openapi` skips the OpenAPI file when needed.
 
 ## Run locally
 
@@ -54,6 +54,8 @@ dotnet build .\AuthApp\AuthApp.sln
 
 cd .\MyApp
 dotisan make:resource Customer
+dotisan make:crud Customer
+dotisan generate
 dotisan migrate
 dotisan dev
 ~~~
@@ -85,7 +87,7 @@ dotnet ef database update --project src\MyApp.Api
 
 ~~~powershell
 dotnet pack src\Dotisan.Cli\Dotisan.Cli.csproj --configuration Release --output .\artifacts
-dotnet tool install --global Dotisan --add-source .\artifacts --version 0.4.0
+dotnet tool install --global Dotisan --add-source .\artifacts --version 0.5.0
 dotisan new MyApp
 ~~~
 
@@ -95,7 +97,7 @@ Authentication projects use normal ASP.NET Core Identity, cookie authentication,
 
 Authenticated projects also generate an explicit authorization foundation. Edit `src\<Name>.Api\Authorization\Permissions.cs` for code-defined permission names, use standard `IdentityRole` role claims with claim type `permission`, and protect generated endpoints with explicit `RequireAuthorization(...)` calls. The generated profile probe demonstrates `profile.view`; generated resources add `<Resource>View`, `<Resource>Create`, `<Resource>Update`, and `<Resource>Delete` permissions. API callers receive `401` when unauthenticated and `403` when authenticated without the required role claim.
 
-The v0.4.0 audit foundation generates an editable `AuditEntry` model and scoped `IAuditWriter` service for plain and authenticated projects. Auditing is enabled by default through standard `Audit:Enabled` configuration; set `Audit__Enabled=false` to disable writes. Generated resource and authentication operations record actor, resource, action, changed fields, trace ID, and correlation ID. Author the schema with `dotnet ef migrations add InitialAudit`; audit is persistence logging, not event sourcing.
+The v0.5.0 audit foundation generates an editable `AuditEntry` model and scoped `IAuditWriter` service for plain and authenticated projects. Auditing is enabled by default through standard `Audit:Enabled` configuration; set `Audit__Enabled=false` to disable writes. Generated resource and authentication operations record actor, resource, action, changed fields, trace ID, and correlation ID. Author the schema with `dotnet ef migrations add InitialAudit`; audit is persistence logging, not event sourcing.
 
 ## Deliberately deferred commands
 

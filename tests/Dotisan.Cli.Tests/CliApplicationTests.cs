@@ -14,7 +14,7 @@ public sealed class CliApplicationTests
         var exitCode = await app.RunAsync(["--version"]);
 
         Assert.Equal(DotisanExitCode.Success, exitCode);
-        Assert.Contains("dotisan 0.4.0", console.Output);
+        Assert.Contains("dotisan 0.5.0", console.Output);
     }
 
     [Fact]

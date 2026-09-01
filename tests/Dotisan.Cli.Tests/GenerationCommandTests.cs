@@ -29,6 +29,7 @@ public sealed class GenerationCommandTests
             Assert.True(result.Success, result.ErrorMessage);
             Assert.Equal("export interface Profile {" + Environment.NewLine + "  name: string;" + Environment.NewLine + "}" + Environment.NewLine,
                 await File.ReadAllTextAsync(Path.Combine(frontend, "src", "generated", "models.ts")));
+            Assert.True(File.Exists(Path.Combine(root, "openapi.json")));
         }
         finally
         {

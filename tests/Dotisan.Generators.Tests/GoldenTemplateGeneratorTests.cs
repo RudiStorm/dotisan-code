@@ -25,7 +25,9 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "generated", "schemas.ts")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "generated", "services.ts")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "generated", "queries.ts")));
-            Assert.Contains("\"version\": \"0.4.0\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
+            var mainTs = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "src", "main.ts"));
+            Assert.Contains("VueQueryPlugin", mainTs);
+            Assert.Contains("\"version\": \"0.5.0\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditEntry.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "IAuditWriter.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditWriter.cs")));
@@ -181,6 +183,29 @@ public sealed class GoldenTemplateGeneratorTests
             {
                 Directory.Delete(output, recursive: true);
             }
+        }
+    }
+
+    [Fact]
+    public async Task Crud_scaffolder_creates_editable_frontend_files_outside_generated_output()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-crud-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var generated = await new GoldenTemplateGenerator().GenerateAsync(ProjectOptions.Quick("TodoApp", output), CancellationToken.None);
+            Assert.True(generated.Success, generated.ErrorMessage);
+
+            var result = await CrudScaffolder.ScaffoldAsync(output, "Customer", CancellationToken.None);
+
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "features", "Customers", "CustomerList.vue")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "routes", "customers.ts")));
+            Assert.All(result.CreatedFiles, file => Assert.DoesNotContain("generated", file, StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            if (Directory.Exists(output))
+                Directory.Delete(output, recursive: true);
         }
     }
 
