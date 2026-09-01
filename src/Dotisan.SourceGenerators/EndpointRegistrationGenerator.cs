@@ -231,6 +231,11 @@ public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
         AppendEndpointMetadata(source, contractData.EndpointMetadata);
         AppendContractManifest(source, contractData.Models);
         source.AppendLine("}");
+        source.AppendLine();
+        source.AppendLine("public static class DotisanContractExport");
+        source.AppendLine("{");
+        source.AppendLine("    public static string ContractManifestJson => DotisanGeneratedEndpointExtensions.ContractManifestJson;");
+        source.AppendLine("}");
         return source.ToString();
     }
 

@@ -70,6 +70,7 @@ internal static class TemplateFiles
                 : new[] { new TemplateFile("compose.yaml", DatabaseCompose(options.Name, options.Database)) }),
             new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.Database, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public)),
+            new($"src/{options.Name}.Api/Infrastructure/DotisanContractExport.cs", ContractExport()),
             new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Auditing/AuditEntry.cs", AuditEntry(identifier)),
             new($"src/{options.Name}.Api/Auditing/IAuditWriter.cs", AuditWriterContract(identifier)),
@@ -118,6 +119,7 @@ internal static class TemplateFiles
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <RootNamespace>{{name.Replace('-', '_')}}</RootNamespace>
+        <DefineConstants>DOTISAN_CONTRACT_FALLBACK</DefineConstants>
       </PropertyGroup>
       <ItemGroup>
         <PackageReference Include="{{DatabasePackage(database)}}" />
@@ -347,7 +349,7 @@ internal static class TemplateFiles
 
         var outputPath = Path.GetFullPath(arguments[index + 1]);
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-        File.WriteAllText(outputPath, Dotisan.Generated.DotisanGeneratedEndpointExtensions.ContractManifestJson);
+        File.WriteAllText(outputPath, Dotisan.Generated.DotisanContractExport.ContractManifestJson);
         return true;
     }
 
@@ -446,7 +448,7 @@ internal static class TemplateFiles
 
         var outputPath = Path.GetFullPath(arguments[index + 1]);
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-        File.WriteAllText(outputPath, Dotisan.Generated.DotisanGeneratedEndpointExtensions.ContractManifestJson);
+        File.WriteAllText(outputPath, Dotisan.Generated.DotisanContractExport.ContractManifestJson);
         return true;
     }
 
@@ -1150,6 +1152,17 @@ internal static class TemplateFiles
 
     const queryClient = new QueryClient();
     createApp(App).use(createPinia()).use(VueQueryPlugin, { queryClient }).use(router).mount('#app');
+    """;
+
+    private static string ContractExport() => """
+    namespace Dotisan.Generated;
+
+    #if DOTISAN_CONTRACT_FALLBACK
+    public static class DotisanContractExport
+    {
+        public const string ContractManifestJson = "{\"schemaVersion\":1,\"endpoints\":[],\"models\":[]}";
+    }
+    #endif
     """;
 
     private static string RoutesIndex() => """

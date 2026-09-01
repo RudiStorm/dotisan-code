@@ -88,6 +88,8 @@ public sealed class SourceGeneratorTests
         Assert.Contains("EndpointManifestJson", generated);
         Assert.Contains("EndpointManifestSha256", generated);
         Assert.Contains("public static global::Dotisan.Core.ContractManifest ContractManifest { get; } =", generated);
+        Assert.Contains("public static class DotisanContractExport", generated);
+        Assert.Contains("ContractManifestJson => DotisanGeneratedEndpointExtensions.ContractManifestJson", generated);
         Assert.Contains("EndpointMetadata);", generated);
         Assert.Contains("public static string ContractManifestJson => ContractManifest.ToJson();", generated);
         Assert.Contains("public static string ContractManifestSha256 => ContractManifest.Sha256;", generated);

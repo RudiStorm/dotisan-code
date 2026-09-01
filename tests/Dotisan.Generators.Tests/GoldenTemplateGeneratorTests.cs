@@ -31,6 +31,9 @@ public sealed class GoldenTemplateGeneratorTests
             var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs"));
             Assert.Contains("--dotisan-export-contract", program);
             Assert.Contains("ContractManifestJson", program);
+            var export = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Infrastructure", "DotisanContractExport.cs"));
+            Assert.Contains("schemaVersion", export);
+            Assert.Contains("DOTISAN_CONTRACT_FALLBACK", export);
             Assert.Contains("\"version\": \"0.5.0\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditEntry.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "IAuditWriter.cs")));
