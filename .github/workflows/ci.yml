@@ -36,6 +36,7 @@ jobs:
           done
       - name: Run generated Mailpit password-reset smoke test
         run: |
+          dotnet tool install --global dotnet-ef --version 10.0.7
           dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj -- new MailpitSmoke --auth yes --registration public --mail-provider mailpit --yes --no-restore --output "$RUNNER_TEMP/dotisan-mailpit-smoke"
           cd "$RUNNER_TEMP/dotisan-mailpit-smoke"
           dotnet restore MailpitSmoke.sln
