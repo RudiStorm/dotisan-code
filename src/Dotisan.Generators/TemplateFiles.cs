@@ -13,7 +13,7 @@ internal static class TemplateFiles
         {
           "name": "{{options.Name.ToLowerInvariant()}}-web",
           "private": true,
-          "version": "0.6.6",
+          "version": "0.7.0",
           "packageManager": "{{packageManager}}",
           "type": "module",
           "scripts": {

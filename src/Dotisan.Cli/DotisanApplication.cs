@@ -7,7 +7,7 @@ namespace Dotisan.Cli;
 
 public sealed class DotisanApplication
 {
-    public const string Version = "0.6.6";
+    public const string Version = "0.7.0";
 
     private readonly DotisanCommandRegistry registry;
     private readonly CommandContext context;

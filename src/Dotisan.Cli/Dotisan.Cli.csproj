@@ -6,7 +6,7 @@
     <PackageId>Dotisan</PackageId>
     <ToolCommandName>dotisan</ToolCommandName>
     <PackAsTool>true</PackAsTool>
-    <Version>0.6.6</Version>
+    <Version>0.7.0</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <Description>Dotisan application scaffolding CLI.</Description>
