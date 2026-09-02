@@ -83,6 +83,9 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("AddScoped<IAuditWriter, AuditWriter>", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.Contains("UseSqlite", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.Contains("Microsoft.AspNetCore.OpenApi", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "TodoApp.Api.csproj")));
+            var apiProject = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "TodoApp.Api.csproj"));
+            Assert.DoesNotContain("<PackageReference Include=\"Microsoft.OpenApi\"", apiProject);
+            Assert.DoesNotContain("<PackageReference Include=\"SQLitePCLRaw.lib.e_sqlite3\"", apiProject);
             Assert.Contains("AddOpenApi", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.Contains("MapOpenApi", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.Contains("OpenTelemetry.Extensions.Hosting", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "TodoApp.Api.csproj")));

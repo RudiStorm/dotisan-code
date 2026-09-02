@@ -188,8 +188,6 @@ internal static class TemplateFiles
       <ItemGroup>
         <PackageReference Include="{{DatabasePackage(database)}}" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
-        <PackageReference Include="Microsoft.OpenApi" />
-        <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" />
         <PackageReference Include="WolverineFx" />
         <PackageReference Include="WolverineFx.EntityFrameworkCore" />
         <PackageReference Include="WolverineFx.RuntimeCompilation" />
@@ -213,7 +211,6 @@ internal static class TemplateFiles
       <ItemGroup>
         <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.7" />
         <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.7" />
-        <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
         <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.7" />
         <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.7" />
         <PackageVersion Include="Pomelo.EntityFrameworkCore.MySql" Version="10.0.7" />
@@ -222,7 +219,6 @@ internal static class TemplateFiles
         <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.7" />
         <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.9" />
         <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.7" />
-        <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.12" />
         <PackageVersion Include="WolverineFx" Version="6.30.3" />
         <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="6.30.3" />
         <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="6.30.3" />
@@ -1669,8 +1665,6 @@ internal static class TemplateFiles
         <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
         <PackageReference Include="Microsoft.Data.Sqlite" />
         <PackageReference Include="Microsoft.Extensions.Logging" />
-        <PackageReference Include="Microsoft.OpenApi" />
-        <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" />
         {{(authenticationEnabled ? "<PackageReference Include=\"Microsoft.EntityFrameworkCore.Sqlite\" />" : string.Empty)}}
         <ProjectReference Include="..\\..\\src\\{{name}}.Api\\{{name}}.Api.csproj" />
       </ItemGroup>
