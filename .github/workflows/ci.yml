@@ -3,6 +3,7 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 jobs:
   dotnet:
@@ -15,5 +16,56 @@ jobs:
       - run: dotnet restore Dotisan.sln
       - run: dotnet build Dotisan.sln --no-restore --configuration Release
       - run: dotnet test Dotisan.sln --no-build --configuration Release --verbosity normal
+      - name: Generate API smoke project
+        run: dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj -- new CiSmoke --yes --no-restore --output "$RUNNER_TEMP/dotisan-smoke"
+      - name: Build generated API smoke project
+        working-directory: ${{ runner.temp }}/dotisan-smoke
+        run: |
+          dotnet restore CiSmoke.sln
+          dotnet build CiSmoke.sln --no-restore --configuration Release
+          dotnet test CiSmoke.sln --no-build --configuration Release
+      - name: Build generated authenticated and unauthenticated Vue projects
+        run: |
+          corepack enable
+          dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj -- new CiAuthWeb --auth yes --registration public --yes --no-restore --output "$RUNNER_TEMP/dotisan-auth-web"
+          dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj -- new CiPlainWeb --auth no --yes --no-restore --output "$RUNNER_TEMP/dotisan-plain-web"
+          for web in "$RUNNER_TEMP/dotisan-auth-web/src/CiAuthWeb.Web" "$RUNNER_TEMP/dotisan-plain-web/src/CiPlainWeb.Web"; do
+            pnpm --dir "$web" install --frozen-lockfile=false
+            pnpm --dir "$web" run build
+          done
+      - name: Run generated Mailpit password-reset smoke test
+        run: |
+          dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj -- new MailpitSmoke --auth yes --registration public --mail-provider mailpit --yes --no-restore --output "$RUNNER_TEMP/dotisan-mailpit-smoke"
+          cd "$RUNNER_TEMP/dotisan-mailpit-smoke"
+          dotnet restore MailpitSmoke.sln
+          dotnet build MailpitSmoke.sln --no-restore --configuration Release
+          dotnet ef migrations add InitialIdentity --project src/MailpitSmoke.Api
+          dotnet ef database update --project src/MailpitSmoke.Api
+          docker compose up -d --wait --wait-timeout 120 mailpit
+          trap 'kill "$api_pid" 2>/dev/null || true; docker compose down' EXIT
+          export ASPNETCORE_ENVIRONMENT=Development
+          dotnet run --project src/MailpitSmoke.Api --no-build --configuration Release -- --urls http://127.0.0.1:5000 > "$RUNNER_TEMP/mailpit-api.log" 2>&1 &
+          api_pid=$!
+          for attempt in {1..30}; do curl --fail --silent http://127.0.0.1:5000/api/health >/dev/null && break; sleep 1; done
+          test -n "$(curl --fail --silent http://127.0.0.1:5000/api/health)"
+          cookie_file="$RUNNER_TEMP/mailpit-cookies.txt"
+          antiforgery_json=$(curl --fail --silent --cookie-jar "$cookie_file" --cookie "$cookie_file" http://127.0.0.1:5000/api/account/antiforgery)
+          antiforgery_token=$(echo "$antiforgery_json" | jq -r .token)
+          email="mailpit-smoke-${GITHUB_RUN_ID}@example.com"
+          curl --fail --silent --cookie "$cookie_file" --header "Content-Type: application/json" --header "X-XSRF-TOKEN: $antiforgery_token" --data "{\"email\":\"$email\",\"password\":\"Password1!\"}" http://127.0.0.1:5000/api/account/register >/dev/null
+          curl --fail --silent --cookie "$cookie_file" --header "Content-Type: application/json" --header "X-XSRF-TOKEN: $antiforgery_token" --data "{\"email\":\"$email\"}" http://127.0.0.1:5000/api/account/password-reset/request >/dev/null
+          for attempt in {1..30}; do
+            messages=$(curl --fail --silent http://127.0.0.1:8025/api/v1/messages)
+            echo "$messages" | jq -e --arg email "$email" '.messages[]? | select(.To[]?.Address == $email) | select(.Subject == "Reset your password")' >/dev/null && exit 0
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/mailpit-api.log"
+          exit 1
       - name: Pack CLI
         run: dotnet pack src/Dotisan.Cli/Dotisan.Cli.csproj --no-build --configuration Release --output artifacts
+      - name: Upload NuGet artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotisan-nuget
+          path: artifacts/*.nupkg
+          if-no-files-found: error

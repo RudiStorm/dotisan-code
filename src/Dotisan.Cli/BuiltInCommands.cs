@@ -1,7 +1,9 @@
 using System.Text.Json;
 using Dotisan.Core;
+using Dotisan.Core.Diagnostics;
 using Dotisan.Core.Jobs;
 using Dotisan.Cli.Generation;
+using Dotisan.Cli.Diagnostics;
 using Dotisan.Generators;
 
 namespace Dotisan.Cli;
@@ -229,6 +231,68 @@ internal sealed class GenerateCommand : WorkspaceCommand
     }
 }
 
+internal sealed class DoctorCommand : WorkspaceCommand
+{
+    public override string Name => "doctor";
+    public override string Description => "Check workspace and production readiness.";
+
+    public override Task<DotisanExitCode> ExecuteAsync(CommandContext context, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    {
+        if (arguments.Any(argument => argument is not "--production"))
+            return Task.FromResult(Fail(context.Console, "Usage: dotisan doctor [--production].", DotisanExitCode.UsageError));
+        if (!TryGetServices(context, out var services))
+            return Task.FromResult(Fail(context.Console, "Workspace services are unavailable."));
+
+        var report = DoctorService.Inspect(services, arguments.Contains("--production", StringComparer.OrdinalIgnoreCase));
+        foreach (var result in report.Results)
+        {
+            var label = result.Severity switch
+            {
+                DiagnosticSeverity.Pass => "PASS",
+                DiagnosticSeverity.Warning => "WARNING",
+                _ => "BLOCKING"
+            };
+            context.Console.WriteLine($"[{label}] {result.Name}: {result.Message}");
+            if (result.Severity != DiagnosticSeverity.Pass && result.Recommendation is not null)
+                context.Console.WriteLine($"         {result.Recommendation}");
+        }
+
+        return Task.FromResult(report.HasBlockingResults ? DotisanExitCode.GenerationError : DotisanExitCode.Success);
+    }
+}
+
+internal sealed class MailCommand : WorkspaceCommand
+{
+    public override string Name => "mail";
+    public override string Description => "Show or open the local Mailpit inbox.";
+
+    public override Task<DotisanExitCode> ExecuteAsync(CommandContext context, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    {
+        if (arguments.Any(argument => argument is not "--open"))
+            return Task.FromResult(Fail(context.Console, "Usage: dotisan mail [--open].", DotisanExitCode.UsageError));
+        if (!TryGetServices(context, out var services) || services.MailProvider != MailProvider.Mailpit)
+            return Task.FromResult(Fail(context.Console, "Mailpit is not selected. Generate the project with --mail-provider mailpit."));
+
+        const string url = "http://localhost:8025";
+        if (!arguments.Contains("--open", StringComparer.OrdinalIgnoreCase))
+        {
+            context.Console.WriteLine($"Mailpit inbox: {url}");
+            return Task.FromResult(DotisanExitCode.Success);
+        }
+
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = url, UseShellExecute = true });
+            context.Console.WriteLine($"Opened Mailpit inbox: {url}");
+            return Task.FromResult(DotisanExitCode.Success);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Task.FromResult(Fail(context.Console, $"Could not open Mailpit inbox: {exception.Message}"));
+        }
+    }
+}
+
 internal sealed class JobsCommand : WorkspaceCommand
 {
     public override string Name => "jobs";
@@ -328,8 +392,8 @@ internal sealed class DevCommand : WorkspaceCommand
 
     public override async Task<DotisanExitCode> ExecuteAsync(CommandContext context, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
     {
-        if (arguments.Any(argument => argument.StartsWith("--", StringComparison.Ordinal) && argument is not "--lean" and not "--observability" and not "--environment"))
-            return Fail(context.Console, "Usage: dotisan dev [--lean] [--observability] [--environment <name>].", DotisanExitCode.UsageError);
+        if (arguments.Any(argument => argument.StartsWith("--", StringComparison.Ordinal) && argument is not "--lean" and not "--observability" and not "--mailpit" and not "--environment"))
+            return Fail(context.Console, "Usage: dotisan dev [--lean] [--observability] [--mailpit] [--environment <name>].", DotisanExitCode.UsageError);
 
         var environment = "Development";
         for (var index = 0; index < arguments.Count; index++)
@@ -350,6 +414,8 @@ internal sealed class DevCommand : WorkspaceCommand
         var processes = new List<IDotisanProcess>();
         var databaseStartAttempted = false;
         var databaseStarted = false;
+        var mailpitStartAttempted = false;
+        var mailpitStarted = false;
         try
         {
             var proxyMigration = await MigrateLegacyViteProxyAsync(services.FrontendDirectory, context.Console, cancellationToken);
@@ -381,7 +447,20 @@ internal sealed class DevCommand : WorkspaceCommand
                 databaseStarted = true;
             }
 
-            processes.Add(await services.StartAsync("dotnet", ["watch", "--project", services.ApiProjectPath, "run", "--", "--environment", environment, "--urls", "http://localhost:5000"], services.WorkingDirectory, context.Console, cancellationToken));
+            var mailpitExplicit = arguments.Contains("--mailpit", StringComparer.OrdinalIgnoreCase);
+            if (services.MailProvider == MailProvider.Mailpit && (environment.Equals("Development", StringComparison.OrdinalIgnoreCase) || mailpitExplicit))
+            {
+                mailpitStartAttempted = true;
+                var mailpitResult = await services.RunAsync("docker", ["compose", "up", "-d", "--wait", "--wait-timeout", "120", "mailpit"], services.WorkingDirectory, context.Console, cancellationToken);
+                if (!mailpitResult.Success)
+                    return Fail(context.Console, $"Could not start Mailpit with Docker Compose. Ensure Docker Desktop is installed and running, then retry. {mailpitResult.ErrorMessage}");
+                mailpitStarted = true;
+            }
+
+            var apiArguments = new List<string> { "watch", "--project", services.ApiProjectPath, "run", "--", "--environment", environment, "--urls", "http://localhost:5000" };
+            if (arguments.Contains("--observability", StringComparer.OrdinalIgnoreCase))
+                apiArguments.Add("--dotisan-observability");
+            processes.Add(await services.StartAsync("dotnet", apiArguments, services.WorkingDirectory, context.Console, cancellationToken));
             if (!arguments.Contains("--lean", StringComparer.OrdinalIgnoreCase))
             {
                 if (services.FrontendDirectory is null)
@@ -424,6 +503,12 @@ internal sealed class DevCommand : WorkspaceCommand
                     CancellationToken.None);
                 if (!stopResult.Success)
                     context.Console.WriteError(stopResult.ErrorMessage ?? "Could not stop the Docker database service.");
+            }
+            if (mailpitStarted || (mailpitStartAttempted && cancellationToken.IsCancellationRequested))
+            {
+                var stopResult = await services.RunAsync("docker", ["compose", "stop", "mailpit"], services.WorkingDirectory, context.Console, CancellationToken.None);
+                if (!stopResult.Success)
+                    context.Console.WriteError(stopResult.ErrorMessage ?? "Could not stop the Mailpit service.");
             }
         }
     }
@@ -480,6 +565,7 @@ internal sealed class NewCommand : IDotisanCommand
         var registration = RegistrationPolicy.Disabled;
         var multiTenancyEnabled = false;
         var packageManager = PackageManager.Pnpm;
+        var mailProvider = MailProvider.Console;
         var restore = true;
 
         for (var index = 1; index < arguments.Count; index++)
@@ -533,6 +619,10 @@ internal sealed class NewCommand : IDotisanCommand
                     }
 
                     break;
+                case "--mail-provider":
+                    if (!TryReadValue(arguments, ref index, out var mailValue) || !TryParseMailProvider(mailValue, out mailProvider))
+                        return UsageError(context, "--mail-provider must be console, mailpit, or smtp.");
+                    break;
                 case "--no-restore":
                     restore = false;
                     break;
@@ -552,6 +642,7 @@ internal sealed class NewCommand : IDotisanCommand
                     Registration = registration,
                     MultiTenancyEnabled = multiTenancyEnabled,
                     PackageManager = packageManager
+                    ,MailProvider = mailProvider
                 }
                 : context.Prompts.AskForProject(name, outputDirectory);
         }
@@ -787,5 +878,18 @@ internal sealed class NewCommand : IDotisanCommand
             _ => default
         };
         return normalized is "pnpm" or "npm";
+    }
+
+    private static bool TryParseMailProvider(string value, out MailProvider provider)
+    {
+        var normalized = value.ToLowerInvariant();
+        provider = normalized switch
+        {
+            "console" => MailProvider.Console,
+            "mailpit" => MailProvider.Mailpit,
+            "smtp" => MailProvider.Smtp,
+            _ => default
+        };
+        return normalized is "console" or "mailpit" or "smtp";
     }
 }

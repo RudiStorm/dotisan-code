@@ -25,6 +25,8 @@ public static class TanStackQueryGenerator
                 builder.Append("export function ").Append(hookName).AppendLine("Mutation() {");
                 if (UsesBody(endpoint.Method) && requestType != "void")
                     builder.Append("  return useMutation({ mutationFn: (body: Parameters<typeof services.").Append(functionName).AppendLine(">[0]) => services." + functionName + "(body) });");
+                else if (endpoint.Route.Contains('{'))
+                    builder.Append("  return useMutation({ mutationFn: (value: Parameters<typeof services.").Append(functionName).Append(">[0]) => services.").Append(functionName).AppendLine("(value) });");
                 else
                     builder.Append("  return useMutation({ mutationFn: () => services.").Append(functionName).AppendLine("() });");
                 builder.AppendLine("}").AppendLine();

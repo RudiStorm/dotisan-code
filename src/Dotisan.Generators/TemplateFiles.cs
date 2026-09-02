@@ -13,7 +13,7 @@ internal static class TemplateFiles
         {
           "name": "{{options.Name.ToLowerInvariant()}}-web",
           "private": true,
-          "version": "0.6.2",
+          "version": "0.6.6",
           "packageManager": "{{packageManager}}",
           "type": "module",
           "scripts": {
@@ -46,13 +46,14 @@ internal static class TemplateFiles
             new("global.json", "{\n  \"sdk\": {\n    \"version\": \"10.0.100\",\n    \"rollForward\": \"latestMajor\"\n  }\n}\n"),
             new(".node-version", "22\n"),
             new("Directory.Packages.props", PackageVersions()),
-            new("README.md", ProjectReadme(options.Name, options.Database, options.AuthenticationEnabled)),
+            new("README.md", ProjectReadme(options.Name, options.Database, options.AuthenticationEnabled, options.MultiTenancyEnabled)),
             new("dotisan.config", $$"""
             version: 1
             profile: quick
             database: {{options.Database.ToString().ToLowerInvariant()}}
             authentication: {{(options.AuthenticationEnabled ? "enabled" : "disabled")}}
             multi_tenancy: {{(options.MultiTenancyEnabled ? "enabled" : "disabled")}}
+            mail_provider: {{options.MailProvider.ToString().ToLowerInvariant()}}
             package_manager: {{options.PackageManager.ToString().ToLowerInvariant()}}
             dev:
               services:
@@ -60,21 +61,24 @@ internal static class TemplateFiles
                 frontend: true
                 database: true
                 observability: false
-                mail: false
+                mail: {{(options.MailProvider == MailProvider.Mailpit ? "true" : "false")}}
                 workers: false
             """),
             new("dotisan.contract.json", InitialContractManifest(options.AuthenticationEnabled).ToJson()),
             new("Dockerfile", Dockerfile(options.Name)),
-            ..(options.Database == DatabaseProvider.SQLite
+            ..(options.Database == DatabaseProvider.SQLite && options.MailProvider != MailProvider.Mailpit
                 ? Array.Empty<TemplateFile>()
-                : new[] { new TemplateFile("compose.yaml", DatabaseCompose(options.Name, options.Database)) }),
+                : new[] { new TemplateFile("compose.yaml", DatabaseCompose(options.Name, options.Database, options.MailProvider)) }),
             new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.Database, options.AuthenticationEnabled)),
-            new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public)),
+            new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.MultiTenancyEnabled)),
             new($"src/{options.Name}.Api/Infrastructure/DotisanContractExport.cs", ContractExport(options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Auditing/AuditEntry.cs", AuditEntry(identifier)),
             new($"src/{options.Name}.Api/Auditing/IAuditWriter.cs", AuditWriterContract(identifier)),
-            new($"src/{options.Name}.Api/Auditing/AuditWriter.cs", AuditWriter(identifier)),
+            new($"src/{options.Name}.Api/Auditing/AuditWriter.cs", AuditWriter(identifier, options.MultiTenancyEnabled)),
+            ..(options.MultiTenancyEnabled
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Tenancy/TenantContext.cs", TenantContext(identifier)) }
+                : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Api/Jobs/JobRegistration.cs", JobRegistration(identifier, options.Database)),
             new($"src/{options.Name}.Api/Jobs/SampleJob.cs", SampleJob(identifier)),
             new($"src/{options.Name}.Api/Jobs/SampleJobHandler.cs", SampleJobHandler(identifier)),
@@ -82,6 +86,18 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Api/Features/Health/HealthEndpoints.cs", HealthEndpoints(identifier)),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationUser.cs", ApplicationUser(identifier)) }
+                : Array.Empty<TemplateFile>()),
+            ..(options.AuthenticationEnabled
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationSession.cs", ApplicationSession(identifier)) }
+                : Array.Empty<TemplateFile>()),
+            ..(options.AuthenticationEnabled
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/IEmailProvider.cs", EmailSender(identifier)) }
+                : Array.Empty<TemplateFile>()),
+            ..(options.AuthenticationEnabled
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/IExternalLoginProvider.cs", ExternalLoginProvider(identifier)) }
+                : Array.Empty<TemplateFile>()),
+            ..(options.AuthenticationEnabled
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/IntegrationExamples.cs", IntegrationExamples(identifier)) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Authorization/Permissions.cs", Permissions(identifier)) }
@@ -94,7 +110,7 @@ internal static class TemplateFiles
                 : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public)),
             new($"src/{options.Name}.Api/appsettings.json", AppSettings(options.Name, options.Database)),
-            new($"src/{options.Name}.Api/appsettings.Development.json", "{\n  \"Logging\": {\n    \"LogLevel\": {\n      \"Default\": \"Information\",\n      \"Microsoft.AspNetCore\": \"Information\"\n    }\n  }\n}\n"),
+            new($"src/{options.Name}.Api/appsettings.Development.json", DevelopmentAppSettings(options.MailProvider)),
             new($"src/{options.Name}.Web/package.json", packageJson),
             new($"src/{options.Name}.Web/index.html", WebIndex(options.Name)),
             new($"src/{options.Name}.Web/tsconfig.json", "{\n  \"files\": [],\n  \"references\": [{ \"path\": \"./tsconfig.app.json\" }, { \"path\": \"./tsconfig.node.json\" }]\n}\n"),
@@ -121,7 +137,13 @@ internal static class TemplateFiles
                     new TemplateFile($"src/{options.Name}.Web/src/pages/auth/LoginPage.vue", LoginPage()),
                     new TemplateFile($"src/{options.Name}.Web/src/pages/auth/RegisterPage.vue", RegisterPage()),
                     new TemplateFile($"src/{options.Name}.Web/src/pages/auth/ForgotPasswordPage.vue", ForgotPasswordPage()),
-                    new TemplateFile($"src/{options.Name}.Web/src/pages/account/ProfilePage.vue", ProfilePage())
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/auth/EmailConfirmationPage.vue", EmailConfirmationPage()),
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/auth/MfaChallengePage.vue", MfaChallengePage()),
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/account/ProfilePage.vue", ProfilePage()),
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/account/MfaPage.vue", MfaPage()),
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/account/SessionsPage.vue", SessionsPage()),
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/account/ExternalLoginsPage.vue", ExternalLoginsPage()),
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/admin/AuthorizationPage.vue", AuthorizationPage())
                 }
                 : Array.Empty<TemplateFile>()),
             new($"tests/{options.Name}.Api.Tests/{options.Name}.Api.Tests.csproj", ApiTestsProject(options.Name, options.AuthenticationEnabled)),
@@ -153,6 +175,10 @@ internal static class TemplateFiles
         <PackageReference Include="WolverineFx.EntityFrameworkCore" />
         <PackageReference Include="WolverineFx.RuntimeCompilation" />
         <PackageReference Include="WolverineFx.{{WolverineProviderPackage(database)}}" />
+        <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+        <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
         {{(authenticationEnabled ? "<PackageReference Include=\"Microsoft.AspNetCore.Identity.EntityFrameworkCore\" />" : string.Empty)}}
       </ItemGroup>
@@ -184,6 +210,10 @@ internal static class TemplateFiles
         <PackageVersion Include="WolverineFx.SqlServer" Version="6.30.3" />
         <PackageVersion Include="WolverineFx.Postgresql" Version="6.30.3" />
         <PackageVersion Include="WolverineFx.MySql" Version="6.30.3" />
+        <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.18.0" />
+        <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.18.0" />
+        <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.18.0" />
+        <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.18.0" />
         <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
         <PackageVersion Include="xunit" Version="2.9.2" />
         <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
@@ -191,9 +221,9 @@ internal static class TemplateFiles
     </Project>
     """;
 
-    private static string ProjectReadme(string name, DatabaseProvider database, bool authenticationEnabled) => authenticationEnabled
-        ? AuthenticatedProjectReadme(name, database)
-        : PlainProjectReadme(name, database);
+    private static string ProjectReadme(string name, DatabaseProvider database, bool authenticationEnabled, bool multiTenancyEnabled) => authenticationEnabled
+        ? AuthenticatedProjectReadme(name, database, multiTenancyEnabled)
+        : PlainProjectReadme(name, database, multiTenancyEnabled);
 
     private static string WolverineProviderPackage(DatabaseProvider database) => database switch
     {
@@ -375,12 +405,13 @@ internal static class TemplateFiles
     {
         public const string ClaimType = "permission";
         public const string ProfileView = "profile.view";
+        public const string AuthorizationManage = "authorization.manage";
         // DOTISAN:RESOURCE_PERMISSIONS
-        public static IReadOnlyList<string> All { get; } = [ProfileView];
+        public static IReadOnlyList<string> All { get; } = [ProfileView, AuthorizationManage];
     }
     """;
 
-    private static string PlainProjectReadme(string name, DatabaseProvider database) => $$"""
+    private static string PlainProjectReadme(string name, DatabaseProvider database, bool multiTenancyEnabled) => $$"""
     # {{name}}
 
     This project was generated by Dotisan. It is a standard ASP.NET Core + Vue/Vite application with EF Core {{DatabaseDisplayName(database)}}.
@@ -430,7 +461,7 @@ internal static class TemplateFiles
     dotisan.config controls orchestration preferences only. Normal appsettings.json, environment variables, EF Core, and Vite configuration remain the source of truth for their respective concerns. Resource scaffolding creates source files but never creates migrations.
     """;
 
-    private static string AuthenticatedProjectReadme(string name, DatabaseProvider database) => $$"""
+    private static string AuthenticatedProjectReadme(string name, DatabaseProvider database, bool multiTenancyEnabled) => $$"""
     # {{name}}
 
     This project was generated by Dotisan as a standard ASP.NET Core + Vue/Vite application with EF Core {{DatabaseDisplayName(database)}} and opt-in ASP.NET Core Identity cookie authentication.
@@ -503,6 +534,9 @@ internal static class TemplateFiles
 
     private static string AuthorizationEndpoints(string identifier) => $$"""
     using {{identifier}}.Api.Authorization;
+    using {{identifier}}.Api.Identity;
+    using {{identifier}}.Api.Integrations;
+    using Microsoft.AspNetCore.Identity;
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Routing;
@@ -517,37 +551,72 @@ internal static class TemplateFiles
                 .RequireAuthorization(Permissions.ProfileView)
                 .WithName("AuthorizationProfile")
                 .WithTags("Authorization");
+            endpoints.MapGet("/api/authorization/users", (UserManager<ApplicationUser> users, RoleManager<IdentityRole> roles) =>
+                Results.Ok(new { users = users.Users.Select(user => new { id = user.Id, email = user.Email }).ToArray(), roles = roles.Roles.Select(role => role.Name).ToArray() }))
+                .RequireAuthorization(Permissions.AuthorizationManage)
+                .WithName("AuthorizationUsers").WithTags("Authorization");
+            endpoints.MapPost("/api/authorization/users/{userId}/roles/{roleName}", async (string userId, string roleName, UserManager<ApplicationUser> users, RoleManager<IdentityRole> roles) =>
+            {
+                var user = await users.FindByIdAsync(userId);
+                if (user is null || !await roles.RoleExistsAsync(roleName)) return Results.NotFound();
+                var result = await users.AddToRoleAsync(user, roleName);
+                return result.Succeeded ? Results.NoContent() : Results.ValidationProblem(result.Errors.GroupBy(error => error.Code).ToDictionary(group => group.Key, group => group.Select(error => error.Description).ToArray()));
+            }).RequireAuthorization(Permissions.AuthorizationManage).WithName("AuthorizationAssignRole").WithTags("Authorization");
         }
     }
     """;
 
-    private static string ApiProgram(string identifier, DatabaseProvider database, bool authenticationEnabled, bool registrationEnabled) => authenticationEnabled
-        ? AuthenticatedApiProgram(identifier, database, registrationEnabled)
-        : PlainApiProgram(identifier, database);
+    private static string ApiProgram(string identifier, DatabaseProvider database, bool authenticationEnabled, bool registrationEnabled, bool multiTenancyEnabled) => authenticationEnabled
+        ? AuthenticatedApiProgram(identifier, database, registrationEnabled, multiTenancyEnabled)
+        : PlainApiProgram(identifier, database, multiTenancyEnabled);
 
-    private static string PlainApiProgram(string identifier, DatabaseProvider database) => $$"""
+    private static string PlainApiProgram(string identifier, DatabaseProvider database, bool multiTenancyEnabled) => $$"""
     using {{identifier}}.Api.Auditing;
+    {{(multiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty)}}
     using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Data;
     using {{identifier}}.Api.Infrastructure;
     using {{identifier}}.Api.Jobs;
     using Wolverine;
+    using OpenTelemetry;
+    using OpenTelemetry.Metrics;
+    using OpenTelemetry.Trace;
 
     if (TryExportDotisanContract(args))
         return;
 
     var builder = WebApplication.CreateBuilder(args);
+    if (args.Contains("--dotisan-observability", StringComparer.OrdinalIgnoreCase))
+    {
+        builder.Configuration["OpenTelemetry:Enabled"] = "true";
+    }
     builder.Services.AddOpenApi();
     builder.Services.AddProblemDetails();
+    var openTelemetry = builder.Services.AddOpenTelemetry()
+        .WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation())
+        .WithMetrics(metrics => metrics
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation());
+    if (builder.Configuration.GetValue("OpenTelemetry:Enabled", false))
+    {
+        openTelemetry.UseOtlpExporter();
+    }
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
         ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required.");
     builder.Services.AddDbContext<AppDbContext>(options =>
         {{DatabaseRegistration(database)}});
     builder.Services.AddScoped<IAuditWriter, AuditWriter>();
+    {{(multiTenancyEnabled ? "builder.Services.AddHttpContextAccessor();\n    builder.Services.AddScoped<ITenantContext, TenantContext>();" : string.Empty)}}
     builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));
 
     var app = builder.Build();
     app.UseExceptionHandler();
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHttpsRedirection();
+    }
     app.UseDefaultFiles();
     app.UseStaticFiles();
     if (app.Environment.IsDevelopment())
@@ -576,31 +645,54 @@ internal static class TemplateFiles
     public partial class Program { }
     """;
 
-    private static string AuthenticatedApiProgram(string identifier, DatabaseProvider database, bool registrationEnabled) => $$"""
+    private static string AuthenticatedApiProgram(string identifier, DatabaseProvider database, bool registrationEnabled, bool multiTenancyEnabled) => $$"""
     using System.Security.Claims;
     using {{identifier}}.Api.Authorization;
     using {{identifier}}.Api.Auditing;
     using {{identifier}}.Api.Data;
     using {{identifier}}.Api.Identity;
+    using {{identifier}}.Api.Integrations;
     using {{identifier}}.Api.Infrastructure;
     using {{identifier}}.Api.Jobs;
+    {{(multiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty)}}
     using Wolverine;
     using Microsoft.AspNetCore.Authentication.Cookies;
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Identity;
+    using Microsoft.AspNetCore.RateLimiting;
     using Microsoft.EntityFrameworkCore;
+    using System.Threading.RateLimiting;
+    using OpenTelemetry;
+    using OpenTelemetry.Metrics;
+    using OpenTelemetry.Trace;
 
     if (TryExportDotisanContract(args))
         return;
 
     var builder = WebApplication.CreateBuilder(args);
+    if (args.Contains("--dotisan-observability", StringComparer.OrdinalIgnoreCase))
+    {
+        builder.Configuration["OpenTelemetry:Enabled"] = "true";
+    }
     builder.Services.AddOpenApi();
     builder.Services.AddProblemDetails();
+    var openTelemetry = builder.Services.AddOpenTelemetry()
+        .WithTracing(tracing => tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation())
+        .WithMetrics(metrics => metrics
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation());
+    if (builder.Configuration.GetValue("OpenTelemetry:Enabled", false))
+    {
+        openTelemetry.UseOtlpExporter();
+    }
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
         ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required.");
     builder.Services.AddDbContext<AppDbContext>(options =>
         {{DatabaseRegistration(database)}});
     builder.Services.AddScoped<IAuditWriter, AuditWriter>();
+    {{(multiTenancyEnabled ? "builder.Services.AddHttpContextAccessor();\n    builder.Services.AddScoped<ITenantContext, TenantContext>();" : string.Empty)}}
     builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));
     builder.Services.AddIdentityCore<ApplicationUser>(options =>
     {
@@ -610,9 +702,26 @@ internal static class TemplateFiles
     })
     .AddRoles<IdentityRole>()
     .AddSignInManager()
+    .AddDefaultTokenProviders()
     .AddEntityFrameworkStores<AppDbContext>();
-    builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-        .AddCookie(options =>
+    builder.Services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.Zero);
+    builder.Services.AddHttpClient();
+    builder.Services.AddSingleton<IExternalLoginStateStore, ExternalLoginStateStore>();
+    var mailProvider = builder.Configuration["Mail:Provider"]?.ToLowerInvariant() ?? "console";
+    if (mailProvider == "mailpit" && !builder.Environment.IsDevelopment())
+        throw new InvalidOperationException("Mailpit is only supported in the Development environment. Select smtp for staging or production.");
+    builder.Services.AddSingleton<IEmailProvider>(services =>
+    {
+        var configuration = services.GetRequiredService<IConfiguration>();
+        return mailProvider switch
+        {
+            "mailpit" => new MailpitEmailSender(services.GetRequiredService<IHttpClientFactory>(), configuration),
+            "smtp" => new SmtpEmailSender(configuration),
+            _ => new ConsoleEmailSender()
+        };
+    });
+    builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
+        .AddCookie(IdentityConstants.ApplicationScheme, options =>
         {
             options.Cookie.HttpOnly = true;
             options.Cookie.SameSite = SameSiteMode.Lax;
@@ -627,7 +736,19 @@ internal static class TemplateFiles
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 return Task.CompletedTask;
             };
-        });
+            options.Events.OnValidatePrincipal = async context =>
+            {
+                var value = context.Principal?.FindFirstValue("dotisan_session_id");
+                if (!Guid.TryParse(value, out var sessionId)) return;
+                var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                var session = await db.ApplicationSessions.SingleOrDefaultAsync(item => item.Id == sessionId);
+                var now = DateTimeOffset.UtcNow;
+                if (session is null || session.RevokedAt is not null || session.ExpiresAt <= now) { context.RejectPrincipal(); return; }
+                if (session.LastSeenAt < now.AddMinutes(-5)) { session.LastSeenAt = now; await db.SaveChangesAsync(); }
+            };
+        })
+        .AddCookie(IdentityConstants.TwoFactorUserIdScheme)
+        .AddCookie(IdentityConstants.TwoFactorRememberMeScheme);
     builder.Services.AddAuthorization(options =>
     {
         foreach (var permission in Permissions.All)
@@ -637,9 +758,14 @@ internal static class TemplateFiles
         }
     });
     builder.Services.AddAntiforgery(options => options.HeaderName = "X-XSRF-TOKEN");
+    builder.Services.AddRateLimiter(options => options.AddPolicy("account", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
 
     var app = builder.Build();
     app.UseExceptionHandler();
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHttpsRedirection();
+    }
     app.UseDefaultFiles();
     app.UseStaticFiles();
     if (app.Environment.IsDevelopment())
@@ -648,6 +774,7 @@ internal static class TemplateFiles
     }
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseRateLimiter();
     app.UseAntiforgery();
     app.MapDotisanEndpoints();
     app.MapFallbackToFile("index.html");
@@ -721,6 +848,9 @@ internal static class TemplateFiles
           "Audit": {
             "Enabled": true
           },
+          "OpenTelemetry": {
+            "Enabled": false
+          },
           "Dotisan": {
             "Jobs": {
               "Enabled": true,
@@ -739,12 +869,29 @@ internal static class TemplateFiles
         """;
     }
 
-    private static string DatabaseCompose(string name, DatabaseProvider database)
+    private static string DevelopmentAppSettings(MailProvider provider) => $$"""
+    {
+      "Mail": {
+        "Provider": "{{provider.ToString().ToLowerInvariant()}}",
+        "Mailpit": { "BaseUrl": "http://localhost:8025/api/v1", "From": "no-reply@localhost" },
+        "Smtp": { "Host": "localhost", "Port": 25, "From": "no-reply@localhost" }
+      },
+      "Logging": {
+        "LogLevel": {
+          "Default": "Information",
+          "Microsoft.AspNetCore": "Information"
+        }
+      }
+    }
+    """;
+
+
+    private static string DatabaseCompose(string name, DatabaseProvider database, MailProvider mailProvider)
     {
         var databaseName = name.ToLowerInvariant();
         var volumeName = $"{databaseName}-database-data";
 
-        return database switch
+        var compose = database switch
         {
             DatabaseProvider.SqlServer => $$"""
             services:
@@ -804,9 +951,57 @@ internal static class TemplateFiles
             volumes:
               {{volumeName}}:
             """,
-            _ => throw new ArgumentOutOfRangeException(nameof(database), database, "SQLite does not have an external database compose service.")
+            _ => "services:\n"
         };
+
+        return mailProvider == MailProvider.Mailpit
+            ? compose + $$"""
+
+              mailpit:
+                image: axllent/mailpit:latest
+                ports:
+                  - "1025:1025"
+                  - "8025:8025"
+                healthcheck:
+                  test: ["CMD", "wget", "--spider", "-q", "http://localhost:8025/api/v1/info"]
+                  interval: 5s
+                  timeout: 5s
+                  retries: 20
+            """
+            : compose;
     }
+
+    private static string TenantContext(string identifier) => $$"""
+    using System.Security.Claims;
+    using System.Text.Json;
+    using Microsoft.AspNetCore.Http;
+    using Microsoft.Extensions.Hosting;
+
+    namespace {{identifier}}.Api.Tenancy;
+
+    public interface ITenantContext
+    {
+        string TenantId { get; }
+        string RequireTenantId();
+    }
+
+    public interface ITenantEntity
+    {
+        string TenantId { get; set; }
+    }
+
+    public sealed class TenantContext(IHttpContextAccessor httpContextAccessor, IHostEnvironment environment) : ITenantContext
+    {
+        public string TenantId =>
+            httpContextAccessor.HttpContext?.User.FindFirstValue("tenant_id")
+            ?? (environment.IsDevelopment()
+                ? httpContextAccessor.HttpContext?.Request.Headers["X-Tenant-ID"].FirstOrDefault()
+                : null)
+            ?? throw new InvalidOperationException("A tenant_id claim is required.");
+
+        public string RequireTenantId() => TenantId;
+    }
+    """;
 
     private static string DbContext(string identifier, bool authenticationEnabled) => authenticationEnabled
         ? IdentityDbContext(identifier)
@@ -835,6 +1030,7 @@ internal static class TemplateFiles
     public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser>(options)
     {
         public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+        public DbSet<ApplicationSession> ApplicationSessions => Set<ApplicationSession>();
     }
     """;
 
@@ -873,17 +1069,18 @@ internal static class TemplateFiles
     }
     """;
 
-    private static string AuditWriter(string identifier) => $$"""
+    private static string AuditWriter(string identifier, bool multiTenancyEnabled) => $$"""
     using System.Diagnostics;
     using System.Security.Claims;
     using System.Text.Json;
     using {{identifier}}.Api.Data;
+    {{(multiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty)}}
     using Microsoft.AspNetCore.Http;
     using Microsoft.Extensions.Configuration;
 
     namespace {{identifier}}.Api.Auditing;
 
-    public sealed class AuditWriter(AppDbContext db, IConfiguration configuration) : IAuditWriter
+    public sealed class AuditWriter(AppDbContext db, IConfiguration configuration{{(multiTenancyEnabled ? ", ITenantContext tenantContext" : string.Empty)}}) : IAuditWriter
     {
         public async Task RecordAsync(
             HttpContext httpContext,
@@ -904,7 +1101,7 @@ internal static class TemplateFiles
             {
                 Id = Guid.NewGuid(),
                 ActorId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier),
-                TenantId = null,
+                TenantId = {{(multiTenancyEnabled ? "tenantContext.TenantId" : "null")}},
                 EntityType = entityType,
                 EntityId = entityId,
                 Action = action,
@@ -928,16 +1125,173 @@ internal static class TemplateFiles
     }
     """;
 
+    private static string ApplicationSession(string identifier) => $$"""
+    namespace {{identifier}}.Api.Identity;
+
+    public sealed class ApplicationSession
+    {
+        public Guid Id { get; set; }
+        public string UserId { get; set; } = string.Empty;
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset LastSeenAt { get; set; }
+        public DateTimeOffset ExpiresAt { get; set; }
+        public DateTimeOffset? RevokedAt { get; set; }
+        public string DeviceName { get; set; } = "Unknown device";
+        public string? UserAgent { get; set; }
+        public string? IpAddress { get; set; }
+    }
+    """;
+
+    private static string EmailSender(string identifier) => $$"""
+    namespace {{identifier}}.Api.Integrations;
+
+    public interface IEmailProvider
+    {
+        Task SendAsync(string recipient, string subject, string body, CancellationToken cancellationToken = default);
+    }
+
+    public sealed class MailpitEmailSender(IHttpClientFactory httpClientFactory, IConfiguration configuration) : IEmailProvider
+    {
+        public async Task SendAsync(string recipient, string subject, string body, CancellationToken cancellationToken = default)
+        {
+            var baseUrl = configuration["Mail:Mailpit:BaseUrl"] ?? "http://localhost:8025/api/v1";
+            var sender = configuration["Mail:Mailpit:From"] ?? "no-reply@localhost";
+            using var response = await httpClientFactory.CreateClient().PostAsJsonAsync($"{baseUrl.TrimEnd('/')}/send", new { From = new { Email = sender }, To = new[] { new { Email = recipient } }, Subject = subject, Text = body }, cancellationToken);
+            response.EnsureSuccessStatusCode();
+        }
+    }
+
+    public sealed class SmtpEmailSender(IConfiguration configuration) : IEmailProvider
+    {
+        public async Task SendAsync(string recipient, string subject, string body, CancellationToken cancellationToken = default)
+        {
+            using var client = new System.Net.Mail.SmtpClient(configuration["Mail:Smtp:Host"] ?? throw new InvalidOperationException("Mail:Smtp:Host is required."), configuration.GetValue("Mail:Smtp:Port", 25));
+            client.EnableSsl = configuration.GetValue("Mail:Smtp:EnableSsl", true);
+            client.Credentials = new System.Net.NetworkCredential(configuration["Mail:Smtp:Username"], configuration["Mail:Smtp:Password"]);
+            using var message = new System.Net.Mail.MailMessage(configuration["Mail:Smtp:From"] ?? throw new InvalidOperationException("Mail:Smtp:From is required."), recipient, subject, body);
+            await client.SendMailAsync(message, cancellationToken);
+        }
+    }
+
+    public sealed class ConsoleEmailSender : IEmailProvider
+    {
+        public Task SendAsync(string recipient, string subject, string body, CancellationToken cancellationToken = default)
+        {
+            Console.WriteLine($"Application email to {recipient}: {subject}\n{body}");
+            return Task.CompletedTask;
+        }
+    }
+    """;
+
+    private static string ExternalLoginProvider(string identifier) => $$"""
+    using Microsoft.AspNetCore.DataProtection;
+    using System.Collections.Concurrent;
+
+    namespace {{identifier}}.Api.Integrations;
+
+    public sealed record ExternalLoginProviderDescriptor(string Name, string DisplayName);
+    public sealed record ExternalLoginIdentity(string ProviderKey, string Email, string? DisplayName);
+    public interface IExternalLoginStateStore
+    {
+        string Create(string returnUrl);
+        bool TryConsume(string state, out string returnUrl);
+    }
+
+    public sealed class ExternalLoginStateStore(IDataProtectionProvider dataProtectionProvider) : IExternalLoginStateStore
+    {
+        private readonly IDataProtector protector = dataProtectionProvider.CreateProtector("Dotisan.ExternalLogin.State");
+        private readonly ConcurrentDictionary<string, byte> consumed = new(StringComparer.Ordinal);
+
+        public string Create(string returnUrl) => protector.Protect($"{Guid.NewGuid():N}|{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}|{returnUrl}");
+
+        public bool TryConsume(string state, out string returnUrl)
+        {
+            returnUrl = "/";
+            try
+            {
+                var parts = protector.Unprotect(state).Split('|', 3);
+                if (parts.Length != 3 || !long.TryParse(parts[1], out var createdAt) || DateTimeOffset.UtcNow.ToUnixTimeSeconds() - createdAt > 600 || !consumed.TryAdd(parts[0], 0)) return false;
+                returnUrl = parts[2];
+                return true;
+            }
+            catch (Exception) { return false; }
+        }
+    }
+
+    public interface IExternalLoginProvider
+    {
+        string Name { get; }
+        string DisplayName { get; }
+        Task<string> CreateChallengeUrlAsync(string returnUrl, CancellationToken cancellationToken = default);
+        Task<ExternalLoginIdentity?> ResolveIdentityAsync(string callbackCode, string state, CancellationToken cancellationToken = default);
+    }
+    """;
+
+    private static string IntegrationExamples(string identifier) => $$"""
+    using Microsoft.AspNetCore.DataProtection;
+    using System.Net.Http.Headers;
+    using System.Text.Json;
+
+    namespace {{identifier}}.Api.Integrations;
+
+    // Optional examples. Register only after supplying secrets through deployment configuration.
+    public sealed class SendGridEmailProvider(IHttpClientFactory clients, IConfiguration configuration) : IEmailProvider
+    {
+        public async Task SendAsync(string recipient, string subject, string body, CancellationToken cancellationToken = default)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.sendgrid.com/v3/mail/send");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", configuration["Mail:SendGrid:ApiKey"] ?? throw new InvalidOperationException("Mail:SendGrid:ApiKey is required."));
+            request.Content = JsonContent.Create(new { personalizations = new[] { new { to = new[] { new { email = recipient } } } }, from = new { email = configuration["Mail:SendGrid:From"] ?? throw new InvalidOperationException("Mail:SendGrid:From is required.") }, subject, content = new[] { new { type = "text/plain", value = body } } });
+            (await clients.CreateClient().SendAsync(request, cancellationToken)).EnsureSuccessStatusCode();
+        }
+    }
+
+    public sealed class MailgunEmailProvider(IHttpClientFactory clients, IConfiguration configuration) : IEmailProvider
+    {
+        public async Task SendAsync(string recipient, string subject, string body, CancellationToken cancellationToken = default)
+        {
+            var domain = configuration["Mail:Mailgun:Domain"] ?? throw new InvalidOperationException("Mail:Mailgun:Domain is required.");
+            var request = new HttpRequestMessage(HttpMethod.Post, $"https://api.mailgun.net/v3/{domain}/messages") { Content = new FormUrlEncodedContent(new Dictionary<string, string> { ["from"] = configuration["Mail:Mailgun:From"] ?? throw new InvalidOperationException("Mail:Mailgun:From is required."), ["to"] = recipient, ["subject"] = subject, ["text"] = body }) };
+            var key = configuration["Mail:Mailgun:ApiKey"] ?? throw new InvalidOperationException("Mail:Mailgun:ApiKey is required.");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes($"api:{key}")));
+            (await clients.CreateClient().SendAsync(request, cancellationToken)).EnsureSuccessStatusCode();
+        }
+    }
+
+    public sealed class ConfiguredOAuth2Provider(IHttpClientFactory clients, IConfiguration configuration, IExternalLoginStateStore stateStore) : IExternalLoginProvider
+    {
+        public string Name => configuration["OAuth:Name"] ?? "oauth2";
+        public string DisplayName => configuration["OAuth:DisplayName"] ?? "External provider";
+        public Task<string> CreateChallengeUrlAsync(string returnUrl, CancellationToken cancellationToken = default)
+        {
+            var state = stateStore.Create(returnUrl);
+            var query = $"client_id={Uri.EscapeDataString(configuration["OAuth:ClientId"] ?? "")}&redirect_uri={Uri.EscapeDataString(configuration["OAuth:RedirectUri"] ?? "")}&response_type=code&scope={Uri.EscapeDataString(configuration["OAuth:Scope"] ?? "openid profile email")}&state={Uri.EscapeDataString(state)}";
+            return Task.FromResult($"{configuration["OAuth:AuthorizationEndpoint"]}?{query}");
+        }
+        public async Task<ExternalLoginIdentity?> ResolveIdentityAsync(string callbackCode, string state, CancellationToken cancellationToken = default)
+        {
+            var tokenResponse = await clients.CreateClient().PostAsync(configuration["OAuth:TokenEndpoint"], new FormUrlEncodedContent(new Dictionary<string, string> { ["code"] = callbackCode, ["client_id"] = configuration["OAuth:ClientId"] ?? "", ["client_secret"] = configuration["OAuth:ClientSecret"] ?? "", ["redirect_uri"] = configuration["OAuth:RedirectUri"] ?? "", ["grant_type"] = "authorization_code" }), cancellationToken);
+            tokenResponse.EnsureSuccessStatusCode(); var token = (await tokenResponse.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).GetProperty("access_token").GetString();
+            var profile = await clients.CreateClient().GetFromJsonAsync<JsonElement>(configuration["OAuth:UserInfoEndpoint"], cancellationToken); var key = profile.GetProperty(configuration["OAuth:SubjectClaim"] ?? "sub").GetString(); var email = profile.GetProperty(configuration["OAuth:EmailClaim"] ?? "email").GetString();
+            return key is null || email is null ? null : new ExternalLoginIdentity(key, email, profile.TryGetProperty(configuration["OAuth:NameClaim"] ?? "name", out var name) ? name.GetString() : null);
+        }
+    }
+    """;
+
     private static string AccountEndpoints(string identifier, bool registrationEnabled) => $$"""
     using System.Security.Claims;
     using {{identifier}}.Api.Auditing;
+    using {{identifier}}.Api.Data;
     using {{identifier}}.Api.Identity;
+    using {{identifier}}.Api.Integrations;
     using Microsoft.AspNetCore.Authentication.Cookies;
     using Microsoft.AspNetCore.Antiforgery;
+    using Microsoft.AspNetCore.DataProtection;
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Identity;
     using Microsoft.AspNetCore.Routing;
+    using Microsoft.EntityFrameworkCore;
 
     namespace {{identifier}}.Api.Features.Account;
 
@@ -945,10 +1299,27 @@ internal static class TemplateFiles
     {
         public static IEndpointRouteBuilder MapAccountEndpoints(this IEndpointRouteBuilder endpoints, bool registrationEnabled)
         {
-            var group = endpoints.MapGroup("/api/account");
+            var group = endpoints.MapGroup("/api/account").RequireRateLimiting("account");
             group.MapGet("/antiforgery", IssueAntiforgery).AllowAnonymous();
-            group.MapPost("/register", (RegisterRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) => Register(request, users, signInManager, audit, httpContext, registrationEnabled, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
-            group.MapPost("/login", (LoginRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) => Login(request, users, signInManager, audit, httpContext, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/register", (RegisterRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) => Register(request, users, emailProvider, audit, httpContext, registrationEnabled, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/login", (LoginRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, AppDbContext db, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) => Login(request, users, signInManager, db, audit, httpContext, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/password-reset/request", (PasswordResetRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, CancellationToken cancellationToken) => RequestPasswordReset(request, users, emailProvider, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/password-reset/confirm", (PasswordResetConfirmRequest request, UserManager<ApplicationUser> users, CancellationToken cancellationToken) => ConfirmPasswordReset(request, users, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/email-confirmation/confirm", (EmailConfirmationRequest request, UserManager<ApplicationUser> users, CancellationToken cancellationToken) => ConfirmEmail(request, users, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/email-confirmation/resend", (EmailConfirmationResendRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, CancellationToken cancellationToken) => ResendConfirmation(request, users, emailProvider, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapGet("/mfa/setup", (ClaimsPrincipal principal, UserManager<ApplicationUser> users) => SetupMfa(principal, users)).RequireAuthorization();
+            group.MapPost("/mfa/verify", (MfaCodeRequest request, ClaimsPrincipal principal, UserManager<ApplicationUser> users) => VerifyMfa(request, principal, users)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/mfa/disable", (ClaimsPrincipal principal, UserManager<ApplicationUser> users) => DisableMfa(principal, users)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/mfa/recovery-codes/regenerate", (ClaimsPrincipal principal, UserManager<ApplicationUser> users) => RegenerateRecoveryCodes(principal, users)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/mfa/challenge", (MfaCodeRequest request, SignInManager<ApplicationUser> signInManager, AppDbContext db, HttpContext httpContext, CancellationToken cancellationToken) => ChallengeMfa(request, signInManager, db, httpContext, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapGet("/sessions", (ClaimsPrincipal principal, AppDbContext db) => ListSessions(principal, db)).RequireAuthorization();
+            group.MapDelete("/sessions/{id:guid}", (Guid id, ClaimsPrincipal principal, AppDbContext db) => RevokeSession(id, principal, db)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/sessions/revoke-all", (ClaimsPrincipal principal, UserManager<ApplicationUser> users, AppDbContext db) => RevokeAllSessions(principal, users, db)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapGet("/external/providers", (IEnumerable<IExternalLoginProvider> providers) => Results.Ok(new { providers = providers.Select(provider => new ExternalLoginProviderDescriptor(provider.Name, provider.DisplayName)) })).AllowAnonymous();
+            group.MapGet("/external/{provider}/challenge", (string provider, string? returnUrl, IEnumerable<IExternalLoginProvider> providers, CancellationToken cancellationToken) => ExternalLoginChallenge(provider, returnUrl, providers, cancellationToken)).AllowAnonymous();
+            group.MapGet("/external/{provider}/callback", (string provider, string code, string state, ClaimsPrincipal principal, IEnumerable<IExternalLoginProvider> providers, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, AppDbContext db, HttpContext httpContext, IExternalLoginStateStore stateStore, CancellationToken cancellationToken) => ExternalLoginCallback(provider, code, state, principal, providers, users, signInManager, db, httpContext, stateStore, cancellationToken)).AllowAnonymous();
+            group.MapPost("/external/{provider}/link", (string provider, string? returnUrl, ClaimsPrincipal principal, IEnumerable<IExternalLoginProvider> providers, CancellationToken cancellationToken) => ExternalLoginChallenge(provider, returnUrl, providers, cancellationToken)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapDelete("/external/{provider}/link", (string provider, ClaimsPrincipal principal, IEnumerable<IExternalLoginProvider> providers, UserManager<ApplicationUser> users) => UnlinkExternalLogin(provider, principal, providers, users)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
             group.MapPost("/logout", (SignInManager<ApplicationUser> signInManager, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) => Logout(signInManager, audit, httpContext, cancellationToken)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
             group.MapGet("/me", (ClaimsPrincipal user) => Me(user)).RequireAuthorization();
             return endpoints;
@@ -960,7 +1331,7 @@ internal static class TemplateFiles
             return Results.Ok(new { token = tokens.RequestToken });
         }
 
-        private static async Task<IResult> Register(RegisterRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, IAuditWriter audit, HttpContext httpContext, bool registrationEnabled, CancellationToken cancellationToken)
+        private static async Task<IResult> Register(RegisterRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, IAuditWriter audit, HttpContext httpContext, bool registrationEnabled, CancellationToken cancellationToken)
         {
             if (!registrationEnabled)
             {
@@ -978,13 +1349,13 @@ internal static class TemplateFiles
                 return Results.ValidationProblem(errors);
             }
 
-            signInManager.AuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-            await signInManager.SignInAsync(user, isPersistent: false);
+            var confirmationToken = await users.GenerateEmailConfirmationTokenAsync(user);
+            await emailProvider.SendAsync(user.Email!, "Confirm your email", $"Use this email confirmation token: {confirmationToken}", cancellationToken);
             await audit.RecordAsync(httpContext, "Security", user.Id, "security.registered", new Dictionary<string, object?>(), cancellationToken);
             return Results.Ok(new CurrentUserResponse(user.Id, user.Email!));
         }
 
-        private static async Task<IResult> Login(LoginRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, IAuditWriter audit, HttpContext httpContext, CancellationToken cancellationToken)
+        private static async Task<IResult> Login(LoginRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, AppDbContext db, IAuditWriter audit, HttpContext httpContext, CancellationToken cancellationToken)
         {
             var user = await users.FindByEmailAsync(request.Email);
             if (user is null)
@@ -993,8 +1364,16 @@ internal static class TemplateFiles
                 return Results.Unauthorized();
             }
 
-            signInManager.AuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+            if (!await users.IsEmailConfirmedAsync(user))
+            {
+                await audit.RecordAsync(httpContext, "Security", user.Id, "security.login.unconfirmed_email", new Dictionary<string, object?>(), cancellationToken);
+                return Results.Unauthorized();
+            }
+
+            signInManager.AuthenticationScheme = IdentityConstants.ApplicationScheme;
             var result = await signInManager.PasswordSignInAsync(user, request.Password, request.RememberMe, lockoutOnFailure: true);
+            if (result.RequiresTwoFactor)
+                return Results.Ok(new LoginResponse("mfa_required"));
             if (!result.Succeeded)
             {
                 await audit.RecordAsync(httpContext, "Security", user.Id, "security.login.failed", new Dictionary<string, object?>(), cancellationToken);
@@ -1002,15 +1381,182 @@ internal static class TemplateFiles
             }
 
             await audit.RecordAsync(httpContext, "Security", user.Id, "security.login.succeeded", new Dictionary<string, object?>(), cancellationToken);
-            return Results.Ok(new CurrentUserResponse(user.Id, user.Email!));
+            var sessionId = await CreateSession(user.Id, db, httpContext, cancellationToken);
+            await signInManager.SignInWithClaimsAsync(user, request.RememberMe, [new Claim("dotisan_session_id", sessionId.ToString())]);
+            return Results.Ok(new LoginResponse("authenticated"));
+        }
+
+        private static async Task<Guid> CreateSession(string userId, AppDbContext db, HttpContext httpContext, CancellationToken cancellationToken)
+        {
+            var agent = httpContext.Request.Headers.UserAgent.ToString();
+            var now = DateTimeOffset.UtcNow;
+            var id = Guid.NewGuid();
+            db.ApplicationSessions.Add(new ApplicationSession { Id = id, UserId = userId, CreatedAt = now, LastSeenAt = now, ExpiresAt = now.AddDays(30), DeviceName = string.IsNullOrWhiteSpace(agent) ? "Unknown device" : agent[..Math.Min(agent.Length, 100)], UserAgent = agent, IpAddress = httpContext.Connection.RemoteIpAddress?.ToString() });
+            await db.SaveChangesAsync(cancellationToken);
+            return id;
+        }
+
+        private static async Task<IResult> ListSessions(ClaimsPrincipal principal, AppDbContext db)
+        {
+            var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId is null) return Results.Unauthorized();
+            var sessions = (await db.ApplicationSessions.AsNoTracking().Where(session => session.UserId == userId && session.RevokedAt == null).ToListAsync()).Where(session => session.ExpiresAt > DateTimeOffset.UtcNow).OrderByDescending(session => session.LastSeenAt).Select(session => new { session.Id, session.DeviceName, session.CreatedAt, session.LastSeenAt, session.ExpiresAt, session.UserAgent, session.IpAddress }).ToList();
+            return Results.Ok(new { sessions });
+        }
+
+        private static async Task<IResult> RevokeSession(Guid id, ClaimsPrincipal principal, AppDbContext db)
+        {
+            var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            var session = userId is null ? null : await db.ApplicationSessions.SingleOrDefaultAsync(item => item.Id == id && item.UserId == userId && item.RevokedAt == null);
+            if (session is null) return Results.NotFound();
+            session.RevokedAt = DateTimeOffset.UtcNow;
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        }
+
+        private static async Task<IResult> RevokeAllSessions(ClaimsPrincipal principal, UserManager<ApplicationUser> users, AppDbContext db)
+        {
+            var user = await users.GetUserAsync(principal);
+            if (user is null) return Results.Unauthorized();
+            var sessions = await db.ApplicationSessions.Where(session => session.UserId == user.Id && session.RevokedAt == null).ToListAsync();
+            foreach (var session in sessions) session.RevokedAt = DateTimeOffset.UtcNow;
+            await users.UpdateSecurityStampAsync(user);
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        }
+
+        private static async Task<IResult> ExternalLoginChallenge(string provider, string? returnUrl, IEnumerable<IExternalLoginProvider> providers, CancellationToken cancellationToken)
+        {
+            var adapter = providers.FirstOrDefault(item => string.Equals(item.Name, provider, StringComparison.OrdinalIgnoreCase));
+            if (adapter is null) return Results.NotFound(new { code = "external_provider_not_configured" });
+            var safeReturnUrl = !string.IsNullOrWhiteSpace(returnUrl) && Uri.TryCreate(returnUrl, UriKind.Relative, out _) && returnUrl.StartsWith('/') && !returnUrl.StartsWith("//", StringComparison.Ordinal) ? returnUrl : "/";
+            return Results.Redirect(await adapter.CreateChallengeUrlAsync(safeReturnUrl, cancellationToken));
+        }
+
+        private static async Task<IResult> ExternalLoginCallback(string provider, string code, string state, ClaimsPrincipal principal, IEnumerable<IExternalLoginProvider> providers, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, AppDbContext db, HttpContext httpContext, IExternalLoginStateStore stateStore, CancellationToken cancellationToken)
+        {
+            var adapter = providers.FirstOrDefault(item => string.Equals(item.Name, provider, StringComparison.OrdinalIgnoreCase));
+            if (adapter is null) return Results.NotFound(new { code = "external_provider_not_configured" });
+            if (!stateStore.TryConsume(state, out var returnUrl)) return Results.BadRequest(new { code = "invalid_external_state" });
+            var identity = await adapter.ResolveIdentityAsync(code, state, cancellationToken);
+            if (identity is null) return Results.BadRequest(new { code = "invalid_external_identity" });
+            var login = new UserLoginInfo(adapter.Name, identity.ProviderKey, adapter.DisplayName);
+            var user = principal.Identity?.IsAuthenticated == true ? await users.GetUserAsync(principal) : null;
+            if (user is not null) { await users.AddLoginAsync(user, login); return Results.Redirect(returnUrl); }
+            user = await users.FindByLoginAsync(adapter.Name, identity.ProviderKey);
+            if (user is null) { user = await users.FindByEmailAsync(identity.Email); if (user is null) { user = new ApplicationUser { UserName = identity.Email, Email = identity.Email, EmailConfirmed = true }; var created = await users.CreateAsync(user); if (!created.Succeeded) return Results.BadRequest(new { code = "external_registration_failed" }); } await users.AddLoginAsync(user, login); }
+            var sessionId = await CreateSession(user.Id, db, httpContext, cancellationToken);
+            await signInManager.SignInWithClaimsAsync(user, false, [new Claim("dotisan_session_id", sessionId.ToString())]);
+            return Results.Redirect(returnUrl);
+        }
+
+        private static async Task<IResult> UnlinkExternalLogin(string provider, ClaimsPrincipal principal, IEnumerable<IExternalLoginProvider> providers, UserManager<ApplicationUser> users)
+        {
+            var adapter = providers.FirstOrDefault(item => string.Equals(item.Name, provider, StringComparison.OrdinalIgnoreCase));
+            var user = await users.GetUserAsync(principal);
+            if (adapter is null) return Results.NotFound(new { code = "external_provider_not_configured" });
+            if (user is null) return Results.Unauthorized();
+            var linked = (await users.GetLoginsAsync(user)).FirstOrDefault(item => string.Equals(item.LoginProvider, adapter.Name, StringComparison.OrdinalIgnoreCase));
+            if (linked is null) return Results.BadRequest(new { code = "external_login_not_linked" });
+            var result = await users.RemoveLoginAsync(user, linked.LoginProvider, linked.ProviderKey);
+            return result.Succeeded ? Results.NoContent() : Results.BadRequest(new { code = "external_login_not_linked" });
         }
 
         private static async Task<IResult> Logout(SignInManager<ApplicationUser> signInManager, IAuditWriter audit, HttpContext httpContext, CancellationToken cancellationToken)
         {
-            signInManager.AuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+            signInManager.AuthenticationScheme = IdentityConstants.ApplicationScheme;
             await audit.RecordAsync(httpContext, "Security", null, "security.logout", new Dictionary<string, object?>(), cancellationToken);
             await signInManager.SignOutAsync();
             return Results.NoContent();
+        }
+
+        private static async Task<IResult> RequestPasswordReset(PasswordResetRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, CancellationToken cancellationToken)
+        {
+            var user = await users.FindByEmailAsync(request.Email);
+            if (user is not null)
+            {
+                var token = await users.GeneratePasswordResetTokenAsync(user);
+                await emailProvider.SendAsync(user.Email!, "Reset your password", $"Use this password reset token: {token}", cancellationToken);
+            }
+            return Results.Accepted();
+        }
+
+        private static async Task<IResult> ConfirmEmail(EmailConfirmationRequest request, UserManager<ApplicationUser> users, CancellationToken cancellationToken)
+        {
+            var user = await users.FindByEmailAsync(request.Email);
+            if (user is null) return Results.BadRequest(new { code = "invalid_confirmation" });
+            var result = await users.ConfirmEmailAsync(user, request.Token);
+            return result.Succeeded ? Results.NoContent() : Results.BadRequest(new { code = "invalid_confirmation" });
+        }
+
+        private static async Task<IResult> ResendConfirmation(EmailConfirmationResendRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, CancellationToken cancellationToken)
+        {
+            var user = await users.FindByEmailAsync(request.Email);
+            if (user is not null && !await users.IsEmailConfirmedAsync(user))
+            {
+                var token = await users.GenerateEmailConfirmationTokenAsync(user);
+                await emailProvider.SendAsync(user.Email!, "Confirm your email", $"Use this email confirmation token: {token}", cancellationToken);
+            }
+            return Results.Accepted();
+        }
+
+        private static async Task<IResult> ConfirmPasswordReset(PasswordResetConfirmRequest request, UserManager<ApplicationUser> users, CancellationToken cancellationToken)
+        {
+            var user = await users.FindByEmailAsync(request.Email);
+            if (user is null) return Results.BadRequest(new { code = "invalid_reset" });
+            var result = await users.ResetPasswordAsync(user, request.Token, request.NewPassword);
+            return result.Succeeded ? Results.NoContent() : Results.BadRequest(new { code = "invalid_reset" });
+        }
+
+        private static async Task<IResult> SetupMfa(ClaimsPrincipal principal, UserManager<ApplicationUser> users)
+        {
+            var user = await users.GetUserAsync(principal);
+            if (user is null) return Results.Unauthorized();
+            var key = await users.GetAuthenticatorKeyAsync(user);
+            if (string.IsNullOrWhiteSpace(key)) { await users.ResetAuthenticatorKeyAsync(user); key = await users.GetAuthenticatorKeyAsync(user); }
+            return Results.Ok(new { sharedKey = key, authenticatorUri = $"otpauth://totp/Dotisan:{Uri.EscapeDataString(user.Email!)}?secret={key}&issuer=Dotisan" });
+        }
+
+        private static async Task<IResult> VerifyMfa(MfaCodeRequest request, ClaimsPrincipal principal, UserManager<ApplicationUser> users)
+        {
+            var user = await users.GetUserAsync(principal);
+            if (user is null) return Results.Unauthorized();
+            if (!await users.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultAuthenticatorProvider, request.Code)) return Results.BadRequest(new { code = "invalid_mfa_code" });
+            await users.SetTwoFactorEnabledAsync(user, true);
+            return Results.NoContent();
+        }
+
+        private static async Task<IResult> DisableMfa(ClaimsPrincipal principal, UserManager<ApplicationUser> users)
+        {
+            var user = await users.GetUserAsync(principal);
+            if (user is null) return Results.Unauthorized();
+            await users.SetTwoFactorEnabledAsync(user, false);
+            return Results.NoContent();
+        }
+
+        private static async Task<IResult> RegenerateRecoveryCodes(ClaimsPrincipal principal, UserManager<ApplicationUser> users)
+        {
+            var user = await users.GetUserAsync(principal);
+            if (user is null) return Results.Unauthorized();
+            if (!await users.GetTwoFactorEnabledAsync(user)) return Results.BadRequest(new { code = "mfa_not_enabled" });
+            return Results.Ok(new { recoveryCodes = await users.GenerateNewTwoFactorRecoveryCodesAsync(user, 10) });
+        }
+
+        private static async Task<IResult> ChallengeMfa(MfaCodeRequest request, SignInManager<ApplicationUser> signInManager, AppDbContext db, HttpContext httpContext, CancellationToken cancellationToken)
+        {
+            var result = await signInManager.TwoFactorAuthenticatorSignInAsync(request.Code, false, false);
+            if (!result.Succeeded)
+                result = await signInManager.TwoFactorRecoveryCodeSignInAsync(request.Code);
+            if (result.Succeeded)
+            {
+                var user = await signInManager.GetTwoFactorAuthenticationUserAsync();
+                if (user is not null)
+                {
+                    var sessionId = await CreateSession(user.Id, db, httpContext, cancellationToken);
+                    await signInManager.SignInWithClaimsAsync(user, false, [new Claim("dotisan_session_id", sessionId.ToString())]);
+                }
+            }
+            return result.Succeeded ? Results.NoContent() : Results.Unauthorized();
         }
 
         private static IResult Me(ClaimsPrincipal user)
@@ -1024,6 +1570,12 @@ internal static class TemplateFiles
 
         public sealed record RegisterRequest(string Email, string Password);
         public sealed record LoginRequest(string Email, string Password, bool RememberMe);
+        public sealed record LoginResponse(string Code);
+        public sealed record PasswordResetRequest(string Email);
+        public sealed record PasswordResetConfirmRequest(string Email, string Token, string NewPassword);
+        public sealed record EmailConfirmationRequest(string Email, string Token);
+        public sealed record EmailConfirmationResendRequest(string Email);
+        public sealed record MfaCodeRequest(string Code);
         public sealed record CurrentUserResponse(string Id, string Email);
     }
     """;
@@ -1031,6 +1583,7 @@ internal static class TemplateFiles
     private static string EndpointExtensions(string identifier, bool authenticationEnabled, bool registrationEnabled) => $$"""
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Routing;
+    using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Features.Health;
     using {{identifier}}.Api.Features.Jobs;
     {{(authenticationEnabled ? $"using {identifier}.Api.Features.Account;\n    using {identifier}.Api.Features.Authorization;" : string.Empty)}}
@@ -1093,10 +1646,12 @@ internal static class TemplateFiles
     using System.Security.Claims;
     using System.Net;
     using System.Net.Http.Json;
+    using System.Text.Json;
     using {{identifier}}.Api.Authorization;
     using {{identifier}}.Api.Auditing;
     using {{identifier}}.Api.Data;
     using {{identifier}}.Api.Identity;
+    using {{identifier}}.Api.Integrations;
     using Microsoft.AspNetCore.DataProtection;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.AspNetCore.Mvc.Testing;
@@ -1104,6 +1659,7 @@ internal static class TemplateFiles
     using Microsoft.EntityFrameworkCore;
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.DependencyInjection.Extensions;
+    using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.Logging;
     using Microsoft.AspNetCore.Identity;
 
@@ -1154,6 +1710,19 @@ internal static class TemplateFiles
         }
 
         [Fact]
+        public async Task Newly_registered_unconfirmed_users_cannot_access_protected_resources()
+        {
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+            var antiforgery = await GetAntiforgeryToken(client);
+            using var register = new HttpRequestMessage(HttpMethod.Post, "/api/account/register");
+            register.Headers.Add("X-XSRF-TOKEN", antiforgery);
+            register.Content = JsonContent.Create(new { email = $"unconfirmed-{Guid.NewGuid():N}@example.com", password = "Password1!" });
+
+            Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(register)).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/account/me")).StatusCode);
+        }
+
+        [Fact]
         public async Task Successful_login_writes_actor_trace_and_correlation()
         {
             var email = $"audit-login-{Guid.NewGuid():N}@example.com";
@@ -1201,6 +1770,155 @@ internal static class TemplateFiles
 
             Assert.Equal(HttpStatusCode.Unauthorized, (await client.SendAsync(login)).StatusCode);
             Assert.Empty(await disabledFactory.ReadAuditEntriesAsync());
+        }
+
+        [Fact]
+        public async Task Mfa_setup_requires_authentication_and_invalid_codes_are_rejected()
+        {
+            using var anonymous = factory.CreateClient();
+            Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync("/api/account/mfa/setup")).StatusCode);
+            using var client = await SignInAsync($"mfa-{Guid.NewGuid():N}@example.com");
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/account/mfa/setup")).StatusCode);
+            var antiforgery = await GetAntiforgeryToken(client);
+            using var verify = new HttpRequestMessage(HttpMethod.Post, "/api/account/mfa/verify");
+            verify.Headers.Add("X-XSRF-TOKEN", antiforgery);
+            verify.Content = JsonContent.Create(new { code = "000000" });
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.SendAsync(verify)).StatusCode);
+        }
+
+        [Fact]
+        public async Task Recovery_code_completes_the_mfa_challenge_once()
+        {
+            var email = $"recovery-{Guid.NewGuid():N}@example.com";
+            var recoveryCode = await factory.SeedMfaUserAsync(email);
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+            var antiforgery = await GetAntiforgeryToken(client);
+            using var login = new HttpRequestMessage(HttpMethod.Post, "/api/account/login");
+            login.Headers.Add("X-XSRF-TOKEN", antiforgery);
+            login.Content = JsonContent.Create(new { email, password = "Password1!", rememberMe = false });
+            var loginResponse = await client.SendAsync(login);
+            Assert.Equal(HttpStatusCode.OK, loginResponse.StatusCode);
+            Assert.Contains("mfa_required", await loginResponse.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+
+            antiforgery = await GetAntiforgeryToken(client);
+            using var challenge = new HttpRequestMessage(HttpMethod.Post, "/api/account/mfa/challenge");
+            challenge.Headers.Add("X-XSRF-TOKEN", antiforgery);
+            challenge.Content = JsonContent.Create(new { code = recoveryCode });
+            Assert.Equal(HttpStatusCode.NoContent, (await client.SendAsync(challenge)).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/account/me")).StatusCode);
+        }
+
+        [Fact]
+        public async Task Session_can_be_listed_and_revoked()
+        {
+            using var client = await SignInAsync($"session-{Guid.NewGuid():N}@example.com");
+            var sessionsResponse = await client.GetAsync("/api/account/sessions");
+            Assert.True(sessionsResponse.IsSuccessStatusCode, await sessionsResponse.Content.ReadAsStringAsync());
+            var payload = JsonSerializer.Deserialize<JsonElement>(await sessionsResponse.Content.ReadAsStringAsync());
+            var sessionId = payload.GetProperty("sessions")[0].GetProperty("id").GetGuid();
+            var antiforgery = await GetAntiforgeryToken(client);
+            using var revoke = new HttpRequestMessage(HttpMethod.Delete, $"/api/account/sessions/{sessionId}");
+            revoke.Headers.Add("X-XSRF-TOKEN", antiforgery);
+            Assert.Equal(HttpStatusCode.NoContent, (await client.SendAsync(revoke)).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/account/me")).StatusCode);
+        }
+
+        [Fact]
+        public async Task Email_confirmation_rejects_invalid_tokens_without_revealing_details()
+        {
+            using var client = factory.CreateClient();
+            var antiforgery = await GetAntiforgeryToken(client);
+            using var confirmation = new HttpRequestMessage(HttpMethod.Post, "/api/account/email-confirmation/confirm");
+            confirmation.Headers.Add("X-XSRF-TOKEN", antiforgery);
+            confirmation.Content = JsonContent.Create(new { email = "missing@example.com", token = "invalid" });
+            var response = await client.SendAsync(confirmation);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Contains("invalid_confirmation", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public async Task External_provider_listing_is_safe_when_no_adapter_is_registered()
+        {
+            using var client = factory.CreateClient();
+            var providers = await client.GetFromJsonAsync<JsonElement>("/api/account/external/providers");
+            Assert.Empty(providers.GetProperty("providers").EnumerateArray());
+            Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/account/external/google/challenge")).StatusCode);
+        }
+
+        [Fact]
+        public void External_login_state_is_protected_and_single_use()
+        {
+            var stateStore = factory.Services.GetRequiredService<IExternalLoginStateStore>();
+            var state = stateStore.Create("/security/external-logins");
+
+            Assert.DoesNotContain("/security/external-logins", state, StringComparison.Ordinal);
+            Assert.True(stateStore.TryConsume(state, out var returnUrl));
+            Assert.Equal("/security/external-logins", returnUrl);
+            Assert.False(stateStore.TryConsume(state, out _));
+            Assert.False(stateStore.TryConsume("invalid-state", out _));
+        }
+
+        [Fact]
+        public async Task Fake_external_provider_completes_login_and_rejects_replayed_state()
+        {
+            using var client = factory.WithWebHostBuilder(builder => builder.ConfigureServices(services => services.AddSingleton<IExternalLoginProvider, FakeExternalLoginProvider>()))
+                .CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true, AllowAutoRedirect = false });
+            var challenge = await client.GetAsync("/api/account/external/fake/challenge?returnUrl=%2Fsecurity%2Fexternal-logins");
+            Assert.Equal(HttpStatusCode.Redirect, challenge.StatusCode);
+            var callbackUrl = challenge.Headers.Location?.ToString() ?? throw new InvalidOperationException("Fake provider did not return a callback URL.");
+
+            var callback = await client.GetAsync(callbackUrl);
+            Assert.Equal(HttpStatusCode.Redirect, callback.StatusCode);
+            Assert.Equal("/security/external-logins", callback.Headers.Location?.ToString());
+            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/account/me")).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync(callbackUrl)).StatusCode);
+        }
+
+        private sealed class FakeExternalLoginProvider(IExternalLoginStateStore stateStore) : IExternalLoginProvider
+        {
+            public string Name => "fake";
+            public string DisplayName => "Fake provider";
+            public Task<string> CreateChallengeUrlAsync(string returnUrl, CancellationToken cancellationToken = default)
+                => Task.FromResult($"/api/account/external/fake/callback?code=fake-code&state={Uri.EscapeDataString(stateStore.Create(returnUrl))}");
+            public Task<ExternalLoginIdentity?> ResolveIdentityAsync(string callbackCode, string state, CancellationToken cancellationToken = default)
+                => Task.FromResult<ExternalLoginIdentity?>(callbackCode == "fake-code" ? new ExternalLoginIdentity("fake-user", "fake-user@example.com", "Fake User") : null);
+        }
+
+        [Fact]
+        public async Task Vendor_mail_adapters_send_requests_without_logging_secrets()
+        {
+            var handler = new RecordingHandler();
+            var clients = new RecordingHttpClientFactory(handler);
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Mail:SendGrid:ApiKey"] = "sendgrid-secret",
+                ["Mail:SendGrid:From"] = "no-reply@example.com",
+                ["Mail:Mailgun:ApiKey"] = "mailgun-secret",
+                ["Mail:Mailgun:Domain"] = "example.test",
+                ["Mail:Mailgun:From"] = "no-reply@example.com"
+            }).Build();
+
+            await new SendGridEmailProvider(clients, configuration).SendAsync("person@example.com", "Subject", "Body");
+            Assert.Equal("https://api.sendgrid.com/v3/mail/send", handler.LastRequest!.RequestUri!.ToString());
+            Assert.Equal("Bearer sendgrid-secret", handler.LastRequest.Headers.Authorization!.ToString());
+            await new MailgunEmailProvider(clients, configuration).SendAsync("person@example.com", "Subject", "Body");
+            Assert.Equal("https://api.mailgun.net/v3/example.test/messages", handler.LastRequest.RequestUri!.ToString());
+            Assert.StartsWith("Basic ", handler.LastRequest.Headers.Authorization!.ToString(), StringComparison.Ordinal);
+        }
+
+        private sealed class RecordingHttpClientFactory(RecordingHandler handler) : IHttpClientFactory
+        {
+            public HttpClient CreateClient(string name) => new(handler, disposeHandler: false);
+        }
+
+        private sealed class RecordingHandler : HttpMessageHandler
+        {
+            public HttpRequestMessage? LastRequest { get; private set; }
+            protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+            {
+                LastRequest = request;
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Accepted));
+            }
         }
 
         {{(registrationPolicy == RegistrationPolicy.Public ? PublicAuthenticationTests() : RestrictedRegistrationTest())}}
@@ -1265,7 +1983,7 @@ internal static class TemplateFiles
             using var scope = Services.CreateScope();
             var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
             var roles = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-            var user = new ApplicationUser { UserName = email, Email = email };
+            var user = new ApplicationUser { UserName = email, Email = email, EmailConfirmed = true };
             var result = await users.CreateAsync(user, "Password1!");
             if (!result.Succeeded)
             {
@@ -1297,6 +2015,17 @@ internal static class TemplateFiles
             }
         }
 
+        public async Task<string> SeedMfaUserAsync(string email)
+        {
+            using var scope = Services.CreateScope();
+            var users = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+            var user = new ApplicationUser { UserName = email, Email = email, EmailConfirmed = true };
+            var result = await users.CreateAsync(user, "Password1!");
+            if (!result.Succeeded) throw new InvalidOperationException(string.Join("; ", result.Errors.Select(error => error.Description)));
+            await users.SetTwoFactorEnabledAsync(user, true);
+            return (await users.GenerateNewTwoFactorRecoveryCodesAsync(user, 1))?.Single() ?? throw new InvalidOperationException("Recovery code generation failed.");
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)
@@ -1308,7 +2037,7 @@ internal static class TemplateFiles
 
     private static string PublicAuthenticationTests() => """
         [Fact]
-        public async Task Public_registration_logs_the_user_in_and_me_returns_the_account()
+        public async Task Public_registration_requires_email_confirmation_before_protected_access()
         {
             using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
             var antiforgery = await GetAntiforgeryToken(client);
@@ -1318,20 +2047,15 @@ internal static class TemplateFiles
 
             var registration = await client.SendAsync(register);
             Assert.Equal(HttpStatusCode.OK, registration.StatusCode);
-            Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/account/me")).StatusCode);
+            Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/account/me")).StatusCode);
         }
 
         [Fact]
         public async Task Logout_clears_the_authentication_cookie()
         {
-            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
-            var antiforgery = await GetAntiforgeryToken(client);
-            using var register = new HttpRequestMessage(HttpMethod.Post, "/api/account/register");
-            register.Headers.Add("X-XSRF-TOKEN", antiforgery);
-            register.Content = JsonContent.Create(new { email = "logout@example.com", password = "Password1!" });
-            Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(register)).StatusCode);
+            using var client = await SignInAsync("logout@example.com");
 
-            antiforgery = await GetAntiforgeryToken(client);
+            var antiforgery = await GetAntiforgeryToken(client);
             using var logout = new HttpRequestMessage(HttpMethod.Post, "/api/account/logout");
             logout.Headers.Add("X-XSRF-TOKEN", antiforgery);
             Assert.Equal(HttpStatusCode.NoContent, (await client.SendAsync(logout)).StatusCode);
@@ -1393,16 +2117,45 @@ internal static class TemplateFiles
             1,
             [
                 new("account.antiforgery", "Account", "IssueAntiforgery", "GET", "/api/account/antiforgery", "System.Void", "AntiforgeryResponse", false, null, null, ["Account"], false, false),
-                new("account.login", "Account", "Login", "POST", "/api/account/login", "LoginRequest", "System.Void", false, null, null, ["Account"], true, false),
+                new("account.login", "Account", "Login", "POST", "/api/account/login", "LoginRequest", "LoginResponse", false, null, null, ["Account"], true, false),
                 new("account.logout", "Account", "Logout", "POST", "/api/account/logout", "System.Void", "System.Void", true, "authenticated", null, ["Account"], false, false),
                 new("account.me", "Account", "Me", "GET", "/api/account/me", "System.Void", "CurrentUserResponse", true, "authenticated", null, ["Account"], false, false),
-                new("account.register", "Account", "Register", "POST", "/api/account/register", "RegisterRequest", "System.Void", false, null, null, ["Account"], true, false)
+                new("account.register", "Account", "Register", "POST", "/api/account/register", "RegisterRequest", "System.Void", false, null, null, ["Account"], true, false),
+                new("account.passwordResetRequest", "Account", "RequestPasswordReset", "POST", "/api/account/password-reset/request", "PasswordResetRequest", "System.Void", false, null, null, ["Account"], true, false),
+                new("account.passwordResetConfirm", "Account", "ConfirmPasswordReset", "POST", "/api/account/password-reset/confirm", "PasswordResetConfirmRequest", "System.Void", false, null, null, ["Account"], true, false),
+                new("account.emailConfirmationConfirm", "Account", "ConfirmEmail", "POST", "/api/account/email-confirmation/confirm", "EmailConfirmationRequest", "System.Void", false, null, null, ["Account"], true, false),
+                new("account.emailConfirmationResend", "Account", "ResendConfirmation", "POST", "/api/account/email-confirmation/resend", "EmailConfirmationResendRequest", "System.Void", false, null, null, ["Account"], true, false),
+                new("account.mfaSetup", "Account", "GetMfaSetup", "GET", "/api/account/mfa/setup", "System.Void", "MfaSetupResponse", true, "authenticated", null, ["Account"], false, false),
+                new("account.mfaVerify", "Account", "VerifyMfa", "POST", "/api/account/mfa/verify", "MfaCodeRequest", "System.Void", true, "authenticated", null, ["Account"], true, false),
+                new("account.mfaDisable", "Account", "DisableMfa", "POST", "/api/account/mfa/disable", "System.Void", "System.Void", true, "authenticated", null, ["Account"], false, false),
+                new("account.mfaRecoveryCodes", "Account", "RegenerateRecoveryCodes", "POST", "/api/account/mfa/recovery-codes/regenerate", "System.Void", "RecoveryCodesResponse", true, "authenticated", null, ["Account"], false, false),
+                new("account.mfaChallenge", "Account", "ChallengeMfa", "POST", "/api/account/mfa/challenge", "MfaCodeRequest", "System.Void", false, null, null, ["Account"], true, false),
+                new("account.sessions", "Account", "ListSessions", "GET", "/api/account/sessions", "System.Void", "SessionsResponse", true, "authenticated", null, ["Account"], false, false),
+                new("account.revokeSession", "Account", "RevokeSession", "DELETE", "/api/account/sessions/{id}", "System.Void", "System.Void", true, "authenticated", null, ["Account"], true, false),
+                new("account.revokeAllSessions", "Account", "RevokeAllSessions", "POST", "/api/account/sessions/revoke-all", "System.Void", "System.Void", true, "authenticated", null, ["Account"], true, false)
+                ,new("account.externalProviders", "Account", "ListExternalProviders", "GET", "/api/account/external/providers", "System.Void", "ExternalProvidersResponse", false, null, null, ["Account"], false, false)
+                ,new("account.externalChallenge", "Account", "ExternalLoginChallenge", "GET", "/api/account/external/{provider}/challenge", "System.Void", "System.Void", false, null, null, ["Account"], false, false)
+                ,new("account.externalCallback", "Account", "ExternalLoginCallback", "GET", "/api/account/external/{provider}/callback", "System.Void", "System.Void", false, null, null, ["Account"], false, false)
+                ,new("account.externalLink", "Account", "LinkExternalProvider", "POST", "/api/account/external/{provider}/link", "System.Void", "System.Void", true, "authenticated", null, ["Account"], true, false)
+                ,new("account.externalUnlink", "Account", "UnlinkExternalProvider", "DELETE", "/api/account/external/{provider}/link", "System.Void", "System.Void", true, "authenticated", null, ["Account"], true, false)
             ],
             [
                 new("AntiforgeryResponse", "AntiforgeryResponse", [new ContractProperty("token", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], []),
                 new("CurrentUserResponse", "CurrentUserResponse", [new ContractProperty("id", new ContractTypeDescriptor(ContractTypeKind.String), false, false), new ContractProperty("email", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], []),
                 new("LoginRequest", "LoginRequest", [new ContractProperty("email", new ContractTypeDescriptor(ContractTypeKind.String), false, false), new ContractProperty("password", new ContractTypeDescriptor(ContractTypeKind.String), false, false), new ContractProperty("rememberMe", new ContractTypeDescriptor(ContractTypeKind.Boolean), false, false)], []),
+                new("LoginResponse", "LoginResponse", [new ContractProperty("code", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], []),
                 new("RegisterRequest", "RegisterRequest", [new ContractProperty("email", new ContractTypeDescriptor(ContractTypeKind.String), false, false), new ContractProperty("password", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], [])
+                ,new("PasswordResetRequest", "PasswordResetRequest", [new ContractProperty("email", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], [])
+                ,new("PasswordResetConfirmRequest", "PasswordResetConfirmRequest", [new ContractProperty("email", new ContractTypeDescriptor(ContractTypeKind.String), false, false), new ContractProperty("token", new ContractTypeDescriptor(ContractTypeKind.String), false, false), new ContractProperty("newPassword", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], [])
+                ,new("EmailConfirmationRequest", "EmailConfirmationRequest", [new ContractProperty("email", new ContractTypeDescriptor(ContractTypeKind.String), false, false), new ContractProperty("token", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], [])
+                ,new("EmailConfirmationResendRequest", "EmailConfirmationResendRequest", [new ContractProperty("email", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], [])
+                ,new("MfaCodeRequest", "MfaCodeRequest", [new ContractProperty("code", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], [])
+                ,new("MfaSetupResponse", "MfaSetupResponse", [new ContractProperty("sharedKey", new ContractTypeDescriptor(ContractTypeKind.String), false, false), new ContractProperty("authenticatorUri", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], [])
+                ,new("RecoveryCodesResponse", "RecoveryCodesResponse", [new ContractProperty("recoveryCodes", new ContractTypeDescriptor(ContractTypeKind.Array, null, new ContractTypeDescriptor(ContractTypeKind.String)), false, false)], [])
+                ,new("SessionInfo", "SessionInfo", [new ContractProperty("id", new ContractTypeDescriptor(ContractTypeKind.Guid), false, false), new ContractProperty("deviceName", new ContractTypeDescriptor(ContractTypeKind.String), false, false), new ContractProperty("createdAt", new ContractTypeDescriptor(ContractTypeKind.DateTime), false, false), new ContractProperty("lastSeenAt", new ContractTypeDescriptor(ContractTypeKind.DateTime), false, false), new ContractProperty("expiresAt", new ContractTypeDescriptor(ContractTypeKind.DateTime), false, false), new ContractProperty("userAgent", new ContractTypeDescriptor(ContractTypeKind.String), true, false), new ContractProperty("ipAddress", new ContractTypeDescriptor(ContractTypeKind.String), true, false)], [])
+                ,new("SessionsResponse", "SessionsResponse", [new ContractProperty("sessions", new ContractTypeDescriptor(ContractTypeKind.Array, null, new ContractTypeDescriptor(ContractTypeKind.Object, "SessionInfo")), false, false)], [])
+                ,new("ExternalLoginProviderDescriptor", "ExternalLoginProviderDescriptor", [new ContractProperty("name", new ContractTypeDescriptor(ContractTypeKind.String), false, false), new ContractProperty("displayName", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], [])
+                ,new("ExternalProvidersResponse", "ExternalProvidersResponse", [new ContractProperty("providers", new ContractTypeDescriptor(ContractTypeKind.Array, null, new ContractTypeDescriptor(ContractTypeKind.Object, "ExternalLoginProviderDescriptor")), false, false)], [])
             ],
             [
                 EndpointContractMetadata.Create("GET", "/api/account/antiforgery", null, [], ["Account"], false),
@@ -1410,6 +2163,23 @@ internal static class TemplateFiles
                 EndpointContractMetadata.Create("POST", "/api/account/logout", null, [], ["Account"], false),
                 EndpointContractMetadata.Create("GET", "/api/account/me", null, [], ["Account"], false),
                 EndpointContractMetadata.Create("POST", "/api/account/register", new EndpointRequestBodyMetadata(new ContractTypeDescriptor(ContractTypeKind.Object, "RegisterRequest")), [], ["Account"], true)
+                ,EndpointContractMetadata.Create("POST", "/api/account/password-reset/request", new EndpointRequestBodyMetadata(new ContractTypeDescriptor(ContractTypeKind.Object, "PasswordResetRequest")), [], ["Account"], true)
+                ,EndpointContractMetadata.Create("POST", "/api/account/password-reset/confirm", new EndpointRequestBodyMetadata(new ContractTypeDescriptor(ContractTypeKind.Object, "PasswordResetConfirmRequest")), [], ["Account"], true)
+                ,EndpointContractMetadata.Create("POST", "/api/account/email-confirmation/confirm", new EndpointRequestBodyMetadata(new ContractTypeDescriptor(ContractTypeKind.Object, "EmailConfirmationRequest")), [], ["Account"], true)
+                ,EndpointContractMetadata.Create("POST", "/api/account/email-confirmation/resend", new EndpointRequestBodyMetadata(new ContractTypeDescriptor(ContractTypeKind.Object, "EmailConfirmationResendRequest")), [], ["Account"], true)
+                ,EndpointContractMetadata.Create("GET", "/api/account/mfa/setup", null, [], ["Account"], false)
+                ,EndpointContractMetadata.Create("POST", "/api/account/mfa/verify", new EndpointRequestBodyMetadata(new ContractTypeDescriptor(ContractTypeKind.Object, "MfaCodeRequest")), [], ["Account"], true)
+                ,EndpointContractMetadata.Create("POST", "/api/account/mfa/disable", null, [], ["Account"], false)
+                ,EndpointContractMetadata.Create("POST", "/api/account/mfa/recovery-codes/regenerate", null, [], ["Account"], false)
+                ,EndpointContractMetadata.Create("POST", "/api/account/mfa/challenge", new EndpointRequestBodyMetadata(new ContractTypeDescriptor(ContractTypeKind.Object, "MfaCodeRequest")), [], ["Account"], true)
+                ,EndpointContractMetadata.Create("GET", "/api/account/sessions", null, [], ["Account"], false)
+                ,EndpointContractMetadata.Create("DELETE", "/api/account/sessions/{id}", null, [new EndpointParameterMetadata("id", new ContractTypeDescriptor(ContractTypeKind.Guid), false, false)], ["Account"], true)
+                ,EndpointContractMetadata.Create("POST", "/api/account/sessions/revoke-all", null, [], ["Account"], true)
+                ,EndpointContractMetadata.Create("GET", "/api/account/external/providers", null, [], ["Account"], false)
+                ,EndpointContractMetadata.Create("GET", "/api/account/external/{provider}/challenge", null, [new EndpointParameterMetadata("provider", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], ["Account"], false)
+                ,EndpointContractMetadata.Create("GET", "/api/account/external/{provider}/callback", null, [new EndpointParameterMetadata("provider", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], ["Account"], false)
+                ,EndpointContractMetadata.Create("POST", "/api/account/external/{provider}/link", null, [new EndpointParameterMetadata("provider", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], ["Account"], true)
+                ,EndpointContractMetadata.Create("DELETE", "/api/account/external/{provider}/link", null, [new EndpointParameterMetadata("provider", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], ["Account"], true)
             ])
         : new ContractManifest(1, [], []);
 
@@ -1437,16 +2207,22 @@ internal static class TemplateFiles
     import LoginPage from '../pages/auth/LoginPage.vue';
     import RegisterPage from '../pages/auth/RegisterPage.vue';
     import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage.vue';
+    import EmailConfirmationPage from '../pages/auth/EmailConfirmationPage.vue';
+    import MfaChallengePage from '../pages/auth/MfaChallengePage.vue';
     import ProfilePage from '../pages/account/ProfilePage.vue';
+    import MfaPage from '../pages/account/MfaPage.vue';
+    import SessionsPage from '../pages/account/SessionsPage.vue';
+    import ExternalLoginsPage from '../pages/account/ExternalLoginsPage.vue';
+    import AuthorizationPage from '../pages/admin/AuthorizationPage.vue';
 
     const routes: RouteRecordRaw[] = [
-      { path: '/', component: PortalLayout, meta: { requiresAuth: true }, children: [{ path: '', component: DashboardPage }, { path: 'profile', component: ProfilePage }] },
-      { path: '/auth', component: AuthLayout, children: [{ path: 'login', name: 'login', component: LoginPage }, { path: 'register', name: 'register', component: RegisterPage }, { path: 'forgot-password', component: ForgotPasswordPage }] }
+      { path: '/', component: PortalLayout, meta: { requiresAuth: true }, children: [{ path: '', component: DashboardPage }, { path: 'profile', component: ProfilePage }, { path: 'security/mfa', component: MfaPage }, { path: 'security/sessions', component: SessionsPage }, { path: 'security/external-logins', component: ExternalLoginsPage }, { path: 'admin/authorization', component: AuthorizationPage, meta: { requiresPermission: 'authorization.manage' } }] },
+      { path: '/auth', component: AuthLayout, children: [{ path: 'login', name: 'login', component: LoginPage }, { path: 'register', name: 'register', component: RegisterPage }, { path: 'forgot-password', component: ForgotPasswordPage }, { path: 'confirm-email', component: EmailConfirmationPage }, { path: 'mfa-challenge', component: MfaChallengePage }] }
     ];
     // DOTISAN:ROUTES
     const router = createRouter({ history: createWebHistory(), routes });
     router.beforeEach(async (to) => {
-      if (!to.meta.requiresAuth) return true;
+      if (!to.meta.requiresAuth && !to.meta.requiresPermission) return true;
       try { await me(); return true; } catch { return { name: 'login', query: { redirect: to.fullPath } }; }
     });
     export default router;
@@ -1654,7 +2430,7 @@ internal static class TemplateFiles
     defineProps<{ open?: boolean }>();
     const links = [
       { label: 'Dashboard', to: '/' },
-      {{(authenticationEnabled ? "{ label: 'Profile', to: '/profile' }," : string.Empty)}}
+      {{(authenticationEnabled ? "{ label: 'Profile', to: '/profile' }, { label: 'MFA security', to: '/security/mfa' }, { label: 'Sessions', to: '/security/sessions' }, { label: 'External logins', to: '/security/external-logins' }, { label: 'Authorization', to: '/admin/authorization' }," : string.Empty)}}
     ];
     </script>
     <template>
@@ -1711,18 +2487,27 @@ internal static class TemplateFiles
     <script setup lang="ts">
     import { ref } from 'vue'; import { useRoute, useRouter } from 'vue-router'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue'; import { issueAntiforgery, login } from '../../dotisan/services';
     const router = useRouter(); const route = useRoute(); const email = ref(''); const password = ref(''); const rememberMe = ref(false); const error = ref(''); const pending = ref(false);
-    async function submit() { pending.value = true; error.value = ''; try { const token = await issueAntiforgery(); await login({ email: email.value, password: password.value, rememberMe: rememberMe.value }, { headers: { 'X-XSRF-TOKEN': token.token } }); await router.push(String(route.query.redirect ?? '/')); } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Unable to sign in.'; } finally { pending.value = false; } }
+    async function submit() { pending.value = true; error.value = ''; try { const token = await issueAntiforgery(); const result = await login({ email: email.value, password: password.value, rememberMe: rememberMe.value }, { headers: { 'X-XSRF-TOKEN': token.token } }); if (result.code === 'mfa_required') { await router.push({ path: '/auth/mfa-challenge', query: { redirect: String(route.query.redirect ?? '/') } }); return; } await router.push(String(route.query.redirect ?? '/')); } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Unable to sign in.'; } finally { pending.value = false; } }
     </script>
     <template>
     <UiCard><div class="auth-card-heading"><p class="eyebrow">Welcome back</p><h1>Sign in</h1><p class="muted">Continue to your workspace.</p></div><form class="form-stack" @submit.prevent="submit"><p v-if="error" class="form-error" role="alert" v-text="error"></p><label>Email<UiInput v-model="email" type="email" autocomplete="email" required /></label><label>Password<UiInput v-model="password" type="password" autocomplete="current-password" required /></label><label class="checkbox"><input v-model="rememberMe" type="checkbox" /> Remember me</label><UiButton type="submit" :disabled="pending"><span v-text="pending ? 'Signing in...' : 'Sign in'"></span></UiButton></form><p class="form-links"><RouterLink to="/auth/register">Create an account</RouterLink><RouterLink to="/auth/forgot-password">Forgot password?</RouterLink></p></UiCard>
     </template>
     """;
 
+    private static string MfaChallengePage() => """
+    <script setup lang="ts">
+    import { ref } from 'vue'; import { useRoute, useRouter } from 'vue-router'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue'; import { issueAntiforgery, challengeMfa } from '../../dotisan/services';
+    const router = useRouter(); const route = useRoute(); const code = ref(''); const error = ref(''); const pending = ref(false);
+    async function submit() { pending.value = true; error.value = ''; try { const token = await issueAntiforgery(); await challengeMfa({ code: code.value }, { headers: { 'X-XSRF-TOKEN': token.token } }); await router.push(String(route.query.redirect ?? '/')); } catch (exception) { error.value = exception instanceof Error ? exception.message : 'That MFA code is invalid.'; } finally { pending.value = false; } }
+    </script>
+    <template><UiCard><div class="auth-card-heading"><p class="eyebrow">Account security</p><h1>Verify your identity</h1><p class="muted">Enter the six-digit code from your authenticator app.</p></div><form class="form-stack" @submit.prevent="submit"><p v-if="error" class="form-error" role="alert" v-text="error"></p><label>Authenticator code<UiInput v-model="code" inputmode="numeric" autocomplete="one-time-code" required /></label><UiButton type="submit" :disabled="pending"><span v-text="pending ? 'Verifying...' : 'Verify code'"></span></UiButton></form><p class="form-links"><RouterLink to="/auth/login">Return to sign in</RouterLink></p></UiCard></template>
+    """;
+
     private static string RegisterPage() => """
     <script setup lang="ts">
     import { ref } from 'vue'; import { useRouter } from 'vue-router'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue'; import { issueAntiforgery, register } from '../../dotisan/services';
     const router = useRouter(); const email = ref(''); const password = ref(''); const error = ref(''); const pending = ref(false);
-    async function submit() { pending.value = true; error.value = ''; try { const token = await issueAntiforgery(); await register({ email: email.value, password: password.value }, { headers: { 'X-XSRF-TOKEN': token.token } }); await router.push('/'); } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Unable to create your account.'; } finally { pending.value = false; } }
+    async function submit() { pending.value = true; error.value = ''; try { const token = await issueAntiforgery(); await register({ email: email.value, password: password.value }, { headers: { 'X-XSRF-TOKEN': token.token } }); await router.push({ path: '/auth/confirm-email', query: { email: email.value } }); } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Unable to create your account.'; } finally { pending.value = false; } }
     </script>
     <template>
     <UiCard><div class="auth-card-heading"><p class="eyebrow">Get started</p><h1>Create account</h1><p class="muted">Set up your workspace access.</p></div><form class="form-stack" @submit.prevent="submit"><p v-if="error" class="form-error" role="alert" v-text="error"></p><label>Email<UiInput v-model="email" type="email" autocomplete="email" required /></label><label>Password<UiInput v-model="password" type="password" autocomplete="new-password" required /></label><UiButton type="submit" :disabled="pending"><span v-text="pending ? 'Creating...' : 'Create account'"></span></UiButton></form><p class="form-links"><RouterLink to="/auth/login">Already have an account?</RouterLink></p></UiCard>
@@ -1730,9 +2515,24 @@ internal static class TemplateFiles
     """;
 
     private static string ForgotPasswordPage() => """
+    <script setup lang="ts">
+    import { ref } from 'vue'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue'; import { issueAntiforgery, requestPasswordReset } from '../../dotisan/services';
+    const email = ref(''); const sent = ref(false); const error = ref(''); const pending = ref(false);
+    async function submit() { pending.value = true; error.value = ''; try { const token = await issueAntiforgery(); await requestPasswordReset({ email: email.value }, { headers: { 'X-XSRF-TOKEN': token.token } }); sent.value = true; } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Unable to request a reset.'; } finally { pending.value = false; } }
+    </script>
     <template>
-    <UiCard><div class="auth-card-heading"><p class="eyebrow">Account recovery</p><h1>Forgot password?</h1><p class="muted">Password reset delivery is not configured yet. Add your mail provider and endpoint when you are ready.</p></div><p class="form-links"><RouterLink to="/auth/login">Return to sign in</RouterLink></p></UiCard>
+    <UiCard><div class="auth-card-heading"><p class="eyebrow">Account recovery</p><h1>Forgot password?</h1><p v-if="sent" class="muted">If the account exists, a reset email has been sent.</p><form v-else class="form-stack" @submit.prevent="submit"><p v-if="error" class="form-error" role="alert" v-text="error"></p><label>Email<UiInput v-model="email" type="email" autocomplete="email" required /></label><UiButton type="submit" :disabled="pending"><span v-text="pending ? 'Sending...' : 'Send reset email'"></span></UiButton></form></div><p class="form-links"><RouterLink to="/auth/login">Return to sign in</RouterLink></p></UiCard>
     </template>
+    """;
+
+    private static string EmailConfirmationPage() => """
+    <script setup lang="ts">
+    import { onMounted, ref } from 'vue'; import { useRoute } from 'vue-router'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue'; import { confirmEmail, issueAntiforgery, resendConfirmation } from '../../dotisan/services';
+    const route = useRoute(); const email = ref(String(route.query.email ?? '')); const status = ref('Confirming your email...'); const error = ref(''); const resent = ref(false); const pending = ref(false);
+    onMounted(async () => { try { await confirmEmail({ email: String(route.query.email ?? ''), token: String(route.query.token ?? '') }); status.value = 'Your email has been confirmed. You can sign in.'; } catch (exception) { error.value = exception instanceof Error ? exception.message : 'This confirmation link is invalid or expired.'; status.value = ''; } });
+    async function resend() { pending.value = true; error.value = ''; try { const token = await issueAntiforgery(); await resendConfirmation({ email: email.value }, { headers: { 'X-XSRF-TOKEN': token.token } }); resent.value = true; } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Unable to resend confirmation.'; } finally { pending.value = false; } }
+    </script>
+    <template><UiCard><div class="auth-card-heading"><p class="eyebrow">Account security</p><h1>Email confirmation</h1><p v-if="status" class="muted" v-text="status"></p><p v-if="error" class="form-error" role="alert" v-text="error"></p><form v-if="!status" class="form-stack" @submit.prevent="resend"><label>Email<UiInput v-model="email" type="email" autocomplete="email" required /></label><UiButton type="submit" :disabled="pending"><span v-text="pending ? 'Sending...' : 'Resend confirmation email'"></span></UiButton><p v-if="resent" class="muted">If the account exists, a confirmation email has been sent.</p></form></div><p class="form-links"><RouterLink to="/auth/login">Continue to sign in</RouterLink></p></UiCard></template>
     """;
 
     private static string ProfilePage() => """
@@ -1742,6 +2542,51 @@ internal static class TemplateFiles
     <template>
     <section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Account</p><h2>Your profile</h2></div></div><UiCard><p v-if="error" class="form-error" role="alert" v-text="error"></p><dl v-else-if="profile" class="profile-list"><div><dt>Email</dt><dd v-text="profile.email"></dd></div><div><dt>User ID</dt><dd class="mono" v-text="profile.id"></dd></div></dl><p v-else class="muted">Loading profile...</p></UiCard></section>
     </template>
+    """;
+
+    private static string AuthorizationPage() => """
+    <script setup lang="ts">
+    import { onMounted, ref } from 'vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue';
+    const users = ref<{ id: string; email: string }[]>([]); const roles = ref<string[]>([]); const selectedRole = ref(''); const error = ref('');
+    async function load() { const response = await fetch('/api/authorization/users', { credentials: 'include' }); if (!response.ok) throw new Error(response.status === 403 ? 'You do not have permission to manage authorization.' : 'Could not load authorization data.'); const data = await response.json(); users.value = data.users; roles.value = data.roles; selectedRole.value = roles.value[0] ?? ''; }
+    async function assign(userId: string) { if (!selectedRole.value) return; const response = await fetch(`/api/authorization/users/${userId}/roles/${encodeURIComponent(selectedRole.value)}`, { method: 'POST', credentials: 'include' }); if (!response.ok) error.value = 'Could not assign that role.'; }
+    onMounted(() => load().catch(exception => error.value = exception instanceof Error ? exception.message : 'Could not load authorization data.'));
+    </script>
+    <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Administration</p><h2>Authorization</h2><p class="muted">Assign existing Identity roles to users. Define permission claims in the API.</p></div></div><UiCard><p v-if="error" class="form-error" role="alert" v-text="error"></p><label>Role<UiInput v-model="selectedRole" placeholder="Role name" /></label><p v-if="!users.length" class="muted">Loading users...</p><ul v-else class="profile-list"><li v-for="user in users" :key="user.id"><span v-text="user.email"></span><button class="ui-button ui-button--outline" @click="assign(user.id)">Assign role</button></li></ul></UiCard></section></template>
+    """;
+
+    private static string MfaPage() => """
+    <script setup lang="ts">
+    import { onMounted, ref } from 'vue'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue'; import { getMfaSetup, regenerateRecoveryCodes, verifyMfa } from '../../dotisan/services';
+    const sharedKey = ref(''); const uri = ref(''); const code = ref(''); const recoveryCodes = ref<string[]>([]); const message = ref(''); const error = ref('');
+    onMounted(async () => { try { const setup = await getMfaSetup(); sharedKey.value = setup.sharedKey; uri.value = setup.authenticatorUri; } catch { error.value = 'Could not load MFA setup.'; } });
+    async function enable() { try { await verifyMfa({ code: code.value }); message.value = 'MFA enabled.'; } catch { error.value = 'That authenticator code is invalid.'; } }
+    async function regenerate() { try { const result = await regenerateRecoveryCodes(); recoveryCodes.value = result.recoveryCodes; } catch { error.value = 'Could not regenerate recovery codes.'; } }
+    </script>
+    <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Account security</p><h2>Multi-factor authentication</h2><p class="muted">Use an authenticator app and keep recovery codes somewhere safe.</p></div></div><UiCard><p v-if="error" class="form-error" role="alert" v-text="error"></p><p v-if="message" class="muted" v-text="message"></p><p><strong>Secret:</strong> <code v-text="sharedKey"></code></p><p class="muted">Authenticator URI: <code v-text="uri"></code></p><form class="form-stack" @submit.prevent="enable"><label>Verification code<UiInput v-model="code" inputmode="numeric" autocomplete="one-time-code" required /></label><UiButton type="submit">Enable MFA</UiButton></form><UiButton variant="outline" @click="regenerate">Generate recovery codes</UiButton><ul v-if="recoveryCodes.length"><li v-for="recoveryCode in recoveryCodes" :key="recoveryCode" class="mono" v-text="recoveryCode"></li></ul></UiCard></section></template>
+    """;
+
+    private static string SessionsPage() => """
+    <script setup lang="ts">
+    import { onMounted, ref } from 'vue'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import { issueAntiforgery, listSessions, revokeSession, revokeAllSessions } from '../../dotisan/services';
+    const sessions = ref<{ id: string; deviceName: string; createdAt: string; lastSeenAt: string; expiresAt: string; userAgent?: string | null; ipAddress?: string | null }[]>([]); const error = ref(''); const message = ref('');
+    async function load() { try { sessions.value = (await listSessions()).sessions; } catch { error.value = 'Could not load active sessions.'; } }
+    async function revoke(id: string) { try { const token = await issueAntiforgery(); await revokeSession(id, { headers: { 'X-XSRF-TOKEN': token.token } }); await load(); } catch { error.value = 'Could not revoke that session.'; } }
+    async function revokeAll() { try { const token = await issueAntiforgery(); await revokeAllSessions({ headers: { 'X-XSRF-TOKEN': token.token } }); message.value = 'All sessions have been revoked.'; await load(); } catch { error.value = 'Could not revoke sessions.'; } }
+    onMounted(load);
+    </script>
+    <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Account security</p><h2>Sessions and devices</h2><p class="muted">Review where your account is signed in and revoke access you do not recognize.</p></div><UiButton variant="outline" @click="revokeAll">Revoke all</UiButton></div><UiCard><p v-if="error" class="form-error" role="alert" v-text="error"></p><p v-if="message" class="muted" v-text="message"></p><p v-if="!sessions.length" class="muted">No active sessions recorded.</p><ul v-else class="profile-list"><li v-for="session in sessions" :key="session.id"><strong v-text="session.deviceName"></strong><span class="muted" v-text="session.userAgent || 'Unknown browser'"></span><span class="muted" v-text="session.ipAddress || 'Unknown address'"></span><span class="muted">Expires <time :datetime="session.expiresAt" v-text="new Date(session.expiresAt).toLocaleString()"></time></span><UiButton variant="outline" @click="revoke(session.id)">Revoke</UiButton></li></ul></UiCard></section></template>
+    """;
+
+    private static string ExternalLoginsPage() => """
+    <script setup lang="ts">
+    import { onMounted, ref } from 'vue'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import { issueAntiforgery } from '../../dotisan/services';
+    const providers = ref<{ name: string; displayName: string }[]>([]); const message = ref('');
+    onMounted(async () => { const response = await fetch('/api/account/external/providers'); if (response.ok) providers.value = (await response.json()).providers; });
+    function connect(name: string) { window.location.assign(`/api/account/external/${encodeURIComponent(name)}/challenge?returnUrl=${encodeURIComponent('/security/external-logins')}`); }
+    async function disconnect(name: string) { const token = await issueAntiforgery(); await fetch(`/api/account/external/${encodeURIComponent(name)}/link`, { method: 'DELETE', credentials: 'include', headers: { 'X-XSRF-TOKEN': token.token } }); message.value = `${name} disconnected.`; }
+    </script>
+    <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Account security</p><h2>External sign-in providers</h2><p class="muted">Connect providers through an application-specific adapter. Dotisan keeps this boundary provider-neutral.</p></div></div><UiCard><p v-if="message" class="muted" v-text="message"></p><p v-if="!providers.length" class="muted">No external providers are configured yet.</p><ul v-else class="profile-list"><li v-for="provider in providers" :key="provider.name"><strong v-text="provider.displayName"></strong><span class="muted" v-text="provider.name"></span><UiButton @click="connect(provider.name)">Connect</UiButton><UiButton variant="outline" @click="disconnect(provider.name)">Disconnect</UiButton></li></ul></UiCard></section></template>
     """;
 
     private static string StyleCss() => """

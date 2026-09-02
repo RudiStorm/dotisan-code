@@ -1,5 +1,7 @@
 # Dotisan Command list
 
+This file is retained as a lightweight command index. The authoritative user guide is `README.md`; the current quickstart is `docs/quickstart.md`.
+
 ## Create new Dotisan Project
 ```
 dotisan new {projectname}
@@ -22,45 +24,22 @@ dotisan new {projectname}
 ## Build and Run Commands
 ### Build
 ```
-dotisan build --dev --staging --production
+dotisan build [--no-frontend]
 ```
 This builds the api project first, then generates the typescript models, then builds the typescript project.
 
 ### Run 
 ```
-dotisan run --dev --staging --production
+dotisan dev [--lean] [--observability] [--environment <name>]
 ```
-This will first build the api, generate the models as previous, then we will run dotnet watch and npm run dev at the same time. So that hot reload on both ends will work.
+This runs the API and Vue development servers together with hot reload.
 
 ## Make Commands
-### Model
+### Resource and endpoint scaffolding
 ```
-dotisan make:model {modelname}
-```
-
-Parameters 
-```
--c --controller
--r --resource
-```
-
-### Controller
-```
-dotisan make:controller {controllername}
-# example of this is GetUser, GetUsers, PostUserCreate, PatchUserUpdate, DeleteUser
-```
-
-This creates a single file endpoint, with a request, response, requesthandler 
-
-### Migrations
-```
-dotisan make:migration {migrationname}
-# example UserMigration
-```
-
-### Seed
-```
-dotisan make:seed {seedname}
+dotisan make:resource {resourcename}
+dotisan make:endpoint {endpointname}
+dotisan make:crud {resourcename}
 ```
 
 ## Migrations
@@ -71,29 +50,17 @@ dotisan migrate
 This runs migrations that havent run yet
 
 ```
-dotisan migrate --refresh
+dotisan migrate status
 ```
 
-this drops the db tables and reruns the migrations
-
-```
-dotisan migrate --seed
-```
-
-This migrates the database and seeds the new seeds that havent run yet
-
-```
-dotisan migrate revert
-```
-
-This reverses the database migration previously run
+`dotisan new` creates and applies the initial development migration automatically when restore is enabled. `dotisan migrate` applies existing migrations; production migrations must be reviewed and committed first.
 
 ## Providers
 Providers are a set of classes that help a user connect to a set of providers much faster. For example one of the base providers will be mail trap, so an email notification system can be tested. Another is Microsoft Exchange, with classes prewritten, that easily allow you to send emails with the microsoft exchange.
 
-### Add Provider
+### Planned provider commands
 ```
-dotisan add provider {providername}
+Provider installation commands are planned and are not implemented in v0.6.2.
 ```
 
 Providers we are looking at adding from the beginning:
@@ -106,7 +73,7 @@ When adding providers it can add multiple items. These can include controllers, 
 
 ### Remove Provider
 ```
-dotisan remove provider {providername}
+`dotisan remove provider` is planned and is not implemented in v0.6.2.
 ```
 
 > [!WARNING]  

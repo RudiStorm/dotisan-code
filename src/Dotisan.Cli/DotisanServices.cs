@@ -76,10 +76,12 @@ public sealed class DefaultDotisanServices : IDotisanServices
         workspace = DotisanWorkspaceLocator.Find(root);
         PackageManager = ReadPackageManager(workspace?.Root);
         Database = ReadDatabaseProvider(workspace?.Root);
+        MailProvider = ReadMailProvider(workspace?.Root);
     }
 
     public string WorkingDirectory => workspace?.Root ?? root;
     public DatabaseProvider Database { get; }
+    public MailProvider MailProvider { get; }
     public string? SolutionPath => workspace?.SolutionPath;
     public string? ApiProjectPath => workspace?.ApiProjectPath;
     public string? FrontendDirectory => workspace?.FrontendDirectory;
@@ -155,6 +157,15 @@ public sealed class DefaultDotisanServices : IDotisanServices
             "mysql" => DatabaseProvider.MySQL,
             _ => DatabaseProvider.SQLite
         };
+    }
+
+    private static MailProvider ReadMailProvider(string? projectRoot)
+    {
+        if (projectRoot is null) return MailProvider.Console;
+        var value = Path.Combine(projectRoot, "dotisan.config");
+        if (!File.Exists(value)) return MailProvider.Console;
+        var provider = File.ReadLines(value).Select(line => line.Trim()).Where(line => line.StartsWith("mail_provider:", StringComparison.OrdinalIgnoreCase)).Select(line => line["mail_provider:".Length..].Trim().ToLowerInvariant()).FirstOrDefault();
+        return provider switch { "mailpit" => MailProvider.Mailpit, "smtp" => MailProvider.Smtp, _ => MailProvider.Console };
     }
 }
 

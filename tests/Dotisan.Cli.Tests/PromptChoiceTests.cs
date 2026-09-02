@@ -8,7 +8,7 @@ public sealed class PromptChoiceTests
     [Fact]
     public void Quick_prompt_captures_the_specified_choices()
     {
-        var answers = new Queue<string?>(["", "PostgreSQL", "yes", "Invite only", "yes", "npm"]);
+        var answers = new Queue<string?>(["", "PostgreSQL", "yes", "Invite only", "yes", "npm", ""]);
         var prompts = new DefaultPrompts(
             new CapturingConsole(),
             isInputRedirected: () => false,
@@ -26,7 +26,7 @@ public sealed class PromptChoiceTests
     [Fact]
     public void Quick_prompt_accepts_numbers_for_each_menu()
     {
-        var answers = new Queue<string?>(["1", "3", "2", "2", "2", "1"]);
+        var answers = new Queue<string?>(["1", "3", "2", "2", "2", "1", "1"]);
         var prompts = new DefaultPrompts(
             new CapturingConsole(),
             isInputRedirected: () => false,

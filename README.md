@@ -2,7 +2,7 @@
 
 Dotisan is a .NET 10 application scaffolding CLI for building ordinary ASP.NET Core and Vue applications. It gives you a working API, frontend, database wiring, typed frontend contracts, optional authentication, resource scaffolding, and durable background jobs without hiding the generated source code behind a proprietary runtime.
 
-The current release is v0.6.2.
+The current release is v0.6.6.
 
 ## What you get
 
@@ -24,20 +24,20 @@ Dotisan owns the initial scaffold. After that, the generated application is your
 Install the .NET tool from NuGet:
 
 ```powershell
-dotnet tool install --global Dotisan --version 0.6.2
+dotnet tool install --global Dotisan --version 0.6.6
 dotisan --version
 ```
 
 For a locally built package:
 
 ```powershell
-dotnet tool install --global Dotisan --add-source .\artifacts --version 0.6.2
+dotnet tool install --global Dotisan --add-source .\artifacts --version 0.6.6
 ```
 
 Upgrade an existing installation with:
 
 ```powershell
-dotnet tool update --global Dotisan --version 0.6.2
+dotnet tool update --global Dotisan --version 0.6.6
 ```
 
 ## Create and run an application
@@ -65,12 +65,25 @@ Useful development variants:
 ```powershell
 dotisan dev --lean                 # API only
 dotisan dev --environment Staging  # use a different ASP.NET Core environment
+dotisan dev --observability        # enable OTLP export for the API process
 dotisan run                        # run only the API with dotnet run
 dotisan build                      # build the API and frontend
 dotisan build --no-frontend        # build only the .NET solution
 ```
 
 For external database providers, `dotisan dev` starts the generated Docker Compose `database` service, waits for its health check, and stops the container when development ends. The named database volume is preserved.
+
+## Observability
+
+Generated applications include OpenTelemetry tracing and metrics for ASP.NET Core and HTTP client activity. Telemetry collection is registered by default, while exporting is opt-in:
+
+```powershell
+$env:OpenTelemetry__Enabled = "true"
+$env:OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:4317"
+dotnet run --project src\MyApp.Api
+```
+
+Or use `dotisan dev --observability`, which enables OTLP export for the coordinated API process. Standard OpenTelemetry environment variables remain the production configuration boundary; Dotisan does not select a vendor-specific backend.
 
 ## Command reference
 
@@ -100,9 +113,10 @@ Common options include:
 dotisan dev [--lean] [--observability] [--environment <name>]
 dotisan run
 dotisan build [--no-frontend]
+dotisan doctor [--production]
 ```
 
-Use `dev` for the coordinated API/frontend development experience, `run` for the API alone, and `build` for a production-style compile of the generated projects.
+Use `dev` for the coordinated API/frontend development experience, `run` for the API alone, `build` for a production-style compile of the generated projects, and `doctor --production` for read-only readiness diagnostics.
 
 ### Frontend contracts
 
@@ -231,7 +245,9 @@ Create an authenticated application with:
 dotisan new AuthApp --auth yes --registration public
 ```
 
-Authenticated projects use standard ASP.NET Core Identity, EF Core stores, cookie authentication, antiforgery, and ProblemDetails. They include account endpoints for registration, login, logout, current-user information, and antiforgery tokens.
+Authenticated projects use standard ASP.NET Core Identity, EF Core stores, cookie authentication, antiforgery, and ProblemDetails. They include registration, login, logout, current-user, email-confirmation, password-reset, TOTP MFA/recovery-code, and session/device endpoints. Login returns `mfa_required` when a second factor is needed, and the generated Vue portal includes setup, challenge, and session-management screens. Password-reset requests are anti-enumeration safe and use the generated mail-provider selector: `console`, `mailpit`, or `smtp`. Select Mailpit with `dotisan new AuthApp --auth yes --mail-provider mailpit`; this generates Compose service ports `1025` and `8025`, and `dotisan dev` starts it automatically. Staging and production can select `smtp` through `Mail__Provider` and standard `Mail__Smtp__*` configuration.
+
+When Mailpit is selected, use `dotisan mail` to print the local inbox URL or `dotisan mail --open` to open it in a browser. Mailpit is Development-only; generated APIs reject `Mail:Provider=mailpit` in other environments. Use SMTP for staging and production and keep credentials in deployment secrets. `Integrations/IntegrationExamples.cs` contains optional SendGrid, Mailgun, and configuration-driven OAuth2 examples; register only the adapter you have configured through deployment secrets. External login registration, linking, callback, and unlinking are exposed through the provider-neutral `IExternalLoginProvider` contract.
 
 Before starting the app, create and apply the Identity schema:
 
@@ -241,7 +257,7 @@ dotisan migrate
 dotisan dev
 ```
 
-The generated authorization foundation uses code-defined permission constants and standard Identity role claims. Generated protected endpoints return `401` for unauthenticated callers and `403` for authenticated callers without the required permission claim. Edit `src\AuthApp.Api\Authorization\Permissions.cs` and the generated endpoint files directly.
+The generated authorization foundation uses code-defined permission constants and standard Identity role claims. Authenticated projects also generate an `/admin/authorization` Vue screen and protected APIs for listing users/roles and assigning roles. Access requires the `authorization.manage` permission claim. Generated protected endpoints return `401` for unauthenticated callers and `403` for authenticated callers without the required permission claim. Edit `src\AuthApp.Api\Authorization\Permissions.cs` and the generated endpoint files directly.
 
 ## Database providers
 
@@ -289,3 +305,7 @@ dotnet pack src\Dotisan.Cli\Dotisan.Cli.csproj --configuration Release --output 
 ```
 
 The package is a .NET global tool with the command name `dotisan` and is licensed under MIT.
+
+### NuGet signing
+
+The v0.6.6 package is currently unsigned. NuGet signing is not required for the v0.6.6 build or artifact validation, and no signing certificate or publishing secret is included in this repository. If the project adopts a signed-package policy for public releases, configure certificate-based signing in the protected publishing workflow; never commit the certificate or its password to source control.

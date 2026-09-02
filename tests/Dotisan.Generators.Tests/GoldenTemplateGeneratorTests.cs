@@ -6,6 +6,33 @@ namespace Dotisan.Generators.Tests;
 public sealed class GoldenTemplateGeneratorTests
 {
     [Fact]
+    public async Task Mailpit_provider_generates_compose_service_and_provider_configuration()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-mailpit-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var result = await new GoldenTemplateGenerator().GenerateAsync(ProjectOptions.Quick("MailApp", output) with
+            {
+                AuthenticationEnabled = true,
+                MailProvider = MailProvider.Mailpit
+            }, CancellationToken.None);
+
+            Assert.True(result.Success, result.ErrorMessage);
+            var compose = await File.ReadAllTextAsync(Path.Combine(output, "compose.yaml"));
+            var config = await File.ReadAllTextAsync(Path.Combine(output, "dotisan.config"));
+            var appsettings = await File.ReadAllTextAsync(Path.Combine(output, "src", "MailApp.Api", "appsettings.Development.json"));
+            Assert.Contains("mailpit:", compose);
+            Assert.Contains("axllent/mailpit", compose);
+            Assert.Contains("8025:8025", compose);
+            Assert.Contains("mail_provider: mailpit", config);
+            Assert.Contains("\"Provider\": \"mailpit\"", appsettings);
+        }
+        finally
+        {
+            if (Directory.Exists(output)) Directory.Delete(output, recursive: true);
+        }
+    }
+    [Fact]
     public async Task Generator_writes_buildable_app_shape_with_sqlite_defaults()
     {
         var output = Path.Combine(Path.GetTempPath(), "dotisan-test-" + Guid.NewGuid().ToString("N"));
@@ -37,7 +64,7 @@ public sealed class GoldenTemplateGeneratorTests
             var export = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Infrastructure", "DotisanContractExport.cs"));
             Assert.Contains("schemaVersion", export);
             Assert.Contains("DOTISAN_CONTRACT_FALLBACK", export);
-            Assert.Contains("\"version\": \"0.6.2\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
+            Assert.Contains("\"version\": \"0.6.6\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditEntry.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "IAuditWriter.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditWriter.cs")));
@@ -58,6 +85,11 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("Microsoft.AspNetCore.OpenApi", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "TodoApp.Api.csproj")));
             Assert.Contains("AddOpenApi", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.Contains("MapOpenApi", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
+            Assert.Contains("OpenTelemetry.Extensions.Hosting", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "TodoApp.Api.csproj")));
+            Assert.Contains("OpenTelemetry.Exporter.OpenTelemetryProtocol", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "TodoApp.Api.csproj")));
+            Assert.Contains("AddAspNetCoreInstrumentation", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
+            Assert.Contains("AddHttpClientInstrumentation", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
+            Assert.Contains("\"OpenTelemetry\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "JobRegistration.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "SampleJob.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "SampleJobHandler.cs")));
@@ -123,6 +155,39 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("path: 'login'", routes);
             var readme = await File.ReadAllTextAsync(Path.Combine(output, "README.md"));
             Assert.Contains("login, registration, forgot-password, and profile pages", readme);
+        }
+        finally
+        {
+            if (Directory.Exists(output))
+                Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Tenant_enabled_template_emits_tenant_context_and_resource_isolation_boundary()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-tenant-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var generated = await new GoldenTemplateGenerator().GenerateAsync(
+                ProjectOptions.Quick("TenantApp", output) with { MultiTenancyEnabled = true }, CancellationToken.None);
+            Assert.True(generated.Success, generated.ErrorMessage);
+
+            var tenancy = await File.ReadAllTextAsync(Path.Combine(output, "src", "TenantApp.Api", "Tenancy", "TenantContext.cs"));
+            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "TenantApp.Api", "Program.cs"));
+            Assert.Contains("interface ITenantContext", tenancy);
+            Assert.Contains("X-Tenant-ID", tenancy);
+            Assert.Contains("AddHttpContextAccessor", program);
+            Assert.Contains("AddScoped<ITenantContext, TenantContext>", program);
+
+            var resource = await ResourceScaffolder.ScaffoldAsync(output, "Customer", CancellationToken.None);
+            Assert.True(resource.Success, resource.ErrorMessage);
+            var model = await File.ReadAllTextAsync(Path.Combine(output, "src", "TenantApp.Api", "Features", "Customers", "Customer.cs"));
+            var endpoints = await File.ReadAllTextAsync(Path.Combine(output, "src", "TenantApp.Api", "Features", "Customers", "CustomerEndpoints.cs"));
+            Assert.Contains("ITenantEntity", model);
+            Assert.Contains("TenantId", model);
+            Assert.Contains("RequireTenantId", endpoints);
+            Assert.Contains("TenantId == tenantContext.TenantId", endpoints);
         }
         finally
         {
@@ -323,7 +388,7 @@ public sealed class GoldenTemplateGeneratorTests
             var secondResult = await ResourceScaffolder.ScaffoldAsync(output, "Order", CancellationToken.None);
             Assert.True(secondResult.Success, secondResult.ErrorMessage);
             permissions = await File.ReadAllTextAsync(Path.Combine(output, "src", "AuthApp.Api", "Authorization", "Permissions.cs"));
-            Assert.Contains("[ProfileView, CustomersView, CustomersCreate, CustomersUpdate, CustomersDelete, OrdersView, OrdersCreate, OrdersUpdate, OrdersDelete]", permissions);
+            Assert.Contains("[ProfileView, AuthorizationManage, CustomersView, CustomersCreate, CustomersUpdate, CustomersDelete, OrdersView, OrdersCreate, OrdersUpdate, OrdersDelete]", permissions);
         }
         finally
         {
@@ -400,18 +465,51 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("CurrentUserResponse", accountEndpoints);
             Assert.Contains("PasswordSignInAsync", accountEndpoints);
             Assert.Contains("UserManager<ApplicationUser>", accountEndpoints);
-            Assert.Contains("AuthenticationScheme = CookieAuthenticationDefaults.AuthenticationScheme", accountEndpoints);
+            Assert.Contains("AuthenticationScheme = IdentityConstants.ApplicationScheme", accountEndpoints);
             Assert.Contains("IAuditWriter", accountEndpoints);
             Assert.Contains("security.registered", accountEndpoints);
             Assert.Contains("security.registration.denied", accountEndpoints);
             Assert.Contains("security.login.succeeded", accountEndpoints);
             Assert.Contains("security.login.failed", accountEndpoints);
             Assert.Contains("security.logout", accountEndpoints);
+            Assert.Contains("PasswordResetRequest", accountEndpoints);
+            Assert.Contains("GeneratePasswordResetTokenAsync", accountEndpoints);
+            Assert.Contains("EmailConfirmationRequest", accountEndpoints);
+            Assert.Contains("EmailConfirmationResendRequest", accountEndpoints);
+            Assert.Contains("GenerateEmailConfirmationTokenAsync", accountEndpoints);
+            Assert.Contains("IExternalLoginProvider", await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Integrations", "IExternalLoginProvider.cs")));
+            Assert.Contains("SendGridEmailProvider", await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Integrations", "IntegrationExamples.cs")));
+            Assert.Contains("IEmailProvider", accountEndpoints);
+            Assert.Contains("public const string AuthorizationManage", permissions);
+            Assert.Contains("MapGet(\"/api/authorization/users\"", authorizationEndpoints);
+            Assert.Contains("MapPost(\"/api/authorization/users/{userId}/roles/{roleName}\"", authorizationEndpoints);
+            Assert.True(File.Exists(Path.Combine(authenticatedOutput, "src", "AuthApp.Web", "src", "pages", "admin", "AuthorizationPage.vue")));
+            var authRoutes = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Web", "src", "routes", "index.ts"));
+            Assert.Contains("AuthorizationPage", authRoutes);
+            Assert.Contains("requiresPermission", authRoutes);
+            Assert.Contains("password-reset/request", authServices);
+            Assert.Contains("email-confirmation/confirm", authServices);
+            Assert.True(File.Exists(Path.Combine(authenticatedOutput, "src", "AuthApp.Web", "src", "pages", "auth", "EmailConfirmationPage.vue")));
+            Assert.Contains("email-confirmation/resend", authServices);
+            Assert.Contains("Connect", await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Web", "src", "pages", "account", "ExternalLoginsPage.vue")));
+            Assert.DoesNotContain("IntegrationExamples.cs", plainPaths);
+            Assert.Contains("/mfa/setup", accountEndpoints);
+            Assert.Contains("GetAuthenticatorKeyAsync", accountEndpoints);
+            Assert.Contains("TwoFactorAuthenticatorSignInAsync", accountEndpoints);
+            Assert.Contains("mfa_required", accountEndpoints);
+            Assert.Contains("LoginResponse", accountEndpoints);
+            Assert.Contains("GenerateNewTwoFactorRecoveryCodesAsync", accountEndpoints);
+            Assert.True(File.Exists(Path.Combine(authenticatedOutput, "src", "AuthApp.Web", "src", "pages", "account", "MfaPage.vue")));
+            Assert.True(File.Exists(Path.Combine(authenticatedOutput, "src", "AuthApp.Web", "src", "pages", "auth", "MfaChallengePage.vue")));
             Assert.DoesNotContain("AccountEndpoints.cs", plainPaths);
+            Assert.DoesNotContain("AuthorizationPage.vue", plainPaths);
             Assert.Contains("AddIdentityCore<ApplicationUser>", authenticatedProgram);
             Assert.Contains("AddRoles<IdentityRole>()", authenticatedProgram);
             Assert.Contains("AddEntityFrameworkStores<AppDbContext>", authenticatedProgram);
-            Assert.Contains("AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)", authenticatedProgram);
+            Assert.Contains("AddAuthentication(IdentityConstants.ApplicationScheme)", authenticatedProgram);
+            Assert.Contains("AddRateLimiter", authenticatedProgram);
+            Assert.Contains("RequireRateLimiting(\"account\")", accountEndpoints);
+            Assert.Contains("TwoFactorRecoveryCodeSignInAsync", accountEndpoints);
             Assert.Contains("AddAuthorization(options =>", authenticatedProgram);
             Assert.Contains("AddScoped<IAuditWriter, AuditWriter>", authenticatedProgram);
             Assert.Contains("Permissions.All", authenticatedProgram);
@@ -451,7 +549,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("--auth yes", authenticatedReadme);
             Assert.Contains("InitialIdentity", authenticatedReadme);
             Assert.Contains("dotisan migrate", authenticatedReadme);
-            Assert.Contains("does not create migrations", authenticatedReadme);
+            Assert.Contains("creates and applies the initial Identity migration automatically", authenticatedReadme);
             Assert.Contains("RequireAuthorization", authenticatedReadme);
             Assert.Contains("RoleManager<IdentityRole>", authenticatedReadme);
             Assert.Contains("403", authenticatedReadme);

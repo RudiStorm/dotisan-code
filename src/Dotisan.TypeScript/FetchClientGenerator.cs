@@ -74,6 +74,9 @@ public static class FetchClientGenerator
             index = route.IndexOf('}', start) + 1;
         }
 
+        if (route.EndsWith('}'))
+            builder.Append('"');
+
         return builder.ToString();
     }
 

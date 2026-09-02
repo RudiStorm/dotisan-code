@@ -23,6 +23,13 @@ public enum PackageManager
     Npm
 }
 
+public enum MailProvider
+{
+    Console,
+    Mailpit,
+    Smtp
+}
+
 public sealed record ProjectOptions(
     string Name,
     string OutputDirectory,
@@ -32,6 +39,7 @@ public sealed record ProjectOptions(
     bool MultiTenancyEnabled,
     PackageManager PackageManager)
 {
+    public MailProvider MailProvider { get; init; } = MailProvider.Console;
     private static readonly Regex ValidName = new("^[A-Za-z][A-Za-z0-9_-]*$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     public static ProjectOptions Quick(string name, string outputDirectory)

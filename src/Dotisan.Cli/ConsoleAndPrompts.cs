@@ -44,6 +44,16 @@ public sealed class DefaultPrompts : IPrompts
         var packageManager = ReadChoice("Package manager", "pnpm", ["pnpm", "npm"]) == "npm"
             ? PackageManager.Npm
             : PackageManager.Pnpm;
+        var mailProvider = MailProvider.Console;
+        if (authenticationEnabled)
+        {
+            mailProvider = ReadChoice("Mail provider", "console", ["console", "mailpit", "smtp"]) switch
+            {
+                "mailpit" => MailProvider.Mailpit,
+                "smtp" => MailProvider.Smtp,
+                _ => MailProvider.Console
+            };
+        }
 
         return ProjectOptions.Quick(name, outputDirectory) with
         {
@@ -58,6 +68,7 @@ public sealed class DefaultPrompts : IPrompts
             Registration = registration,
             MultiTenancyEnabled = multiTenancyEnabled,
             PackageManager = packageManager
+            ,MailProvider = mailProvider
         };
     }
 

@@ -1,12 +1,13 @@
 using Dotisan.Core;
 using Dotisan.Generators;
 using Dotisan.Cli.Generation;
+using Dotisan.Cli.Diagnostics;
 
 namespace Dotisan.Cli;
 
 public sealed class DotisanApplication
 {
-    public const string Version = "0.6.2";
+    public const string Version = "0.6.6";
 
     private readonly DotisanCommandRegistry registry;
     private readonly CommandContext context;
@@ -79,7 +80,9 @@ public sealed class DotisanApplication
         registry.Register(new GenerateCommand());
         registry.Register(new JobsCommand());
         registry.Register(new ScheduleCommand());
-        foreach (var command in new[] { "add", "remove", "doctor" })
+        registry.Register(new DoctorCommand());
+        registry.Register(new MailCommand());
+        foreach (var command in new[] { "add", "remove" })
             registry.Register(new NotImplementedCommand(command));
     }
 }

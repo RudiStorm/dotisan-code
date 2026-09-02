@@ -98,6 +98,7 @@ public sealed class ResourceScaffolder
         var dbSetPath = Path.Combine(apiDirectory, "Data", $"{resourceName}DbSet.cs");
         var extensionPath = Path.Combine(apiDirectory, "Infrastructure", "DotisanEndpointExtensions.cs");
         var authenticationEnabled = await IsAuthenticationEnabledAsync(root, cancellationToken);
+        var multiTenancyEnabled = await IsMultiTenancyEnabledAsync(root, cancellationToken);
         var permissionsPath = Path.Combine(apiDirectory, "Authorization", "Permissions.cs");
 
         if (new[] { modelPath, endpointPath, dbSetPath }.Any(File.Exists))
@@ -130,8 +131,8 @@ public sealed class ResourceScaffolder
         }
 
         Directory.CreateDirectory(featureDirectory);
-        await File.WriteAllTextAsync(modelPath, Model(identifier, resourceName, featureName), cancellationToken);
-        await File.WriteAllTextAsync(endpointPath, Endpoint(identifier, resourceName, featureName, authenticationEnabled), cancellationToken);
+        await File.WriteAllTextAsync(modelPath, Model(identifier, resourceName, featureName, multiTenancyEnabled), cancellationToken);
+        await File.WriteAllTextAsync(endpointPath, Endpoint(identifier, resourceName, featureName, authenticationEnabled, multiTenancyEnabled), cancellationToken);
         await File.WriteAllTextAsync(dbSetPath, DbSet(identifier, resourceName, featureName), cancellationToken);
         if (authenticationEnabled)
         {
@@ -155,18 +156,22 @@ public sealed class ResourceScaffolder
 
     private static string ToIdentifier(string projectName) => new(projectName.Select(character => char.IsLetterOrDigit(character) || character == '_' ? character : '_').ToArray());
 
-    private static string Model(string identifier, string resourceName, string featureName) => $$"""
+    private static string Model(string identifier, string resourceName, string featureName, bool multiTenancyEnabled) => $$"""
+    {{(multiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty)}}
+
     namespace {{identifier}}.Api.Features.{{featureName}};
 
-    public sealed class {{resourceName}}
+    public sealed class {{resourceName}}{{(multiTenancyEnabled ? " : ITenantEntity" : string.Empty)}}
     {
         public Guid Id { get; set; }
         public string Name { get; set; } = string.Empty;
         public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+        {{(multiTenancyEnabled ? "public string TenantId { get; set; } = string.Empty;" : string.Empty)}}
     }
     """;
 
-    private static string Endpoint(string identifier, string resourceName, string featureName, bool authenticationEnabled) => $$"""
+    private static string Endpoint(string identifier, string resourceName, string featureName, bool authenticationEnabled, bool multiTenancyEnabled) => $$"""
+    {{(multiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty)}}
     using {{identifier}}.Api.Data;
     {{(authenticationEnabled ? $"using {identifier}.Api.Authorization;\n    using {identifier}.Api.Auditing;" : string.Empty)}}
     using Microsoft.AspNetCore.Http;
@@ -179,22 +184,22 @@ public sealed class ResourceScaffolder
     {
         public static void Map{{resourceName}}Endpoints(IEndpointRouteBuilder endpoints)
         {
-            var collection = endpoints.MapGet("/api/{{featureName.ToLowerInvariant()}}", async (AppDbContext db, {{(authenticationEnabled ? "HttpContext httpContext, IAuditWriter audit, " : string.Empty)}}CancellationToken cancellationToken) =>
+            var collection = endpoints.MapGet("/api/{{featureName.ToLowerInvariant()}}", async (AppDbContext db, {{(multiTenancyEnabled ? "ITenantContext tenantContext, " : string.Empty)}}{{(authenticationEnabled ? "HttpContext httpContext, IAuditWriter audit, " : string.Empty)}}CancellationToken cancellationToken) =>
             {
-                var entities = await db.{{featureName}}.AsNoTracking().ToListAsync(cancellationToken);
+                var entities = await db.{{featureName}}.AsNoTracking(){{(multiTenancyEnabled ? ".Where(item => item.TenantId == tenantContext.TenantId)" : string.Empty)}}.ToListAsync(cancellationToken);
                 {{(authenticationEnabled ? "await audit.RecordAsync(httpContext, \"" + featureName + "\", null, \"list\", new Dictionary<string, object?>(), cancellationToken);" : string.Empty)}}
                 return entities;
             });
             {{(authenticationEnabled ? "collection.RequireAuthorization(Permissions." + featureName + "View);" : string.Empty)}}
 
-            var create = endpoints.MapPost("/api/{{featureName.ToLowerInvariant()}}", async (Create{{resourceName}}Request request, AppDbContext db, {{(authenticationEnabled ? "HttpContext httpContext, IAuditWriter audit, " : string.Empty)}}CancellationToken cancellationToken) =>
+            var create = endpoints.MapPost("/api/{{featureName.ToLowerInvariant()}}", async (Create{{resourceName}}Request request, AppDbContext db, {{(multiTenancyEnabled ? "ITenantContext tenantContext, " : string.Empty)}}{{(authenticationEnabled ? "HttpContext httpContext, IAuditWriter audit, " : string.Empty)}}CancellationToken cancellationToken) =>
             {
                 if (string.IsNullOrWhiteSpace(request.Name))
                 {
                     return Results.ValidationProblem(new Dictionary<string, string[]> { [nameof(request.Name)] = ["Name is required."] });
                 }
 
-                var entity = new {{resourceName}} { Name = request.Name.Trim() };
+                var entity = new {{resourceName}} { Name = request.Name.Trim(){{(multiTenancyEnabled ? ", TenantId = tenantContext.RequireTenantId()" : string.Empty)}} };
                 db.{{featureName}}.Add(entity);
                 await db.SaveChangesAsync(cancellationToken);
                 {{(authenticationEnabled ? "await audit.RecordAsync(httpContext, \"" + resourceName + "\", entity.Id.ToString(), \"create\", new Dictionary<string, object?> { [\"Name\"] = entity.Name }, cancellationToken);" : string.Empty)}}
@@ -203,9 +208,9 @@ public sealed class ResourceScaffolder
             {{(authenticationEnabled ? "create.RequireAuthorization(Permissions." + featureName + "Create);" : string.Empty)}}
 
             {{(authenticationEnabled ? $$"""
-            var read = endpoints.MapGet("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, AppDbContext db, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) =>
+            var read = endpoints.MapGet("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, AppDbContext db, {{(multiTenancyEnabled ? "ITenantContext tenantContext, " : string.Empty)}}HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) =>
             {
-                var entity = await db.{{featureName}}.AsNoTracking().FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+                var entity = await db.{{featureName}}.AsNoTracking().FirstOrDefaultAsync(item => item.Id == id{{(multiTenancyEnabled ? " && item.TenantId == tenantContext.TenantId" : string.Empty)}}, cancellationToken);
                 if (entity is null)
                 {
                     return Results.NotFound();
@@ -216,14 +221,14 @@ public sealed class ResourceScaffolder
             });
             read.RequireAuthorization(Permissions.{{featureName}}View);
 
-            var update = endpoints.MapPut("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, Update{{resourceName}}Request request, AppDbContext db, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) =>
+            var update = endpoints.MapPut("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, Update{{resourceName}}Request request, AppDbContext db, {{(multiTenancyEnabled ? "ITenantContext tenantContext, " : string.Empty)}}HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) =>
             {
                 if (string.IsNullOrWhiteSpace(request.Name))
                 {
                     return Results.ValidationProblem(new Dictionary<string, string[]> { [nameof(request.Name)] = ["Name is required."] });
                 }
 
-                var entity = await db.{{featureName}}.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+                var entity = await db.{{featureName}}.FirstOrDefaultAsync(item => item.Id == id{{(multiTenancyEnabled ? " && item.TenantId == tenantContext.TenantId" : string.Empty)}}, cancellationToken);
                 if (entity is null)
                 {
                     return Results.NotFound();
@@ -237,9 +242,9 @@ public sealed class ResourceScaffolder
             });
             update.RequireAuthorization(Permissions.{{featureName}}Update);
 
-            var delete = endpoints.MapDelete("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, AppDbContext db, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) =>
+            var delete = endpoints.MapDelete("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, AppDbContext db, {{(multiTenancyEnabled ? "ITenantContext tenantContext, " : string.Empty)}}HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) =>
             {
-                var entity = await db.{{featureName}}.FirstOrDefaultAsync(item => item.Id == id, cancellationToken);
+                var entity = await db.{{featureName}}.FirstOrDefaultAsync(item => item.Id == id{{(multiTenancyEnabled ? " && item.TenantId == tenantContext.TenantId" : string.Empty)}}, cancellationToken);
                 if (entity is null)
                 {
                     return Results.NotFound();
@@ -302,6 +307,16 @@ public sealed class ResourceScaffolder
 
         var lines = await File.ReadAllLinesAsync(configPath, cancellationToken);
         return lines.Any(line => line.Trim().Equals("authentication: enabled", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static async Task<bool> IsMultiTenancyEnabledAsync(string root, CancellationToken cancellationToken)
+    {
+        var configPath = Path.Combine(root, "dotisan.config");
+        if (!File.Exists(configPath))
+            return false;
+
+        var lines = await File.ReadAllLinesAsync(configPath, cancellationToken);
+        return lines.Any(line => line.Trim().Equals("multi_tenancy: enabled", StringComparison.OrdinalIgnoreCase));
     }
 
     private static string DbSet(string identifier, string resourceName, string featureName) => $$"""

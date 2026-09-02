@@ -14,7 +14,7 @@ public sealed class CliApplicationTests
         var exitCode = await app.RunAsync(["--version"]);
 
         Assert.Equal(DotisanExitCode.Success, exitCode);
-        Assert.Contains("dotisan 0.6.2", console.Output);
+        Assert.Contains("dotisan 0.6.6", console.Output);
     }
 
     [Fact]
@@ -46,15 +46,55 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
-    public async Task Future_command_returns_helpful_not_implemented_error()
+    public async Task Doctor_production_reports_a_ready_generated_workspace()
+    {
+        var console = new MemoryConsole();
+        var root = CreateDoctorWorkspace();
+        try
+        {
+            var app = DotisanApplication.CreateDefault(console, new DefaultDotisanServices(root));
+
+            var exitCode = await app.RunAsync(["doctor", "--production"]);
+
+            Assert.Equal(DotisanExitCode.Success, exitCode);
+            Assert.Contains("[PASS] Workspace", console.Output);
+            Assert.Contains("[PASS] Production Dockerfile", console.Output);
+            Assert.Contains("[PASS] EF Core migrations", console.Output);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Doctor_rejects_unknown_options()
     {
         var console = new MemoryConsole();
         var app = DotisanApplication.CreateDefault(console);
 
-        var exitCode = await app.RunAsync(["doctor"]);
+        var exitCode = await app.RunAsync(["doctor", "--unknown"]);
 
-        Assert.Equal(DotisanExitCode.NotImplemented, exitCode);
-        Assert.Contains("doctor is not implemented yet", console.ErrorOutput);
+        Assert.Equal(DotisanExitCode.UsageError, exitCode);
+        Assert.Contains("Usage: dotisan doctor [--production]", console.ErrorOutput);
+    }
+
+    private static string CreateDoctorWorkspace()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "dotisan-doctor-" + Guid.NewGuid().ToString("N"));
+        var api = Path.Combine(root, "src", "App.Api");
+        Directory.CreateDirectory(Path.Combine(api, "Migrations"));
+        Directory.CreateDirectory(Path.Combine(root, "src", "App.Web"));
+        File.WriteAllText(Path.Combine(root, "App.sln"), string.Empty);
+        File.WriteAllText(Path.Combine(root, "dotisan.config"), "database: sqlite\n");
+        File.WriteAllText(Path.Combine(root, "Dockerfile"), "FROM mcr.microsoft.com/dotnet/aspnet:10.0\n");
+        File.WriteAllText(Path.Combine(root, "src", "App.Web", "package.json"), "{}\n");
+        File.WriteAllText(Path.Combine(api, "App.Api.csproj"), "<Project />");
+        File.WriteAllText(Path.Combine(api, "Program.cs"), "app.UseHttpsRedirection(); builder.Services.AddRateLimiter();\n");
+        Directory.CreateDirectory(Path.Combine(api, "Features", "Health"));
+        File.WriteAllText(Path.Combine(api, "Features", "Health", "HealthEndpoints.cs"), "// health endpoint\n");
+        File.WriteAllText(Path.Combine(api, "Migrations", "20260902000000_InitialCreate.cs"), "// migration\n");
+        return root;
     }
 
     [Fact]
@@ -360,6 +400,36 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task Dev_observability_passes_the_generated_observability_switch_to_the_api()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices();
+        var app = DotisanApplication.CreateDefault(console, services: services);
+
+        var exitCode = await app.RunAsync(["dev", "--lean", "--observability"]);
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Contains("--dotisan-observability", services.StartArguments);
+    }
+
+    [Fact]
+    public async Task Dev_mailpit_starts_the_mailpit_compose_service()
+    {
+        using var cancellation = new CancellationTokenSource();
+        var services = new RecordingServices { MailProvider = MailProvider.Mailpit, BlockProcesses = true };
+        var console = new MemoryConsole();
+        var app = DotisanApplication.CreateDefault(console, services);
+
+        var task = app.RunAsync(["dev"], cancellation.Token);
+        await services.BothProcessesStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        cancellation.Cancel();
+        await task;
+
+        Assert.Contains(services.RunRequests, request => request.FileName == "docker" && request.Arguments.SequenceEqual(["compose", "up", "-d", "--wait", "--wait-timeout", "120", "mailpit"]));
+        Assert.Contains(services.RunRequests, request => request.FileName == "docker" && request.Arguments.SequenceEqual(["compose", "stop", "mailpit"]));
+    }
+
+    [Fact]
     public async Task Dev_migrates_the_legacy_vite_proxy_before_starting_services()
     {
         var frontend = Path.Combine(Path.GetTempPath(), "dotisan-vite-migration-" + Guid.NewGuid().ToString("N"));
@@ -501,6 +571,7 @@ public sealed class CliApplicationTests
     {
         public string WorkingDirectory => "C:\\work";
         public DatabaseProvider Database { get; init; } = DatabaseProvider.SQLite;
+        public MailProvider MailProvider { get; init; } = MailProvider.Console;
         public string? SolutionPath => "C:\\work\\App.sln";
         public string? ApiProjectPath => "C:\\work\\src\\App.Api\\App.Api.csproj";
         public string? FrontendDirectory { get; init; } = "C:\\work\\src\\App.Web";

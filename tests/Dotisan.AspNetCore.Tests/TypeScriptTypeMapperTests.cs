@@ -54,6 +54,20 @@ public sealed class TypeScriptTypeMapperTests
     }
 
     [Fact]
+    public void Generated_services_close_urls_with_path_parameters()
+    {
+        var manifest = new ContractManifest(
+            1,
+            [new EndpointManifestEntry("sessions.revoke", "Sessions", "RevokeSession", "DELETE", "/api/sessions/{id}", "void", "void", true, "authenticated", null, ["Sessions"], false, false)],
+            [],
+            [new EndpointContractMetadata(null, [new EndpointParameterMetadata("id", new ContractTypeDescriptor(ContractTypeKind.Guid), false, false)], [], 204, ["Sessions"], new EndpointValidationMetadata(false, []))]);
+
+        var services = TypeScriptContractGenerator.GenerateAll(manifest).Single(file => file.Path == "services.ts").Content;
+
+        Assert.Contains("\"/api/sessions/\" + id + \"\"", services);
+    }
+
+    [Fact]
     public void Generated_file_manifest_hash_is_stable_for_file_order()
     {
         var files = new[]

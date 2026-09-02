@@ -36,6 +36,7 @@ public interface IDotisanServices
 {
     string WorkingDirectory { get; }
     DatabaseProvider Database { get; }
+    MailProvider MailProvider { get; }
     string? SolutionPath { get; }
     string? ApiProjectPath { get; }
     string? FrontendDirectory { get; }
