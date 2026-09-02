@@ -196,6 +196,52 @@ public sealed class GoldenTemplateGeneratorTests
         }
     }
 
+    [Fact]
+    public async Task Generated_web_scaffold_contains_frontend_testing_and_shadcn_configuration()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-web-scaffold-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var generated = await new GoldenTemplateGenerator().GenerateAsync(ProjectOptions.Quick("WebScaffold", output), CancellationToken.None);
+            Assert.True(generated.Success, generated.ErrorMessage);
+            var web = Path.Combine(output, "src", "WebScaffold.Web");
+            var package = await File.ReadAllTextAsync(Path.Combine(web, "package.json"));
+            Assert.Contains("@vue/test-utils", package);
+            Assert.Contains("@playwright/test", package);
+            Assert.True(File.Exists(Path.Combine(web, "vitest.config.ts")));
+            Assert.True(File.Exists(Path.Combine(web, "playwright.config.ts")));
+            Assert.True(File.Exists(Path.Combine(web, "components.json")));
+            Assert.True(File.Exists(Path.Combine(web, "src", "components", "ui", "Badge.test.ts")));
+        }
+        finally
+        {
+            if (Directory.Exists(output))
+                Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Generated_api_contains_aspire_and_complete_opentelemetry_wiring()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-observability-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var generated = await new GoldenTemplateGenerator().GenerateAsync(ProjectOptions.Quick("ObservabilityApp", output), CancellationToken.None);
+            Assert.True(generated.Success, generated.ErrorMessage);
+            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "ObservabilityApp.Api", "Program.cs"));
+            var compose = await File.ReadAllTextAsync(Path.Combine(output, "compose.yaml"));
+            Assert.Contains("AddEntityFrameworkCoreInstrumentation", program);
+            Assert.Contains("AddOpenTelemetry(logging", program);
+            Assert.Contains("aspire-dashboard", compose);
+            Assert.Contains("18888:18888", compose);
+        }
+        finally
+        {
+            if (Directory.Exists(output))
+                Directory.Delete(output, recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData(DatabaseProvider.SQLite, "Microsoft.EntityFrameworkCore.Sqlite", "UseSqlite", "Data Source=app.db", "SQLite")]
     [InlineData(DatabaseProvider.SqlServer, "Microsoft.EntityFrameworkCore.SqlServer", "UseSqlServer", "Server=localhost,1433;Database=DataApp;User Id=sa;Password=DotisanDev123!;TrustServerCertificate=True", "SQL Server")]
@@ -251,7 +297,8 @@ public sealed class GoldenTemplateGeneratorTests
             }
             else
             {
-                Assert.False(File.Exists(Path.Combine(output, "compose.yaml")));
+                var compose = await File.ReadAllTextAsync(Path.Combine(output, "compose.yaml"));
+                Assert.Contains("aspire-dashboard", compose);
             }
         }
         finally

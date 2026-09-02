@@ -19,14 +19,18 @@ internal static class TemplateFiles
           "scripts": {
             "dev": "vite",
             "build": "vue-tsc -b && vite build",
-            "test": "vitest run"
+            "test": "vitest run --config vitest.config.ts",
+            "test:e2e": "playwright test"
           },
           "dependencies": {
             "@tanstack/vue-query": "^5.59.0",
             "pinia": "^2.3.0",
             "vue": "^3.5.0",
             "vue-router": "^4.4.0",
-            "zod": "^3.23.0"
+            "zod": "^3.23.0",
+            "class-variance-authority": "^0.7.0",
+            "clsx": "^2.1.0",
+            "tailwind-merge": "^2.5.0"
           },
           "devDependencies": {
             "@types/node": "^22.0.0",
@@ -35,7 +39,13 @@ internal static class TemplateFiles
             "typescript": "~5.6.0",
             "vite": "^6.0.0",
             "vitest": "^2.1.0",
-            "vue-tsc": "^2.1.0"
+            "vue-tsc": "^2.1.0",
+            "@vue/test-utils": "^2.4.0",
+            "@playwright/test": "^1.49.0",
+            "tailwindcss": "^3.4.0",
+            "postcss": "^8.4.0",
+            "autoprefixer": "^10.4.0",
+            "jsdom": "^25.0.0"
           }
         }
         """;
@@ -66,9 +76,7 @@ internal static class TemplateFiles
             """),
             new("dotisan.contract.json", InitialContractManifest(options.AuthenticationEnabled).ToJson()),
             new("Dockerfile", Dockerfile(options.Name)),
-            ..(options.Database == DatabaseProvider.SQLite && options.MailProvider != MailProvider.Mailpit
-                ? Array.Empty<TemplateFile>()
-                : new[] { new TemplateFile("compose.yaml", DatabaseCompose(options.Name, options.Database, options.MailProvider)) }),
+            new TemplateFile("compose.yaml", DatabaseCompose(options.Name, options.Database, options.MailProvider)),
             new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.Database, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.MultiTenancyEnabled)),
             new($"src/{options.Name}.Api/Infrastructure/DotisanContractExport.cs", ContractExport(options.AuthenticationEnabled)),
@@ -117,6 +125,11 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/tsconfig.app.json", "{\n  \"extends\": \"@vue/tsconfig/tsconfig.dom.json\",\n  \"include\": [\"src/**/*.ts\", \"src/**/*.tsx\", \"src/**/*.vue\"],\n  \"compilerOptions\": {\n    \"composite\": true,\n    \"tsBuildInfoFile\": \"./node_modules/.tmp/tsconfig.app.tsbuildinfo\",\n    \"strict\": true,\n    \"target\": \"ES2022\",\n    \"lib\": [\"ES2022\", \"DOM\", \"DOM.Iterable\"],\n    \"moduleResolution\": \"Bundler\"\n  }\n}\n"),
             new($"src/{options.Name}.Web/tsconfig.node.json", "{\n  \"compilerOptions\": {\n    \"composite\": true,\n    \"tsBuildInfoFile\": \"./node_modules/.tmp/tsconfig.node.tsbuildinfo\",\n    \"module\": \"ESNext\",\n    \"moduleResolution\": \"Bundler\",\n    \"allowSyntheticDefaultImports\": true,\n    \"target\": \"ES2022\",\n    \"types\": [\"node\"]\n  },\n  \"include\": [\"vite.config.ts\"]\n}\n"),
             new($"src/{options.Name}.Web/vite.config.ts", ViteConfig()),
+            new($"src/{options.Name}.Web/tailwind.config.ts", TailwindConfig()),
+            new($"src/{options.Name}.Web/postcss.config.cjs", PostCssConfig()),
+            new($"src/{options.Name}.Web/playwright.config.ts", PlaywrightConfig()),
+            new($"src/{options.Name}.Web/vitest.config.ts", VitestConfig()),
+            new($"src/{options.Name}.Web/components.json", ShadcnComponentsConfig()),
             new($"src/{options.Name}.Web/src/env.d.ts", "/// <reference types=\"vite/client\" />\n"),
             new($"src/{options.Name}.Web/src/main.ts", MainTs()),
             new($"src/{options.Name}.Web/src/routes/index.ts", RoutesIndex(options.AuthenticationEnabled)),
@@ -127,6 +140,9 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/src/components/ui/Input.vue", UiInput()),
             new($"src/{options.Name}.Web/src/components/ui/Card.vue", UiCard()),
             new($"src/{options.Name}.Web/src/components/ui/Badge.vue", UiBadge()),
+            new($"src/{options.Name}.Web/src/lib/utils.ts", ShadcnUtils()),
+            new($"src/{options.Name}.Web/src/components/ui/Badge.test.ts", UiBadgeTest()),
+            new($"src/{options.Name}.Web/tests/e2e/shell.spec.ts", FrontendSmokeTest()),
             new($"src/{options.Name}.Web/src/components/AppSidebar.vue", AppSidebar(options.Name, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Web/src/components/AppHeader.vue", AppHeader(options.Name, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Web/src/layouts/PortalLayout.vue", PortalLayout()),
@@ -150,6 +166,9 @@ internal static class TemplateFiles
             new($"tests/{options.Name}.Api.Tests/HealthEndpointTests.cs", ApiTests(identifier)),
             new($"tests/{options.Name}.Api.Tests/JobTests.cs", JobTests(identifier)),
             new($"tests/{options.Name}.Api.Tests/Usings.cs", "global using Xunit;\n"),
+            ..(options.MultiTenancyEnabled
+                ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/TenantContextTests.cs", TenantContextTests(identifier)) }
+                : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/AuthenticationEndpointTests.cs", AuthenticationTests(identifier, options.Registration)) }
                 : Array.Empty<TemplateFile>()),
@@ -177,6 +196,7 @@ internal static class TemplateFiles
         <PackageReference Include="WolverineFx.{{WolverineProviderPackage(database)}}" />
         <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
         <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+        <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" />
         <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
         <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
         <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
@@ -212,6 +232,7 @@ internal static class TemplateFiles
         <PackageVersion Include="WolverineFx.MySql" Version="6.30.3" />
         <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.18.0" />
         <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.18.0" />
+        <PackageVersion Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" Version="1.18.0-beta.1" />
         <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.18.0" />
         <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.18.0" />
         <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
@@ -581,6 +602,7 @@ internal static class TemplateFiles
     using OpenTelemetry;
     using OpenTelemetry.Metrics;
     using OpenTelemetry.Trace;
+    using OpenTelemetry.Logs;
 
     if (TryExportDotisanContract(args))
         return;
@@ -595,10 +617,12 @@ internal static class TemplateFiles
     var openTelemetry = builder.Services.AddOpenTelemetry()
         .WithTracing(tracing => tracing
             .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation())
+            .AddHttpClientInstrumentation()
+            .AddEntityFrameworkCoreInstrumentation())
         .WithMetrics(metrics => metrics
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation());
+    builder.Logging.AddOpenTelemetry(logging => logging.IncludeFormattedMessage = true);
     if (builder.Configuration.GetValue("OpenTelemetry:Enabled", false))
     {
         openTelemetry.UseOtlpExporter();
@@ -665,6 +689,7 @@ internal static class TemplateFiles
     using OpenTelemetry;
     using OpenTelemetry.Metrics;
     using OpenTelemetry.Trace;
+    using OpenTelemetry.Logs;
 
     if (TryExportDotisanContract(args))
         return;
@@ -679,10 +704,12 @@ internal static class TemplateFiles
     var openTelemetry = builder.Services.AddOpenTelemetry()
         .WithTracing(tracing => tracing
             .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation())
+            .AddHttpClientInstrumentation()
+            .AddEntityFrameworkCoreInstrumentation())
         .WithMetrics(metrics => metrics
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation());
+    builder.Logging.AddOpenTelemetry(logging => logging.IncludeFormattedMessage = true);
     if (builder.Configuration.GetValue("OpenTelemetry:Enabled", false))
     {
         openTelemetry.UseOtlpExporter();
@@ -954,7 +981,7 @@ internal static class TemplateFiles
             _ => "services:\n"
         };
 
-        return mailProvider == MailProvider.Mailpit
+        var withMailpit = mailProvider == MailProvider.Mailpit
             ? compose + $$"""
 
               mailpit:
@@ -969,11 +996,20 @@ internal static class TemplateFiles
                   retries: 20
             """
             : compose;
+
+        return withMailpit + $$"""
+
+              dashboard:
+                image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
+                ports:
+                  - "18888:18888"
+                  - "4317:18889"
+                  - "4318:18890"
+            """;
     }
 
     private static string TenantContext(string identifier) => $$"""
     using System.Security.Claims;
-    using System.Text.Json;
     using Microsoft.AspNetCore.Http;
     using Microsoft.Extensions.Hosting;
 
@@ -992,12 +1028,24 @@ internal static class TemplateFiles
 
     public sealed class TenantContext(IHttpContextAccessor httpContextAccessor, IHostEnvironment environment) : ITenantContext
     {
-        public string TenantId =>
-            httpContextAccessor.HttpContext?.User.FindFirstValue("tenant_id")
-            ?? (environment.IsDevelopment()
-                ? httpContextAccessor.HttpContext?.Request.Headers["X-Tenant-ID"].FirstOrDefault()
-                : null)
-            ?? throw new InvalidOperationException("A tenant_id claim is required.");
+        public string TenantId
+        {
+            get
+            {
+                var claimTenant = httpContextAccessor.HttpContext?.User.FindFirstValue("tenant_id")?.Trim();
+                if (!string.IsNullOrWhiteSpace(claimTenant))
+                    return claimTenant;
+
+                var headerTenant = environment.IsDevelopment()
+                    ? httpContextAccessor.HttpContext?.Request.Headers["X-Tenant-ID"].FirstOrDefault()?.Trim()
+                    : null;
+                return !string.IsNullOrWhiteSpace(headerTenant)
+                    ? headerTenant
+                    : environment.IsEnvironment("Testing")
+                        ? "test-tenant"
+                    : throw new InvalidOperationException("A tenant_id claim is required.");
+            }
+        }
 
         public string RequireTenantId() => TenantId;
     }
@@ -2398,8 +2446,139 @@ internal static class TemplateFiles
     }
     """;
 
+    private static string TenantContextTests(string identifier) => $$"""
+    using System.Security.Claims;
+    using Microsoft.AspNetCore.Hosting;
+    using Microsoft.AspNetCore.Http;
+    using Microsoft.Extensions.FileProviders;
+    using Microsoft.Extensions.Hosting;
+    using {{identifier}}.Api.Tenancy;
+
+    namespace {{identifier}}.Api.Tests;
+
+    public sealed class TenantContextTests
+    {
+        [Fact]
+        public void Authenticated_claim_takes_precedence_over_development_header()
+        {
+            var context = new DefaultHttpContext();
+            context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("tenant_id", "tenant-a")]));
+            context.Request.Headers["X-Tenant-ID"] = "tenant-b";
+            var tenant = new TenantContext(new HttpContextAccessor { HttpContext = context }, Environment("Development"));
+
+            Assert.Equal("tenant-a", tenant.TenantId);
+        }
+
+        [Fact]
+        public void Development_header_is_a_supported_fallback()
+        {
+            var context = new DefaultHttpContext();
+            context.Request.Headers["X-Tenant-ID"] = " tenant-b ";
+            var tenant = new TenantContext(new HttpContextAccessor { HttpContext = context }, Environment("Development"));
+
+            Assert.Equal("tenant-b", tenant.RequireTenantId());
+        }
+
+        [Fact]
+        public void Production_rejects_header_only_tenant_identity()
+        {
+            var context = new DefaultHttpContext();
+            context.Request.Headers["X-Tenant-ID"] = "tenant-b";
+            var tenant = new TenantContext(new HttpContextAccessor { HttpContext = context }, Environment("Production"));
+
+            Assert.Throws<InvalidOperationException>(() => tenant.TenantId);
+        }
+
+        private static IHostEnvironment Environment(string name) => new TestEnvironment { EnvironmentName = name };
+
+        private sealed class TestEnvironment : IHostEnvironment
+        {
+            public string EnvironmentName { get; set; } = Environments.Development;
+            public string ApplicationName { get; set; } = "TenantTests";
+            public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+            public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+        }
+    }
+    """;
+
     private static string AppVue() => """
     <template><RouterView /></template>
+    """;
+
+    private static string PlaywrightConfig() => """
+    import { defineConfig, devices } from '@playwright/test';
+
+    export default defineConfig({
+      testDir: './tests/e2e',
+      reporter: 'list',
+      use: { baseURL: 'http://127.0.0.1:4173' },
+      webServer: { command: 'pnpm dev --host 127.0.0.1 --port 4173', port: 4173, reuseExistingServer: !process.env.CI },
+      projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }]
+    });
+    """;
+
+    private static string VitestConfig() => """
+    import { defineConfig } from 'vitest/config';
+    import vue from '@vitejs/plugin-vue';
+
+    export default defineConfig({
+      plugins: [vue()],
+      test: { environment: 'jsdom', include: ['src/**/*.test.ts'], exclude: ['tests/e2e/**'] }
+    });
+    """;
+
+    private static string TailwindConfig() => """
+    import type { Config } from 'tailwindcss';
+
+    export default {
+      content: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
+      theme: { extend: {} },
+      plugins: []
+    } satisfies Config;
+    """;
+
+    private static string PostCssConfig() => """
+    module.exports = { plugins: { tailwindcss: {}, autoprefixer: {} } };
+    """;
+
+    private static string ShadcnComponentsConfig() => """
+    {
+      "$schema": "https://ui.shadcn.com/schema.json",
+      "style": "default",
+      "tailwind": { "config": "tailwind.config.ts", "css": "src/style.css", "baseColor": "slate", "cssVariables": true },
+      "aliases": { "components": "@/components", "utils": "@/lib/utils", "ui": "@/components/ui" }
+    }
+    """;
+
+    private static string UiBadgeTest() => """
+    import { mount } from '@vue/test-utils';
+    import { describe, expect, it } from 'vitest';
+    import UiBadge from './Badge.vue';
+
+    describe('UiBadge', () => {
+      it('renders its slot content', () => {
+        const wrapper = mount(UiBadge, { slots: { default: 'Ready' } });
+        expect(wrapper.text()).toBe('Ready');
+      });
+    });
+    """;
+
+    private static string ShadcnUtils() => """
+    import { type ClassValue, clsx } from 'clsx';
+    import { twMerge } from 'tailwind-merge';
+
+    export function cn(...inputs: ClassValue[]) {
+      return twMerge(clsx(inputs));
+    }
+    """;
+
+    private static string FrontendSmokeTest() => """
+    import { expect, test } from '@playwright/test';
+
+    test('renders the Dotisan application shell', async ({ page }) => {
+      await page.goto('/');
+      await expect(page.locator('body')).toContainText('Dotisan');
+    });
     """;
 
     private static string UiButton() => """
@@ -2590,6 +2769,10 @@ internal static class TemplateFiles
     """;
 
     private static string StyleCss() => """
+    @tailwind base;
+    @tailwind components;
+    @tailwind utilities;
+
     :root { font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: oklch(24% .03 255); background: oklch(97% .012 255); font-synthesis: none; }
     * { box-sizing: border-box; }
     body { margin: 0; min-width: 320px; background: oklch(97% .012 255); }

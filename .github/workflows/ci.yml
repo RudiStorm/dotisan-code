@@ -33,6 +33,9 @@ jobs:
           for web in "$RUNNER_TEMP/dotisan-auth-web/src/CiAuthWeb.Web" "$RUNNER_TEMP/dotisan-plain-web/src/CiPlainWeb.Web"; do
             pnpm --dir "$web" install --frozen-lockfile=false
             pnpm --dir "$web" run build
+            pnpm --dir "$web" test
+            pnpm --dir "$web" exec playwright install --with-deps chromium
+            pnpm --dir "$web" run test:e2e
           done
       - name: Run generated Mailpit password-reset smoke test
         run: |

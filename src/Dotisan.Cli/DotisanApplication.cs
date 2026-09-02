@@ -82,7 +82,7 @@ public sealed class DotisanApplication
         registry.Register(new ScheduleCommand());
         registry.Register(new DoctorCommand());
         registry.Register(new MailCommand());
-        foreach (var command in new[] { "add", "remove" })
-            registry.Register(new NotImplementedCommand(command));
+        registry.Register(new AddIntegrationCommand());
+        registry.Register(new RemoveIntegrationCommand());
     }
 }

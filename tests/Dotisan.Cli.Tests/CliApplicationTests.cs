@@ -138,6 +138,47 @@ public sealed class CliApplicationTests
         }
     }
 
+    [Fact]
+    public async Task Add_integration_dry_run_reports_an_explicit_recipe()
+    {
+        var root = CreateJobsWorkspace();
+        try
+        {
+            var console = new MemoryConsole();
+            var app = DotisanApplication.CreateDefault(console, new DefaultDotisanServices(root));
+
+            var exitCode = await app.RunAsync(["add:integration", "signoz", "--dry-run"]);
+
+            Assert.Equal(DotisanExitCode.Success, exitCode);
+            Assert.Contains("Would create .dotisan", console.Output);
+            Assert.Contains("OTEL_EXPORTER_OTLP_ENDPOINT", console.Output);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Remove_integration_requires_force_and_removes_only_the_recipe()
+    {
+        var root = CreateJobsWorkspace();
+        try
+        {
+            var console = new MemoryConsole();
+            var app = DotisanApplication.CreateDefault(console, new DefaultDotisanServices(root));
+
+            Assert.Equal(DotisanExitCode.Success, await app.RunAsync(["add:integration", "signoz"]));
+            Assert.Equal(DotisanExitCode.UsageError, await app.RunAsync(["remove:integration", "signoz"]));
+            Assert.Equal(DotisanExitCode.Success, await app.RunAsync(["remove:integration", "signoz", "--force"]));
+            Assert.False(File.Exists(Path.Combine(root, ".dotisan", "integrations", "signoz.md")));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static string CreateJobsWorkspace()
     {
         var root = Path.Combine(Path.GetTempPath(), "dotisan-jobs-cli-" + Guid.NewGuid().ToString("N"));

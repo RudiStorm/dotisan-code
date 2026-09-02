@@ -231,6 +231,72 @@ internal sealed class GenerateCommand : WorkspaceCommand
     }
 }
 
+internal sealed class AddIntegrationCommand : WorkspaceCommand
+{
+    public override string Name => "add:integration";
+    public override string Description => "Add an explicit integration recipe to the workspace.";
+
+    public override async Task<DotisanExitCode> ExecuteAsync(CommandContext context, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    {
+        var dryRun = arguments.Contains("--dry-run", StringComparer.OrdinalIgnoreCase);
+        var names = arguments.Where(argument => !argument.Equals("--dry-run", StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (names.Length != 1)
+            return Fail(context.Console, "Usage: dotisan add:integration <aspire|sendgrid|mailgun|signoz> [--dry-run].", DotisanExitCode.UsageError);
+        if (!IntegrationRecipes.TryGetValue(names[0], out var recipe))
+            return Fail(context.Console, $"Unknown integration '{names[0]}'. Supported integrations: {string.Join(", ", IntegrationRecipes.Keys)}.", DotisanExitCode.UsageError);
+        if (!TryGetServices(context, out var services) || services.SolutionPath is null)
+            return Fail(context.Console, "Could not find a generated Dotisan project. Run this command from the project root.");
+
+        var integrationDirectory = Path.Combine(services.WorkingDirectory, ".dotisan", "integrations");
+        var path = Path.Combine(integrationDirectory, names[0].ToLowerInvariant() + ".md");
+        if (dryRun)
+        {
+            context.Console.WriteLine($"Would create {Path.GetRelativePath(services.WorkingDirectory, path)}");
+            context.Console.WriteLine(recipe);
+            return DotisanExitCode.Success;
+        }
+
+        Directory.CreateDirectory(integrationDirectory);
+        await File.WriteAllTextAsync(path, recipe, cancellationToken);
+        context.Console.WriteLine($"Created {Path.GetRelativePath(services.WorkingDirectory, path)}. Apply the documented package and configuration changes explicitly.");
+        return DotisanExitCode.Success;
+    }
+
+    private static readonly IReadOnlyDictionary<string, string> IntegrationRecipes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["aspire"] = "# Aspire Dashboard\n\nUse `dotisan dev --observability`. Configure OTLP through `OTEL_EXPORTER_OTLP_ENDPOINT`.\n",
+        ["sendgrid"] = "# SendGrid\n\nAdd a provider adapter implementing `IEmailProvider`. Configure `SendGrid:ApiKey` and `SendGrid:From` through deployment secrets.\n",
+        ["mailgun"] = "# Mailgun\n\nAdd a provider adapter implementing `IEmailProvider`. Configure `Mailgun:ApiKey`, `Mailgun:Domain`, and `Mailgun:From` through deployment secrets.\n",
+        ["signoz"] = "# SigNoz\n\nSet `OTEL_EXPORTER_OTLP_ENDPOINT` to the SigNoz collector endpoint and enable export with `OpenTelemetry:Enabled=true`.\n"
+    };
+}
+
+internal sealed class RemoveIntegrationCommand : WorkspaceCommand
+{
+    public override string Name => "remove:integration";
+    public override string Description => "Remove an explicit integration recipe from the workspace.";
+
+    public override async Task<DotisanExitCode> ExecuteAsync(CommandContext context, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    {
+        var force = arguments.Contains("--force", StringComparer.OrdinalIgnoreCase);
+        var names = arguments.Where(argument => !argument.Equals("--force", StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (names.Length != 1)
+            return Fail(context.Console, "Usage: dotisan remove:integration <name> --force.", DotisanExitCode.UsageError);
+        if (!force)
+            return Fail(context.Console, "Refusing to remove an integration without --force. Review the generated source changes first.", DotisanExitCode.UsageError);
+        if (!TryGetServices(context, out var services) || services.SolutionPath is null)
+            return Fail(context.Console, "Could not find a generated Dotisan project. Run this command from the project root.");
+
+        var path = Path.Combine(services.WorkingDirectory, ".dotisan", "integrations", names[0].ToLowerInvariant() + ".md");
+        if (!File.Exists(path))
+            return Fail(context.Console, $"Integration recipe '{names[0]}' was not found.", DotisanExitCode.UsageError);
+        File.Delete(path);
+        context.Console.WriteLine($"Removed {Path.GetRelativePath(services.WorkingDirectory, path)}. Review any package, configuration, and source changes separately.");
+        await Task.CompletedTask;
+        return DotisanExitCode.Success;
+    }
+}
+
 internal sealed class DoctorCommand : WorkspaceCommand
 {
     public override string Name => "doctor";
@@ -416,6 +482,8 @@ internal sealed class DevCommand : WorkspaceCommand
         var databaseStarted = false;
         var mailpitStartAttempted = false;
         var mailpitStarted = false;
+        var dashboardStartAttempted = false;
+        var dashboardStarted = false;
         try
         {
             var proxyMigration = await MigrateLegacyViteProxyAsync(services.FrontendDirectory, context.Console, cancellationToken);
@@ -455,6 +523,16 @@ internal sealed class DevCommand : WorkspaceCommand
                 if (!mailpitResult.Success)
                     return Fail(context.Console, $"Could not start Mailpit with Docker Compose. Ensure Docker Desktop is installed and running, then retry. {mailpitResult.ErrorMessage}");
                 mailpitStarted = true;
+            }
+
+            if (arguments.Contains("--observability", StringComparer.OrdinalIgnoreCase))
+            {
+                dashboardStartAttempted = true;
+                var dashboardResult = await services.RunAsync("docker", ["compose", "up", "-d", "dashboard"], services.WorkingDirectory, context.Console, cancellationToken);
+                if (!dashboardResult.Success)
+                    return Fail(context.Console, $"Could not start the Aspire Dashboard with Docker Compose. Ensure Docker Desktop is installed and running, then retry. {dashboardResult.ErrorMessage}");
+                dashboardStarted = true;
+                context.Console.WriteLine("Aspire Dashboard: http://localhost:18888");
             }
 
             var apiArguments = new List<string> { "watch", "--project", services.ApiProjectPath, "run", "--", "--environment", environment, "--urls", "http://localhost:5000" };
@@ -509,6 +587,12 @@ internal sealed class DevCommand : WorkspaceCommand
                 var stopResult = await services.RunAsync("docker", ["compose", "stop", "mailpit"], services.WorkingDirectory, context.Console, CancellationToken.None);
                 if (!stopResult.Success)
                     context.Console.WriteError(stopResult.ErrorMessage ?? "Could not stop the Mailpit service.");
+            }
+            if (dashboardStarted || (dashboardStartAttempted && cancellationToken.IsCancellationRequested))
+            {
+                var stopResult = await services.RunAsync("docker", ["compose", "stop", "dashboard"], services.WorkingDirectory, context.Console, CancellationToken.None);
+                if (!stopResult.Success)
+                    context.Console.WriteError(stopResult.ErrorMessage ?? "Could not stop the Aspire Dashboard service.");
             }
         }
     }

@@ -85,6 +85,10 @@ dotnet run --project src\MyApp.Api
 
 Or use `dotisan dev --observability`, which enables OTLP export for the coordinated API process. Standard OpenTelemetry environment variables remain the production configuration boundary; Dotisan does not select a vendor-specific backend.
 
+With `--observability`, `dotisan dev` also starts the generated Aspire Dashboard at `http://localhost:18888` and maps OTLP on ports `4317` and `4318`. The dashboard is a development service only.
+
+Generated Vue projects include Vitest, Vue Test Utils, Playwright, Tailwind, and shadcn-vue-compatible `components.json` configuration. Run `pnpm test`, `pnpm run build`, and `pnpm run test:e2e` from the frontend directory.
+
 ## Command reference
 
 ### Project creation
@@ -114,9 +118,13 @@ dotisan dev [--lean] [--observability] [--environment <name>]
 dotisan run
 dotisan build [--no-frontend]
 dotisan doctor [--production]
+dotisan add:integration <name> [--dry-run]
+dotisan remove:integration <name> --force
 ```
 
 Use `dev` for the coordinated API/frontend development experience, `run` for the API alone, `build` for a production-style compile of the generated projects, and `doctor --production` for read-only readiness diagnostics.
+
+Integration commands create or remove only reviewable recipe files under `.dotisan/integrations`. They do not install opaque runtime plugins or delete hand-edited source.
 
 ### Frontend contracts
 
@@ -151,6 +159,12 @@ dotisan migrate --production
 ```powershell
 dotnet ef migrations add InitialCreate --project src\MyApp.Api
 dotisan migrate
+```
+
+To roll back, use standard EF Core tooling after reviewing the target migration:
+
+```powershell
+dotnet ef database update <MigrationName> --project src\MyApp.Api
 ```
 
 Review generated migrations before applying them. For authenticated projects, use an Identity migration such as `InitialIdentity`; for audit support, use an audit migration such as `InitialAudit`.

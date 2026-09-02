@@ -53,14 +53,15 @@ This runs migrations that havent run yet
 dotisan migrate status
 ```
 
-`dotisan new` creates and applies the initial development migration automatically when restore is enabled. `dotisan migrate` applies existing migrations; production migrations must be reviewed and committed first.
+`dotisan new` does not create or apply migrations. Author migrations with `dotnet ef migrations add <Name> --project src/<Name>.Api`, review and commit them, then use `dotisan migrate` to apply existing migrations. To roll back safely, use the standard EF command `dotnet ef database update <MigrationName> --project src/<Name>.Api` after reviewing the target migration.
 
 ## Providers
-Providers are a set of classes that help a user connect to a set of providers much faster. For example one of the base providers will be mail trap, so an email notification system can be tested. Another is Microsoft Exchange, with classes prewritten, that easily allow you to send emails with the microsoft exchange.
+Providers are explicit source/configuration recipes. `dotisan add:integration <name>` creates a reviewable recipe under `.dotisan/integrations`; package installation and registration remain ordinary .NET changes.
 
-### Planned provider commands
+### Provider commands
 ```
-Provider installation commands are planned and are not implemented in v0.6.2.
+dotisan add:integration <aspire|sendgrid|mailgun|signoz> [--dry-run]
+dotisan remove:integration <name> --force
 ```
 
 Providers we are looking at adding from the beginning:
@@ -73,7 +74,7 @@ When adding providers it can add multiple items. These can include controllers, 
 
 ### Remove Provider
 ```
-`dotisan remove provider` is planned and is not implemented in v0.6.2.
+`remove:integration` removes only the Dotisan recipe file. It never attempts to remove packages or hand-edited source.
 ```
 
 > [!WARNING]  
