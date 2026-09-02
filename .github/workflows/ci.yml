@@ -27,6 +27,7 @@ jobs:
       - name: Build generated authenticated and unauthenticated Vue projects
         run: |
           corepack enable
+          corepack prepare pnpm@9.15.0 --activate
           dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj -- new CiAuthWeb --auth yes --registration public --yes --no-restore --output "$RUNNER_TEMP/dotisan-auth-web"
           dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj -- new CiPlainWeb --auth no --yes --no-restore --output "$RUNNER_TEMP/dotisan-plain-web"
           for web in "$RUNNER_TEMP/dotisan-auth-web/src/CiAuthWeb.Web" "$RUNNER_TEMP/dotisan-plain-web/src/CiPlainWeb.Web"; do
