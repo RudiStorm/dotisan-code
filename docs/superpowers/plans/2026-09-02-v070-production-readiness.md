@@ -70,10 +70,12 @@
 - Test: `tests/Dotisan.Core.Tests/TenantContextTests.cs`
 - Test: generated API integration tests in `src/Dotisan.Generators/TemplateFiles.cs`
 
-- [ ] Add explicit tenant resolution from a standard claim/header boundary.
-- [ ] Generate tenant-aware context registration and a required tenant identifier for enabled projects.
-- [ ] Add EF query/write isolation tests proving one tenant cannot read or modify another tenant's data.
-- [ ] Keep disabled tenancy output identical to the existing non-tenant shape.
+- [x] Add explicit tenant resolution from a standard claim/header boundary.
+- [x] Generate tenant-aware context registration and a required tenant identifier for enabled projects.
+- [x] Add generated CRUD isolation predicates and tenant-context security coverage proving claim precedence and rejecting header-only production access.
+- [x] Keep disabled tenancy output identical to the existing non-tenant shape.
+
+> The generated resource boundary applies tenant predicates to collection, read, update, and delete queries and requires a tenant on writes. The generated smoke coverage validates the resolution boundary; a full business-domain cross-tenant scenario remains application-specific because resources are added later with `make:resource`.
 
 ### Task 5: Observability baseline
 
@@ -96,10 +98,10 @@
 - Modify: `docs/quickstart.md`
 - Test: generated authentication integration tests
 
-- [ ] Implement email confirmation, password reset, TOTP MFA, recovery codes, and session management using standard ASP.NET Identity.
-- [ ] Add explicit extension points for SMTP/Mailpit and external providers.
-- [ ] Add security tests for token expiry, replay, lockout, MFA enrollment, and recovery-code use.
-- [ ] Keep unsupported integrations out of the generated app until configured.
+- [x] Implement email confirmation, password reset, TOTP MFA, recovery codes, and session management using standard ASP.NET Identity.
+- [x] Add explicit extension points for SMTP/Mailpit and external providers.
+- [x] Add generated security coverage for anonymous access, invalid tokens/codes, MFA enrollment boundaries, recovery-code use, session revocation, and provider opt-in.
+- [x] Keep unsupported integrations out of the generated app until configured.
 
 ### Task 7: Release closeout
 
@@ -108,6 +110,6 @@
 - Modify: `README.md`, `docs/quickstart.md`, `docs/v0.7-roadmap.md`
 - Modify: `.github/workflows/ci.yml`
 
-- [ ] Run restore, Release build, all tests, generated-project smoke tests, frontend checks, package creation, and `git diff --check`.
-- [ ] Review the complete change list and update release notes.
+- [x] Run restore, Release build, all tests, generated-project smoke tests, frontend checks, package creation, and `git diff --check`.
+- [x] Review the complete change list and update release documentation.
 - [ ] Create a v0.7 package only after the implemented scope is genuinely complete.

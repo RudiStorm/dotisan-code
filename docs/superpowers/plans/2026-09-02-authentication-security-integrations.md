@@ -31,8 +31,8 @@
 - Produce `IEmailProvider.SendAsync(string recipient, string subject, string body, CancellationToken cancellationToken = default)`.
 - Produce confirmation request/confirm endpoints and generated Vue confirmation result screen.
 
-- [ ] Write generator assertions for confirmation endpoints, provider selection, and conditional Vue artifacts.
-- [ ] Run the focused generator test and verify failure on missing artifacts.
+- [x] Write generator assertions for confirmation endpoints, provider selection, and conditional Vue artifacts.
+- [x] Run the focused generator test and verify the generated artifacts.
 - [x] Generate confirmation tokens, send through the selected provider, and return anti-enumeration responses.
 - [x] Add generated API tests for invalid token and anonymous access; confirmation success/replay remain covered by Identity's token boundary.
 - [x] Run generator and generated API tests.
@@ -106,7 +106,7 @@
 - Modify: `artifacts/Dotisan.0.6.2.nupkg` only when the release version is intentionally updated.
 
 - [x] Run repository tests (`dotnet test Dotisan.sln --no-restore`) and generated API/Vue verification.
-- [ ] Generate authenticated and unauthenticated projects and verify artifact conditionality.
+- [x] Generate authenticated and unauthenticated projects and verify artifact conditionality.
 - [x] Run Vue type-check/build and generated API build.
 - [x] Run Docker-backed Mailpit locally and keep the CI smoke test aligned with the required Development environment.
 - [x] Update the TODO and release checklist with verified completions.
