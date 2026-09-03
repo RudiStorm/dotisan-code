@@ -117,7 +117,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [repository, generated-api, browser-smoke, dependency-audit, pack-and-inspect]
     runs-on: ubuntu-latest
-    environment: release
+    environment: production
     permissions:
       contents: read
       id-token: write
