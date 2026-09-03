@@ -102,7 +102,7 @@ jobs:
         run: |
           test "$(find artifacts -name '*.nupkg' | wc -l)" -eq 1
           archive=$(find artifacts -name '*.nupkg' | head -n 1)
-          tar -tf "$archive" | grep -q 'Dotisan.Cli.dll'
+          tar -tf "$archive" | grep 'Dotisan.Cli.dll' >/dev/null
           ! tar -tf "$archive" | grep -E '(^|/)(node_modules|bin|obj|.*\.db|.*\.(pfx|pem|key)$)'
 
   publish-nuget:
