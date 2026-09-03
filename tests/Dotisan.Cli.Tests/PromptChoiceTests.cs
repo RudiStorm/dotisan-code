@@ -16,7 +16,7 @@ public sealed class PromptChoiceTests
 
         var options = prompts.AskForProject("TodoApp", "C:\\work\\TodoApp");
 
-        Assert.Equal(DatabaseProvider.PostgreSQL, options.Database);
+        Assert.Equal(DatabaseProvider.PostgreSQL, options!.Database);
         Assert.True(options.AuthenticationEnabled);
         Assert.Equal(RegistrationPolicy.InviteOnly, options.Registration);
         Assert.True(options.MultiTenancyEnabled);
@@ -34,7 +34,7 @@ public sealed class PromptChoiceTests
 
         var options = prompts.AskForProject("TodoApp", "C:\\work\\TodoApp");
 
-        Assert.Equal(DatabaseProvider.PostgreSQL, options.Database);
+        Assert.Equal(DatabaseProvider.PostgreSQL, options!.Database);
         Assert.True(options.AuthenticationEnabled);
         Assert.Equal(RegistrationPolicy.InviteOnly, options.Registration);
         Assert.True(options.MultiTenancyEnabled);
@@ -60,6 +60,65 @@ public sealed class PromptChoiceTests
         Assert.Contains("1) No", console.Output);
         Assert.Contains("2) Yes", console.Output);
     }
+
+    [Fact]
+    public void Interactive_prompt_uses_arrow_keys_and_shows_review_before_completion()
+    {
+        var console = new CapturingConsole();
+        var keys = new Queue<ConsoleKeyInfo>([
+            Key(ConsoleKey.DownArrow), Key(ConsoleKey.Enter),
+            Key(ConsoleKey.Enter),
+            Key(ConsoleKey.Enter),
+            Key(ConsoleKey.Enter),
+            Key(ConsoleKey.Enter)]);
+        var prompts = new DefaultPrompts(
+            console,
+            isInputRedirected: () => false,
+            readKey: () => keys.Dequeue());
+
+        var options = prompts.AskForProject("TodoApp", "C:\\work\\TodoApp");
+
+        Assert.NotNull(options);
+        Assert.Equal(DatabaseProvider.SqlServer, options!.Database);
+        Assert.Contains("Build boldly. Ship cleanly.", console.Output);
+        Assert.Contains("Review your settings", console.Output);
+    }
+
+    [Fact]
+    public void Interactive_prompt_can_cancel_before_generation_settings_are_complete()
+    {
+        var console = new CapturingConsole();
+        var prompts = new DefaultPrompts(
+            console,
+            isInputRedirected: () => false,
+            readKey: () => Key(ConsoleKey.Escape));
+
+        var options = prompts.AskForProject("TodoApp", "C:\\work\\TodoApp");
+
+        Assert.Null(options);
+        Assert.Contains("cancel", console.Output, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Interactive_prompt_back_from_review_preserves_selected_settings()
+    {
+        var keys = new Queue<ConsoleKeyInfo>([
+            Key(ConsoleKey.DownArrow), Key(ConsoleKey.Enter),
+            Key(ConsoleKey.Enter),
+            Key(ConsoleKey.Enter),
+            Key(ConsoleKey.Enter),
+            Key(ConsoleKey.DownArrow), Key(ConsoleKey.Enter),
+            Key(ConsoleKey.Enter),
+            Key(ConsoleKey.Enter)]);
+        var prompts = new DefaultPrompts(new CapturingConsole(), isInputRedirected: () => false, readKey: () => keys.Dequeue());
+
+        var options = prompts.AskForProject("TodoApp", "C:\\work\\TodoApp");
+
+        Assert.NotNull(options);
+        Assert.Equal(DatabaseProvider.SqlServer, options!.Database);
+    }
+
+    private static ConsoleKeyInfo Key(ConsoleKey key) => new('\0', key, false, false, false);
 
     private sealed class CapturingConsole : IConsole
     {

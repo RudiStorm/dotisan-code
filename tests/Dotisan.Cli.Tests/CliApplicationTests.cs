@@ -14,7 +14,7 @@ public sealed class CliApplicationTests
         var exitCode = await app.RunAsync(["--version"]);
 
         Assert.Equal(DotisanExitCode.Success, exitCode);
-        Assert.Contains("dotisan 0.7.0", console.Output);
+        Assert.Contains("dotisan 0.8.6", console.Output);
     }
 
     [Fact]
@@ -43,6 +43,19 @@ public sealed class CliApplicationTests
 
         Assert.Equal(DotisanExitCode.Success, exitCode);
         Assert.Equal(["argument"], command.Arguments);
+    }
+
+    [Fact]
+    public async Task New_cancelled_by_wizard_does_not_generate_a_project()
+    {
+        var console = new MemoryConsole();
+        var generator = new TrackingProjectGenerator();
+        var app = DotisanApplication.CreateDefault(console, prompts: new CancelingPrompts(), projectGenerator: generator);
+
+        var exitCode = await app.RunAsync(["new", "TodoApp"]);
+
+        Assert.Equal(DotisanExitCode.Canceled, exitCode);
+        Assert.False(generator.WasCalled);
     }
 
     [Fact]
@@ -90,9 +103,9 @@ public sealed class CliApplicationTests
         File.WriteAllText(Path.Combine(root, "Dockerfile"), "FROM mcr.microsoft.com/dotnet/aspnet:10.0\n");
         File.WriteAllText(Path.Combine(root, "src", "App.Web", "package.json"), "{}\n");
         File.WriteAllText(Path.Combine(api, "App.Api.csproj"), "<Project />");
-        File.WriteAllText(Path.Combine(api, "Program.cs"), "app.UseHttpsRedirection(); builder.Services.AddRateLimiter();\n");
+        File.WriteAllText(Path.Combine(api, "Program.cs"), "app.UseHttpsRedirection(); builder.Services.AddRateLimiter(); FrontendUrl must be an absolute HTTPS URL; DataProtection:KeyDirectory\n");
         Directory.CreateDirectory(Path.Combine(api, "Features", "Health"));
-        File.WriteAllText(Path.Combine(api, "Features", "Health", "HealthEndpoints.cs"), "// health endpoint\n");
+        File.WriteAllText(Path.Combine(api, "Features", "Health", "HealthEndpoints.cs"), "// health endpoint /health/ready\n");
         File.WriteAllText(Path.Combine(api, "Migrations", "20260902000000_InitialCreate.cs"), "// migration\n");
         return root;
     }
@@ -218,6 +231,19 @@ public sealed class CliApplicationTests
         Assert.Contains("ef", services.Arguments);
         Assert.Contains("database", services.Arguments);
         Assert.Contains("update", services.Arguments);
+    }
+
+    [Fact]
+    public async Task Migrate_dry_run_lists_migrations_without_applying_them()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices();
+        var app = DotisanApplication.CreateDefault(console, services: services);
+
+        var exitCode = await app.RunAsync(["migrate", "--dry-run"]);
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Equal(["ef", "migrations", "list", "--project", services.ApiProjectPath!], services.Arguments);
     }
 
     [Fact]
@@ -613,6 +639,8 @@ public sealed class CliApplicationTests
         public string WorkingDirectory => "C:\\work";
         public DatabaseProvider Database { get; init; } = DatabaseProvider.SQLite;
         public MailProvider MailProvider { get; init; } = MailProvider.Console;
+        public int ApiPort { get; init; } = 5000;
+        public int WebPort { get; init; } = 5173;
         public string? SolutionPath => "C:\\work\\App.sln";
         public string? ApiProjectPath => "C:\\work\\src\\App.Api\\App.Api.csproj";
         public string? FrontendDirectory { get; init; } = "C:\\work\\src\\App.Web";
@@ -740,5 +768,21 @@ public sealed class CliApplicationTests
     {
         public Task<GenerationResult> GenerateAsync(ProjectOptions options, CancellationToken cancellationToken) =>
             Task.FromResult(GenerationResult.Succeeded(options.OutputDirectory));
+    }
+
+    private sealed class TrackingProjectGenerator : IProjectGenerator
+    {
+        public bool WasCalled { get; private set; }
+
+        public Task<GenerationResult> GenerateAsync(ProjectOptions options, CancellationToken cancellationToken)
+        {
+            WasCalled = true;
+            return Task.FromResult(GenerationResult.Succeeded(options.OutputDirectory));
+        }
+    }
+
+    private sealed class CancelingPrompts : IPrompts
+    {
+        public ProjectOptions? AskForProject(string name, string outputDirectory) => null;
     }
 }

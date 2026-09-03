@@ -40,6 +40,11 @@ public sealed record ProjectOptions(
     PackageManager PackageManager)
 {
     public MailProvider MailProvider { get; init; } = MailProvider.Console;
+    public bool NotificationsEnabled { get; init; }
+    public bool StorageEnabled { get; init; }
+    public bool CachingEnabled { get; init; }
+    public bool ImportsExportsEnabled { get; init; }
+    public bool WebhooksEnabled { get; init; }
     private static readonly Regex ValidName = new("^[A-Za-z][A-Za-z0-9_-]*$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     public static ProjectOptions Quick(string name, string outputDirectory)

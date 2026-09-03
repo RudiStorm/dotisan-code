@@ -13,7 +13,7 @@ internal static class TemplateFiles
         {
           "name": "{{options.Name.ToLowerInvariant()}}-web",
           "private": true,
-          "version": "0.7.0",
+          "version": "0.8.6",
           "packageManager": "{{packageManager}}",
           "type": "module",
           "scripts": {
@@ -63,7 +63,14 @@ internal static class TemplateFiles
             database: {{options.Database.ToString().ToLowerInvariant()}}
             authentication: {{(options.AuthenticationEnabled ? "enabled" : "disabled")}}
             multi_tenancy: {{(options.MultiTenancyEnabled ? "enabled" : "disabled")}}
+            api_port: {{DevelopmentApiPort(options.Name)}}
+            web_port: {{DevelopmentWebPort(options.Name)}}
             mail_provider: {{options.MailProvider.ToString().ToLowerInvariant()}}
+            notifications: {{(options.NotificationsEnabled ? "enabled" : "disabled")}}
+            storage: {{(options.StorageEnabled ? "enabled" : "disabled")}}
+            caching: {{(options.CachingEnabled ? "enabled" : "disabled")}}
+            imports_exports: {{(options.ImportsExportsEnabled ? "enabled" : "disabled")}}
+            webhooks: {{(options.WebhooksEnabled ? "enabled" : "disabled")}}
             package_manager: {{options.PackageManager.ToString().ToLowerInvariant()}}
             dev:
               services:
@@ -78,9 +85,9 @@ internal static class TemplateFiles
             new("Dockerfile", Dockerfile(options.Name)),
             new TemplateFile("compose.yaml", DatabaseCompose(options.Name, options.Database, options.MailProvider)),
             new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.Database, options.AuthenticationEnabled)),
-            new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.MultiTenancyEnabled)),
+            new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.MultiTenancyEnabled, options.NotificationsEnabled, options.StorageEnabled, options.CachingEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled)),
             new($"src/{options.Name}.Api/Infrastructure/DotisanContractExport.cs", ContractExport(options.AuthenticationEnabled)),
-            new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled)),
+            new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled, options.NotificationsEnabled, options.WebhooksEnabled)),
             new($"src/{options.Name}.Api/Auditing/AuditEntry.cs", AuditEntry(identifier)),
             new($"src/{options.Name}.Api/Auditing/IAuditWriter.cs", AuditWriterContract(identifier)),
             new($"src/{options.Name}.Api/Auditing/AuditWriter.cs", AuditWriter(identifier, options.MultiTenancyEnabled)),
@@ -92,6 +99,13 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Api/Jobs/SampleJobHandler.cs", SampleJobHandler(identifier)),
             new($"src/{options.Name}.Api/Features/Jobs/JobEndpoints.cs", JobEndpoints(identifier)),
             new($"src/{options.Name}.Api/Features/Health/HealthEndpoints.cs", HealthEndpoints(identifier)),
+            new($"src/{options.Name}.Api/Infrastructure/DotisanSecurityOptions.cs", DotisanSecurityOptions(identifier)),
+            new($"src/{options.Name}.Api/Infrastructure/DotisanProductionConfiguration.cs", DotisanProductionConfiguration(identifier, options.AuthenticationEnabled)),
+            ..(options.NotificationsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Notifications.cs", Notifications(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
+            ..(options.StorageEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Storage.cs", Storage(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
+            ..(options.CachingEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Caching.cs", Caching(identifier)) } : Array.Empty<TemplateFile>()),
+            ..(options.ImportsExportsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/ImportsExports.cs", ImportsExports(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
+            ..(options.WebhooksEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Webhooks.cs", Webhooks(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationUser.cs", ApplicationUser(identifier)) }
                 : Array.Empty<TemplateFile>()),
@@ -116,15 +130,15 @@ internal static class TemplateFiles
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Authorization/AuthorizationEndpoints.cs", AuthorizationEndpoints(identifier)) }
                 : Array.Empty<TemplateFile>()),
-            new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public)),
-            new($"src/{options.Name}.Api/appsettings.json", AppSettings(options.Name, options.Database)),
+            new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.NotificationsEnabled, options.StorageEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled)),
+            new($"src/{options.Name}.Api/appsettings.json", AppSettings(options.Name, options.Database, DevelopmentWebPort(options.Name))),
             new($"src/{options.Name}.Api/appsettings.Development.json", DevelopmentAppSettings(options.MailProvider)),
             new($"src/{options.Name}.Web/package.json", packageJson),
             new($"src/{options.Name}.Web/index.html", WebIndex(options.Name)),
             new($"src/{options.Name}.Web/tsconfig.json", "{\n  \"files\": [],\n  \"references\": [{ \"path\": \"./tsconfig.app.json\" }, { \"path\": \"./tsconfig.node.json\" }]\n}\n"),
             new($"src/{options.Name}.Web/tsconfig.app.json", "{\n  \"extends\": \"@vue/tsconfig/tsconfig.dom.json\",\n  \"include\": [\"src/**/*.ts\", \"src/**/*.tsx\", \"src/**/*.vue\"],\n  \"compilerOptions\": {\n    \"composite\": true,\n    \"tsBuildInfoFile\": \"./node_modules/.tmp/tsconfig.app.tsbuildinfo\",\n    \"strict\": true,\n    \"target\": \"ES2022\",\n    \"lib\": [\"ES2022\", \"DOM\", \"DOM.Iterable\"],\n    \"moduleResolution\": \"Bundler\"\n  }\n}\n"),
             new($"src/{options.Name}.Web/tsconfig.node.json", "{\n  \"compilerOptions\": {\n    \"composite\": true,\n    \"tsBuildInfoFile\": \"./node_modules/.tmp/tsconfig.node.tsbuildinfo\",\n    \"module\": \"ESNext\",\n    \"moduleResolution\": \"Bundler\",\n    \"allowSyntheticDefaultImports\": true,\n    \"target\": \"ES2022\",\n    \"types\": [\"node\"]\n  },\n  \"include\": [\"vite.config.ts\"]\n}\n"),
-            new($"src/{options.Name}.Web/vite.config.ts", ViteConfig()),
+            new($"src/{options.Name}.Web/vite.config.ts", ViteConfig(DevelopmentApiPort(options.Name), DevelopmentWebPort(options.Name))),
             new($"src/{options.Name}.Web/tailwind.config.ts", TailwindConfig()),
             new($"src/{options.Name}.Web/postcss.config.cjs", PostCssConfig()),
             new($"src/{options.Name}.Web/playwright.config.ts", PlaywrightConfig()),
@@ -132,7 +146,7 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/components.json", ShadcnComponentsConfig()),
             new($"src/{options.Name}.Web/src/env.d.ts", "/// <reference types=\"vite/client\" />\n"),
             new($"src/{options.Name}.Web/src/main.ts", MainTs()),
-            new($"src/{options.Name}.Web/src/routes/index.ts", RoutesIndex(options.AuthenticationEnabled)),
+            new($"src/{options.Name}.Web/src/routes/index.ts", RoutesIndex(options.AuthenticationEnabled, options.NotificationsEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled)),
             new($"src/{options.Name}.Web/src/App.vue", AppVue()),
             new($"src/{options.Name}.Web/src/style.css", StyleCss()),
             new($"src/{options.Name}.Web/src/dotisan/.gitkeep", string.Empty),
@@ -148,6 +162,9 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/src/layouts/PortalLayout.vue", PortalLayout()),
             new($"src/{options.Name}.Web/src/layouts/AuthLayout.vue", AuthLayout()),
             new($"src/{options.Name}.Web/src/pages/DashboardPage.vue", DashboardPage(options.Name)),
+            ..(options.NotificationsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/NotificationsPage.vue", NotificationsPage()) } : Array.Empty<TemplateFile>()),
+            ..(options.ImportsExportsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/ImportsExportsPage.vue", ImportsExportsPage()) } : Array.Empty<TemplateFile>()),
+            ..(options.WebhooksEnabled ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/WebhooksPage.vue", WebhooksPage()) } : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
                 ? new[] {
                     new TemplateFile($"src/{options.Name}.Web/src/pages/auth/LoginPage.vue", LoginPage()),
@@ -207,10 +224,12 @@ internal static class TemplateFiles
     <Project>
       <PropertyGroup>
         <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+        <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
       </PropertyGroup>
       <ItemGroup>
         <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.7" />
         <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.7" />
+        <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
         <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.7" />
         <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.7" />
         <PackageVersion Include="Pomelo.EntityFrameworkCore.MySql" Version="10.0.7" />
@@ -399,8 +418,11 @@ internal static class TemplateFiles
 
     private static string HealthEndpoints(string identifier) => $$"""
     using Microsoft.AspNetCore.Builder;
+    using Microsoft.AspNetCore.Diagnostics.HealthChecks;
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Routing;
+    using Microsoft.Extensions.Diagnostics.HealthChecks;
+    using {{identifier}}.Api.Data;
 
     namespace {{identifier}}.Api.Features.Health;
 
@@ -408,9 +430,68 @@ internal static class TemplateFiles
     {
         public static void MapHealthEndpoints(this IEndpointRouteBuilder endpoints)
         {
+            endpoints.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+            endpoints.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
             endpoints.MapGet("/api/health", () => Results.Ok(new { status = "ok" }))
                 .WithName("Health")
                 .WithTags("System");
+        }
+    }
+
+    public sealed class DatabaseHealthCheck(AppDbContext db) : IHealthCheck
+    {
+        public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
+        {
+            return await db.Database.CanConnectAsync(cancellationToken)
+                ? HealthCheckResult.Healthy()
+                : HealthCheckResult.Unhealthy("The configured database is unavailable.");
+        }
+    }
+    """;
+
+    private static string DotisanSecurityOptions(string identifier) => $$"""
+    using System.ComponentModel.DataAnnotations;
+
+    namespace {{identifier}}.Api.Infrastructure;
+
+    public sealed class DotisanSecurityOptions
+    {
+        [Url]
+        public string? FrontendUrl { get; set; }
+
+        public string? DataProtectionKeyDirectory { get; set; }
+
+        public string[] KnownProxies { get; set; } = [];
+    }
+    """;
+
+    private static string DotisanProductionConfiguration(string identifier, bool emailConfirmationEnabled) => $$"""
+    using Microsoft.Extensions.Configuration;
+
+    namespace {{identifier}}.Api.Infrastructure;
+
+    public static class DotisanProductionConfiguration
+    {
+        public static void Validate(IConfiguration configuration, string environmentName, bool emailConfirmationEnabled = {{emailConfirmationEnabled.ToString().ToLowerInvariant()}})
+        {
+            if (string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(environmentName, "Testing", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var frontendUrl = configuration["Dotisan:Security:FrontendUrl"] ?? configuration["FrontendUrl"];
+            if (!Uri.TryCreate(frontendUrl, UriKind.Absolute, out var parsedFrontendUrl) || parsedFrontendUrl.Scheme != Uri.UriSchemeHttps)
+                throw new InvalidOperationException("Dotisan:Security:FrontendUrl must be an absolute HTTPS URL outside Development.");
+
+            var keyDirectory = configuration["Dotisan:Security:DataProtectionKeyDirectory"] ?? configuration["DataProtection:KeyDirectory"];
+            if (string.IsNullOrWhiteSpace(keyDirectory))
+                throw new InvalidOperationException("Dotisan:Security:DataProtectionKeyDirectory is required outside Development.");
+
+            if (emailConfirmationEnabled)
+            {
+                var mailProvider = configuration["Mail:Provider"]?.Trim().ToLowerInvariant();
+                if (string.IsNullOrWhiteSpace(mailProvider) || mailProvider is "console" or "mailpit")
+                    throw new InvalidOperationException("Mail:Provider must be smtp or a custom provider outside Development.");
+            }
         }
     }
     """;
@@ -553,6 +634,9 @@ internal static class TemplateFiles
     using {{identifier}}.Api.Authorization;
     using {{identifier}}.Api.Identity;
     using {{identifier}}.Api.Integrations;
+    using {{identifier}}.Api.Infrastructure;
+    using {{identifier}}.Api.Features.Health;
+    using Microsoft.AspNetCore.DataProtection;
     using Microsoft.AspNetCore.Identity;
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Http;
@@ -583,33 +667,59 @@ internal static class TemplateFiles
     }
     """;
 
-    private static string ApiProgram(string identifier, DatabaseProvider database, bool authenticationEnabled, bool registrationEnabled, bool multiTenancyEnabled) => authenticationEnabled
-        ? AuthenticatedApiProgram(identifier, database, registrationEnabled, multiTenancyEnabled)
-        : PlainApiProgram(identifier, database, multiTenancyEnabled);
+    private static string ApiProgram(string identifier, DatabaseProvider database, bool authenticationEnabled, bool registrationEnabled, bool multiTenancyEnabled, bool notificationsEnabled, bool storageEnabled, bool cachingEnabled, bool importsExportsEnabled, bool webhooksEnabled) => authenticationEnabled
+        ? AuthenticatedApiProgram(identifier, database, registrationEnabled, multiTenancyEnabled, notificationsEnabled, storageEnabled, cachingEnabled, importsExportsEnabled, webhooksEnabled)
+        : PlainApiProgram(identifier, database, multiTenancyEnabled, notificationsEnabled, storageEnabled, cachingEnabled, importsExportsEnabled, webhooksEnabled);
 
-    private static string PlainApiProgram(string identifier, DatabaseProvider database, bool multiTenancyEnabled) => $$"""
+    private static string PlainApiProgram(string identifier, DatabaseProvider database, bool multiTenancyEnabled, bool notificationsEnabled, bool storageEnabled, bool cachingEnabled, bool importsExportsEnabled, bool webhooksEnabled) => $$"""
     using {{identifier}}.Api.Auditing;
     {{(multiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty)}}
     using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Data;
     using {{identifier}}.Api.Infrastructure;
     using {{identifier}}.Api.Jobs;
+    using {{identifier}}.Api.Features.Health;
+    {{(notificationsEnabled || storageEnabled || cachingEnabled || importsExportsEnabled || webhooksEnabled ? $"using {identifier}.Api.Integrations;" : string.Empty)}}
     using Wolverine;
     using OpenTelemetry;
     using OpenTelemetry.Metrics;
     using OpenTelemetry.Trace;
     using OpenTelemetry.Logs;
+    using Microsoft.AspNetCore.HttpOverrides;
+    using System.Net;
 
     if (TryExportDotisanContract(args))
         return;
 
     var builder = WebApplication.CreateBuilder(args);
+    builder.Services.AddOptions<DotisanSecurityOptions>()
+        .BindConfiguration("Dotisan:Security")
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        foreach (var value in builder.Configuration.GetSection("Dotisan:Security:KnownProxies").Get<string[]>() ?? [])
+        {
+            if (IPAddress.TryParse(value, out var address))
+                options.KnownProxies.Add(address);
+        }
+    });
+    builder.Services.AddCors(options => options.AddPolicy("frontend", policy =>
+    {
+        var frontendUrl = builder.Configuration["Dotisan:Security:FrontendUrl"] ?? builder.Configuration["FrontendUrl"];
+        if (Uri.TryCreate(frontendUrl, UriKind.Absolute, out var origin))
+            policy.WithOrigins(origin.GetLeftPart(UriPartial.Authority)).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+    }));
     if (args.Contains("--dotisan-observability", StringComparer.OrdinalIgnoreCase))
     {
         builder.Configuration["OpenTelemetry:Enabled"] = "true";
     }
     builder.Services.AddOpenApi();
-    builder.Services.AddProblemDetails();
+    builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
+    {
+        context.ProblemDetails.Extensions["correlationId"] = context.HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? context.HttpContext.TraceIdentifier;
+    });
     var openTelemetry = builder.Services.AddOpenTelemetry()
         .WithTracing(tracing => tracing
             .AddAspNetCoreInstrumentation()
@@ -623,15 +733,40 @@ internal static class TemplateFiles
     {
         openTelemetry.UseOtlpExporter();
     }
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required.");
+    var connectionString = ResolveConnectionString(builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required."), builder.Environment.ContentRootPath);
     builder.Services.AddDbContext<AppDbContext>(options =>
         {{DatabaseRegistration(database)}});
+    builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
+    if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing"))
+    {
+        DotisanProductionConfiguration.Validate(builder.Configuration, builder.Environment.EnvironmentName, emailConfirmationEnabled: false);
+        var keyDirectory = builder.Configuration["Dotisan:Security:DataProtectionKeyDirectory"] ?? builder.Configuration["DataProtection:KeyDirectory"];
+        var resolvedKeyDirectory = Path.GetFullPath(keyDirectory!, builder.Environment.ContentRootPath);
+        Directory.CreateDirectory(resolvedKeyDirectory);
+        builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(resolvedKeyDirectory));
+    }
     builder.Services.AddScoped<IAuditWriter, AuditWriter>();
+    {{(notificationsEnabled ? "builder.Services.AddSignalR();\n    builder.Services.AddScoped<INotificationStore, EfNotificationStore>();" : string.Empty)}}
+    {{(storageEnabled ? "builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();" : string.Empty)}}
+    {{(cachingEnabled ? "builder.Services.AddMemoryCache();\n    builder.Services.AddSingleton<IDistributedApplicationCache, MemoryApplicationCache>();\n    builder.Services.AddSingleton<IApplicationCache>(services => services.GetRequiredService<IDistributedApplicationCache>());" : string.Empty)}}
+    {{(importsExportsEnabled ? "builder.Services.AddScoped<IDataExchangeService, DataExchangeService>();" : string.Empty)}}
+    {{(webhooksEnabled ? "builder.Services.AddHttpClient();\n    builder.Services.AddScoped<IWebhookDispatcher, HmacWebhookDispatcher>();" : string.Empty)}}
     {{(multiTenancyEnabled ? "builder.Services.AddHttpContextAccessor();\n    builder.Services.AddScoped<ITenantContext, TenantContext>();" : string.Empty)}}
     builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));
 
     var app = builder.Build();
+    app.UseForwardedHeaders();
+    app.Use(async (context, next) =>
+    {
+        var supplied = context.Request.Headers["X-Correlation-ID"].FirstOrDefault();
+        var correlationId = !string.IsNullOrWhiteSpace(supplied) && supplied.Length <= 100 && supplied.All(character => char.IsLetterOrDigit(character) || character is '-' or '_')
+            ? supplied
+            : Guid.NewGuid().ToString("N");
+        context.Request.Headers["X-Correlation-ID"] = correlationId;
+        context.Response.Headers["X-Correlation-ID"] = correlationId;
+        await next(context);
+    });
     app.UseExceptionHandler();
     if (!app.Environment.IsDevelopment())
     {
@@ -639,6 +774,7 @@ internal static class TemplateFiles
     }
     app.UseDefaultFiles();
     app.UseStaticFiles();
+    app.UseCors("frontend");
     if (app.Environment.IsDevelopment())
     {
         app.MapOpenApi();
@@ -646,6 +782,20 @@ internal static class TemplateFiles
     app.MapDotisanEndpoints();
     app.MapFallbackToFile("index.html");
     app.Run();
+
+    static string ResolveConnectionString(string configured, string contentRoot)
+    {
+        if (!configured.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase))
+            return configured;
+        var parts = configured.Split(';');
+        var dataSource = parts[0]["Data Source=".Length..].Trim();
+        if (Path.IsPathRooted(dataSource) || dataSource.Contains('|'))
+            return configured;
+        var resolvedPath = Path.Combine(contentRoot, dataSource);
+        Directory.CreateDirectory(Path.GetDirectoryName(resolvedPath)!);
+        parts[0] = $"Data Source={resolvedPath}";
+        return string.Join(';', parts);
+    }
 
     static bool TryExportDotisanContract(string[] arguments)
     {
@@ -665,7 +815,7 @@ internal static class TemplateFiles
     public partial class Program { }
     """;
 
-    private static string AuthenticatedApiProgram(string identifier, DatabaseProvider database, bool registrationEnabled, bool multiTenancyEnabled) => $$"""
+    private static string AuthenticatedApiProgram(string identifier, DatabaseProvider database, bool registrationEnabled, bool multiTenancyEnabled, bool notificationsEnabled, bool storageEnabled, bool cachingEnabled, bool importsExportsEnabled, bool webhooksEnabled) => $$"""
     using System.Security.Claims;
     using {{identifier}}.Api.Authorization;
     using {{identifier}}.Api.Auditing;
@@ -674,12 +824,16 @@ internal static class TemplateFiles
     using {{identifier}}.Api.Integrations;
     using {{identifier}}.Api.Infrastructure;
     using {{identifier}}.Api.Jobs;
+    using {{identifier}}.Api.Features.Health;
+    using Microsoft.AspNetCore.DataProtection;
     {{(multiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty)}}
     using Wolverine;
     using Microsoft.AspNetCore.Authentication.Cookies;
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Identity;
     using Microsoft.AspNetCore.RateLimiting;
+    using Microsoft.AspNetCore.HttpOverrides;
+    using System.Net;
     using Microsoft.EntityFrameworkCore;
     using System.Threading.RateLimiting;
     using OpenTelemetry;
@@ -691,12 +845,34 @@ internal static class TemplateFiles
         return;
 
     var builder = WebApplication.CreateBuilder(args);
+    builder.Services.AddOptions<DotisanSecurityOptions>()
+        .BindConfiguration("Dotisan:Security")
+        .ValidateDataAnnotations()
+        .ValidateOnStart();
+    builder.Services.Configure<ForwardedHeadersOptions>(options =>
+    {
+        options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+        foreach (var value in builder.Configuration.GetSection("Dotisan:Security:KnownProxies").Get<string[]>() ?? [])
+        {
+            if (IPAddress.TryParse(value, out var address))
+                options.KnownProxies.Add(address);
+        }
+    });
+    builder.Services.AddCors(options => options.AddPolicy("frontend", policy =>
+    {
+        var frontendUrl = builder.Configuration["Dotisan:Security:FrontendUrl"] ?? builder.Configuration["FrontendUrl"];
+        if (Uri.TryCreate(frontendUrl, UriKind.Absolute, out var origin))
+            policy.WithOrigins(origin.GetLeftPart(UriPartial.Authority)).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+    }));
     if (args.Contains("--dotisan-observability", StringComparer.OrdinalIgnoreCase))
     {
         builder.Configuration["OpenTelemetry:Enabled"] = "true";
     }
     builder.Services.AddOpenApi();
-    builder.Services.AddProblemDetails();
+    builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
+    {
+        context.ProblemDetails.Extensions["correlationId"] = context.HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? context.HttpContext.TraceIdentifier;
+    });
     var openTelemetry = builder.Services.AddOpenTelemetry()
         .WithTracing(tracing => tracing
             .AddAspNetCoreInstrumentation()
@@ -710,11 +886,25 @@ internal static class TemplateFiles
     {
         openTelemetry.UseOtlpExporter();
     }
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required.");
+    var connectionString = ResolveConnectionString(builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required."), builder.Environment.ContentRootPath);
     builder.Services.AddDbContext<AppDbContext>(options =>
         {{DatabaseRegistration(database)}});
+    builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
+    if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing"))
+    {
+        DotisanProductionConfiguration.Validate(builder.Configuration, builder.Environment.EnvironmentName, emailConfirmationEnabled: true);
+        var keyDirectory = builder.Configuration["Dotisan:Security:DataProtectionKeyDirectory"] ?? builder.Configuration["DataProtection:KeyDirectory"];
+        var resolvedKeyDirectory = Path.GetFullPath(keyDirectory!, builder.Environment.ContentRootPath);
+        Directory.CreateDirectory(resolvedKeyDirectory);
+        builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(resolvedKeyDirectory));
+    }
     builder.Services.AddScoped<IAuditWriter, AuditWriter>();
+    {{(notificationsEnabled ? "builder.Services.AddSignalR();\n    builder.Services.AddScoped<INotificationStore, EfNotificationStore>();" : string.Empty)}}
+    {{(storageEnabled ? "builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();" : string.Empty)}}
+    {{(cachingEnabled ? "builder.Services.AddMemoryCache();\n    builder.Services.AddSingleton<IDistributedApplicationCache, MemoryApplicationCache>();\n    builder.Services.AddSingleton<IApplicationCache>(services => services.GetRequiredService<IDistributedApplicationCache>());" : string.Empty)}}
+    {{(importsExportsEnabled ? "builder.Services.AddScoped<IDataExchangeService, DataExchangeService>();" : string.Empty)}}
+    {{(webhooksEnabled ? "builder.Services.AddHttpClient();\n    builder.Services.AddScoped<IWebhookDispatcher, HmacWebhookDispatcher>();" : string.Empty)}}
     {{(multiTenancyEnabled ? "builder.Services.AddHttpContextAccessor();\n    builder.Services.AddScoped<ITenantContext, TenantContext>();" : string.Empty)}}
     builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));
     builder.Services.AddIdentityCore<ApplicationUser>(options =>
@@ -733,6 +923,8 @@ internal static class TemplateFiles
     var mailProvider = builder.Configuration["Mail:Provider"]?.ToLowerInvariant() ?? "console";
     if (mailProvider == "mailpit" && !builder.Environment.IsDevelopment())
         throw new InvalidOperationException("Mailpit is only supported in the Development environment. Select smtp for staging or production.");
+    if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing") && mailProvider == "console")
+        throw new InvalidOperationException("Mail:Provider must be smtp or a custom provider outside Development.");
     builder.Services.AddSingleton<IEmailProvider>(services =>
     {
         var configuration = services.GetRequiredService<IConfiguration>();
@@ -748,7 +940,9 @@ internal static class TemplateFiles
         {
             options.Cookie.HttpOnly = true;
             options.Cookie.SameSite = SameSiteMode.Lax;
-            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing")
+                ? CookieSecurePolicy.SameAsRequest
+                : CookieSecurePolicy.Always;
             options.Events.OnRedirectToLogin = context =>
             {
                 context.Response.StatusCode = StatusCodes.Status401Unauthorized;
@@ -784,6 +978,17 @@ internal static class TemplateFiles
     builder.Services.AddRateLimiter(options => options.AddPolicy("account", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
 
     var app = builder.Build();
+    app.UseForwardedHeaders();
+    app.Use(async (context, next) =>
+    {
+        var supplied = context.Request.Headers["X-Correlation-ID"].FirstOrDefault();
+        var correlationId = !string.IsNullOrWhiteSpace(supplied) && supplied.Length <= 100 && supplied.All(character => char.IsLetterOrDigit(character) || character is '-' or '_')
+            ? supplied
+            : Guid.NewGuid().ToString("N");
+        context.Request.Headers["X-Correlation-ID"] = correlationId;
+        context.Response.Headers["X-Correlation-ID"] = correlationId;
+        await next(context);
+    });
     app.UseExceptionHandler();
     if (!app.Environment.IsDevelopment())
     {
@@ -791,6 +996,7 @@ internal static class TemplateFiles
     }
     app.UseDefaultFiles();
     app.UseStaticFiles();
+    app.UseCors("frontend");
     if (app.Environment.IsDevelopment())
     {
         app.MapOpenApi();
@@ -802,6 +1008,20 @@ internal static class TemplateFiles
     app.MapDotisanEndpoints();
     app.MapFallbackToFile("index.html");
     app.Run();
+
+    static string ResolveConnectionString(string configured, string contentRoot)
+    {
+        if (!configured.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase))
+            return configured;
+        var parts = configured.Split(';');
+        var dataSource = parts[0]["Data Source=".Length..].Trim();
+        if (Path.IsPathRooted(dataSource) || dataSource.Contains('|'))
+            return configured;
+        var resolvedPath = Path.Combine(contentRoot, dataSource);
+        Directory.CreateDirectory(Path.GetDirectoryName(resolvedPath)!);
+        parts[0] = $"Data Source={resolvedPath}";
+        return string.Join(';', parts);
+    }
 
     static bool TryExportDotisanContract(string[] arguments)
     {
@@ -842,7 +1062,7 @@ internal static class TemplateFiles
         DatabaseProvider.SqlServer => $"This project uses EF Core SQL Server. The local default is `Server=localhost,1433;Database={name};User Id=sa;Password=DotisanDev123!;TrustServerCertificate=True`. The generated `compose.yaml` starts SQL Server with `dotisan dev` or `docker compose up -d --wait --wait-timeout 120 database`; replace the connection string and credentials through standard ASP.NET Core configuration before running migrations. `dotisan dev` stops the container on exit and preserves its named volume.",
         DatabaseProvider.PostgreSQL => $"This project uses EF Core PostgreSQL. The local default is `Host=localhost;Database={name.ToLowerInvariant()};Username=postgres;Password=postgres`. The generated `compose.yaml` starts PostgreSQL with `dotisan dev` or `docker compose up -d --wait --wait-timeout 120 database`; replace the connection string and credentials through standard ASP.NET Core configuration before running migrations. `dotisan dev` stops the container on exit and preserves its named volume.",
         DatabaseProvider.MySQL => $"This project uses EF Core MySQL. The local default is `Server=localhost;Database={name.ToLowerInvariant()};User=root;Password=root`. The generated `compose.yaml` starts MySQL with `dotisan dev` or `docker compose up -d --wait --wait-timeout 120 database`; replace the connection string and credentials through standard ASP.NET Core configuration before running migrations. `dotisan dev` stops the container on exit and preserves its named volume.",
-        _ => "This project uses EF Core SQLite. SQLite is file-based and needs no separate database service; the default connection string is `Data Source=app.db`.",
+        _ => $"This project uses EF Core SQLite. SQLite is file-based and needs no separate database service; the project-specific default connection string is `Data Source=Data/{name}.db`.",
     };
 
     private static string DatabaseRegistration(DatabaseProvider database) => database switch
@@ -853,14 +1073,14 @@ internal static class TemplateFiles
         _ => "options.UseSqlite(connectionString)"
     };
 
-    private static string AppSettings(string name, DatabaseProvider database)
+    private static string AppSettings(string name, DatabaseProvider database, int webPort)
     {
         var connectionString = database switch
         {
             DatabaseProvider.SqlServer => $"Server=localhost,1433;Database={name};User Id=sa;Password=DotisanDev123!;TrustServerCertificate=True",
             DatabaseProvider.PostgreSQL => $"Host=localhost;Database={name.ToLowerInvariant()};Username=postgres;Password=postgres",
             DatabaseProvider.MySQL => $"Server=localhost;Database={name.ToLowerInvariant()};User=root;Password=root",
-            _ => "Data Source=app.db"
+            _ => $"Data Source=Data/{name}.db"
         };
 
         return $$"""
@@ -875,12 +1095,18 @@ internal static class TemplateFiles
             "Enabled": false
           },
           "Dotisan": {
+            "Security": {
+              "FrontendUrl": "http://localhost:{{webPort}}",
+              "DataProtectionKeyDirectory": "DataProtection-Keys",
+              "KnownProxies": []
+            },
             "Jobs": {
               "Enabled": true,
               "MaxAttempts": 3,
               "RetryDelaySeconds": 5
             }
           },
+          "FrontendUrl": "http://localhost:{{webPort}}",
           "Logging": {
             "LogLevel": {
               "Default": "Information",
@@ -1047,12 +1273,13 @@ internal static class TemplateFiles
     }
     """;
 
-    private static string DbContext(string identifier, bool authenticationEnabled) => authenticationEnabled
-        ? IdentityDbContext(identifier)
-        : PlainDbContext(identifier);
+    private static string DbContext(string identifier, bool authenticationEnabled, bool notificationsEnabled, bool webhooksEnabled) => authenticationEnabled
+        ? IdentityDbContext(identifier, notificationsEnabled, webhooksEnabled)
+        : PlainDbContext(identifier, notificationsEnabled, webhooksEnabled);
 
-    private static string PlainDbContext(string identifier) => $$"""
+    private static string PlainDbContext(string identifier, bool notificationsEnabled, bool webhooksEnabled) => $$"""
     using {{identifier}}.Api.Auditing;
+    {{(notificationsEnabled || webhooksEnabled ? $"using {identifier}.Api.Integrations;" : string.Empty)}}
     using Microsoft.EntityFrameworkCore;
 
     namespace {{identifier}}.Api.Data;
@@ -1060,11 +1287,14 @@ internal static class TemplateFiles
     public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
     {
         public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+        {{(notificationsEnabled ? $"public DbSet<NotificationRecord> Notifications => Set<NotificationRecord>();" : string.Empty)}}
+        {{(webhooksEnabled ? $"public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();" : string.Empty)}}
     }
     """;
 
-    private static string IdentityDbContext(string identifier) => $$"""
+    private static string IdentityDbContext(string identifier, bool notificationsEnabled, bool webhooksEnabled) => $$"""
     using {{identifier}}.Api.Auditing;
+    {{(notificationsEnabled || webhooksEnabled ? $"using {identifier}.Api.Integrations;" : string.Empty)}}
     using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Identity;
@@ -1075,6 +1305,8 @@ internal static class TemplateFiles
     {
         public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
         public DbSet<ApplicationSession> ApplicationSessions => Set<ApplicationSession>();
+        {{(notificationsEnabled ? $"public DbSet<NotificationRecord> Notifications => Set<NotificationRecord>();" : string.Empty)}}
+        {{(webhooksEnabled ? $"public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();" : string.Empty)}}
     }
     """;
 
@@ -1345,12 +1577,12 @@ internal static class TemplateFiles
         {
             var group = endpoints.MapGroup("/api/account").RequireRateLimiting("account");
             group.MapGet("/antiforgery", IssueAntiforgery).AllowAnonymous();
-            group.MapPost("/register", (RegisterRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) => Register(request, users, emailProvider, audit, httpContext, registrationEnabled, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/register", (RegisterRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, HttpContext httpContext, IAuditWriter audit, IConfiguration configuration, CancellationToken cancellationToken) => Register(request, users, emailProvider, audit, httpContext, configuration, registrationEnabled, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
             group.MapPost("/login", (LoginRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, AppDbContext db, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) => Login(request, users, signInManager, db, audit, httpContext, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
             group.MapPost("/password-reset/request", (PasswordResetRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, CancellationToken cancellationToken) => RequestPasswordReset(request, users, emailProvider, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
             group.MapPost("/password-reset/confirm", (PasswordResetConfirmRequest request, UserManager<ApplicationUser> users, CancellationToken cancellationToken) => ConfirmPasswordReset(request, users, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
             group.MapPost("/email-confirmation/confirm", (EmailConfirmationRequest request, UserManager<ApplicationUser> users, CancellationToken cancellationToken) => ConfirmEmail(request, users, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
-            group.MapPost("/email-confirmation/resend", (EmailConfirmationResendRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, CancellationToken cancellationToken) => ResendConfirmation(request, users, emailProvider, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+            group.MapPost("/email-confirmation/resend", (EmailConfirmationResendRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, IConfiguration configuration, CancellationToken cancellationToken) => ResendConfirmation(request, users, emailProvider, configuration, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
             group.MapGet("/mfa/setup", (ClaimsPrincipal principal, UserManager<ApplicationUser> users) => SetupMfa(principal, users)).RequireAuthorization();
             group.MapPost("/mfa/verify", (MfaCodeRequest request, ClaimsPrincipal principal, UserManager<ApplicationUser> users) => VerifyMfa(request, principal, users)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
             group.MapPost("/mfa/disable", (ClaimsPrincipal principal, UserManager<ApplicationUser> users) => DisableMfa(principal, users)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
@@ -1375,7 +1607,7 @@ internal static class TemplateFiles
             return Results.Ok(new { token = tokens.RequestToken });
         }
 
-        private static async Task<IResult> Register(RegisterRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, IAuditWriter audit, HttpContext httpContext, bool registrationEnabled, CancellationToken cancellationToken)
+        private static async Task<IResult> Register(RegisterRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, IAuditWriter audit, HttpContext httpContext, IConfiguration configuration, bool registrationEnabled, CancellationToken cancellationToken)
         {
             if (!registrationEnabled)
             {
@@ -1394,7 +1626,7 @@ internal static class TemplateFiles
             }
 
             var confirmationToken = await users.GenerateEmailConfirmationTokenAsync(user);
-            await emailProvider.SendAsync(user.Email!, "Confirm your email", $"Use this email confirmation token: {confirmationToken}", cancellationToken);
+            await emailProvider.SendAsync(user.Email!, "Confirm your email", BuildConfirmationEmail(configuration["Dotisan:Security:FrontendUrl"] ?? configuration["FrontendUrl"] ?? "http://localhost:5173", user.Email!, confirmationToken), cancellationToken);
             await audit.RecordAsync(httpContext, "Security", user.Id, "security.registered", new Dictionary<string, object?>(), cancellationToken);
             return Results.Ok(new CurrentUserResponse(user.Id, user.Email!));
         }
@@ -1533,15 +1765,21 @@ internal static class TemplateFiles
             return result.Succeeded ? Results.NoContent() : Results.BadRequest(new { code = "invalid_confirmation" });
         }
 
-        private static async Task<IResult> ResendConfirmation(EmailConfirmationResendRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, CancellationToken cancellationToken)
+        private static async Task<IResult> ResendConfirmation(EmailConfirmationResendRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, IConfiguration configuration, CancellationToken cancellationToken)
         {
             var user = await users.FindByEmailAsync(request.Email);
             if (user is not null && !await users.IsEmailConfirmedAsync(user))
             {
                 var token = await users.GenerateEmailConfirmationTokenAsync(user);
-                await emailProvider.SendAsync(user.Email!, "Confirm your email", $"Use this email confirmation token: {token}", cancellationToken);
+                await emailProvider.SendAsync(user.Email!, "Confirm your email", BuildConfirmationEmail(configuration["Dotisan:Security:FrontendUrl"] ?? configuration["FrontendUrl"] ?? "http://localhost:5173", user.Email!, token), cancellationToken);
             }
             return Results.Accepted();
+        }
+
+        private static string BuildConfirmationEmail(string frontendUrl, string email, string token)
+        {
+            var link = $"{frontendUrl.TrimEnd('/')}/auth/confirm-email?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(token)}";
+            return $"Welcome!\n\nPlease confirm your email address by opening this link:\n{link}\n\nIf you did not create this account, you can safely ignore this email.";
         }
 
         private static async Task<IResult> ConfirmPasswordReset(PasswordResetConfirmRequest request, UserManager<ApplicationUser> users, CancellationToken cancellationToken)
@@ -1624,12 +1862,13 @@ internal static class TemplateFiles
     }
     """;
 
-    private static string EndpointExtensions(string identifier, bool authenticationEnabled, bool registrationEnabled) => $$"""
+    private static string EndpointExtensions(string identifier, bool authenticationEnabled, bool registrationEnabled, bool notificationsEnabled, bool storageEnabled, bool importsExportsEnabled, bool webhooksEnabled) => $$"""
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Routing;
     using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Features.Health;
     using {{identifier}}.Api.Features.Jobs;
+    {{(notificationsEnabled || storageEnabled || importsExportsEnabled || webhooksEnabled ? $"using {identifier}.Api.Integrations;" : string.Empty)}}
     {{(authenticationEnabled ? $"using {identifier}.Api.Features.Account;\n    using {identifier}.Api.Features.Authorization;" : string.Empty)}}
 
     namespace {{identifier}}.Api.Infrastructure;
@@ -1642,6 +1881,10 @@ internal static class TemplateFiles
             // DOTISAN:ENDPOINTS
             HealthEndpoints.MapHealthEndpoints(endpoints);
             JobEndpoints.MapJobEndpoints(endpoints);
+            {{(notificationsEnabled ? "NotificationEndpoints.Map(endpoints); endpoints.MapHub<NotificationHub>(\"/hubs/notifications\");" : string.Empty)}}
+            {{(storageEnabled ? "StorageEndpoints.Map(endpoints);" : string.Empty)}}
+            {{(importsExportsEnabled ? "ImportExportEndpoints.Map(endpoints);" : string.Empty)}}
+            {{(webhooksEnabled ? "WebhookEndpoints.Map(endpoints);" : string.Empty)}}
             {{(authenticationEnabled ? $"AccountEndpoints.MapAccountEndpoints(endpoints, {registrationEnabled.ToString().ToLowerInvariant()});\n            AuthorizationEndpoints.MapAuthorizationEndpoints(endpoints);" : string.Empty)}}
             return endpoints;
         }
@@ -1694,6 +1937,7 @@ internal static class TemplateFiles
     using {{identifier}}.Api.Data;
     using {{identifier}}.Api.Identity;
     using {{identifier}}.Api.Integrations;
+    using {{identifier}}.Api.Infrastructure;
     using Microsoft.AspNetCore.DataProtection;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.AspNetCore.Mvc.Testing;
@@ -1709,6 +1953,54 @@ internal static class TemplateFiles
 
     public sealed class AuthenticationEndpointTests(AuthenticationApplicationFactory factory) : IClassFixture<AuthenticationApplicationFactory>
     {
+        [Fact]
+        public async Task Liveness_and_readiness_health_endpoints_are_available()
+        {
+            using var client = factory.CreateClient();
+            var live = await client.GetAsync("/health/live");
+            var ready = await client.GetAsync("/health/ready");
+            Assert.Equal(HttpStatusCode.OK, live.StatusCode);
+            Assert.Equal(HttpStatusCode.OK, ready.StatusCode);
+        }
+
+        [Fact]
+        public async Task Correlation_id_is_returned_on_api_responses()
+        {
+            using var client = factory.CreateClient();
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/api/account/me");
+            request.Headers.Add("X-Correlation-ID", "health-correlation");
+            var response = await client.SendAsync(request);
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            Assert.Equal("health-correlation", response.Headers.GetValues("X-Correlation-ID").Single());
+        }
+
+        [Fact]
+        public void Production_configuration_rejects_missing_secure_settings()
+        {
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Mail:Provider"] = "console"
+            }).Build();
+
+            var exception = Assert.Throws<InvalidOperationException>(() =>
+                DotisanProductionConfiguration.Validate(configuration, "Production", emailConfirmationEnabled: true));
+
+            Assert.Contains("FrontendUrl", exception.Message, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void Production_configuration_accepts_explicit_deployment_settings()
+        {
+            var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Dotisan:Security:FrontendUrl"] = "https://app.example.com",
+                ["Dotisan:Security:DataProtectionKeyDirectory"] = "keys",
+                ["Mail:Provider"] = "smtp"
+            }).Build();
+
+            DotisanProductionConfiguration.Validate(configuration, "Production", emailConfirmationEnabled: true);
+        }
+
         [Fact]
         public async Task Me_requires_authentication()
         {
@@ -1991,17 +2283,21 @@ internal static class TemplateFiles
     {
         private SqliteConnection? connection;
         public bool AuditEnabled { get; set; } = true;
+        public CapturingEmailProvider EmailProvider { get; } = new();
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Testing");
             builder.UseSetting("Audit:Enabled", AuditEnabled.ToString());
+            builder.UseSetting("FrontendUrl", "https://localhost");
+            builder.UseSetting("DataProtection:KeyDirectory", Path.Combine(Path.GetTempPath(), "dotisan-test-keys"));
             builder.ConfigureLogging(logging => logging.ClearProviders().AddConsole());
             builder.ConfigureServices(services =>
             {
                 connection = new SqliteConnection("Data Source=:memory:");
                 connection.Open();
                 services.AddDataProtection().UseEphemeralDataProtectionProvider();
+                services.AddSingleton<IEmailProvider>(EmailProvider);
                 services.RemoveAll<DbContextOptions<AppDbContext>>();
                 services.AddDbContext<AppDbContext>(options => options.UseSqlite(connection));
 
@@ -2075,6 +2371,17 @@ internal static class TemplateFiles
             base.Dispose(disposing);
         }
     }
+
+    public sealed class CapturingEmailProvider : IEmailProvider
+    {
+        public string LastBody { get; private set; } = string.Empty;
+
+        public Task SendAsync(string recipient, string subject, string body, CancellationToken cancellationToken = default)
+        {
+            LastBody = body;
+            return Task.CompletedTask;
+        }
+    }
     """;
 
     private static string PublicAuthenticationTests() => """
@@ -2090,6 +2397,26 @@ internal static class TemplateFiles
             var registration = await client.SendAsync(register);
             Assert.Equal(HttpStatusCode.OK, registration.StatusCode);
             Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/account/me")).StatusCode);
+        }
+
+        [Fact]
+        public async Task Registration_email_contains_a_confirmable_frontend_link()
+        {
+            var email = $"confirm-{Guid.NewGuid():N}@example.com";
+            using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+            var antiforgery = await GetAntiforgeryToken(client);
+            using var register = new HttpRequestMessage(HttpMethod.Post, "/api/account/register");
+            register.Headers.Add("X-XSRF-TOKEN", antiforgery);
+            register.Content = JsonContent.Create(new { email, password = "Password1!" });
+
+            Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(register)).StatusCode);
+            var link = factory.EmailProvider.LastBody.Split('\n', StringSplitOptions.RemoveEmptyEntries).Single(line => line.Contains("/auth/confirm-email?", StringComparison.Ordinal)).Trim();
+            var query = link[(link.IndexOf('?') + 1)..].Split('&').Select(part => part.Split('=', 2)).ToDictionary(part => part[0], part => Uri.UnescapeDataString(part[1]));
+            using var confirmation = new HttpRequestMessage(HttpMethod.Post, "/api/account/email-confirmation/confirm");
+            confirmation.Headers.Add("X-XSRF-TOKEN", await GetAntiforgeryToken(client));
+            confirmation.Content = JsonContent.Create(new { email = query["email"], token = query["token"] });
+
+            Assert.Equal(HttpStatusCode.NoContent, (await client.SendAsync(confirmation)).StatusCode);
         }
 
         [Fact]
@@ -2130,7 +2457,7 @@ internal static class TemplateFiles
     </html>
     """;
 
-    private static string ViteConfig() => """
+    private static string ViteConfig(int apiPort, int webPort) => $$"""
     import { fileURLToPath, URL } from 'node:url';
     import { defineConfig } from 'vite';
     import vue from '@vitejs/plugin-vue';
@@ -2138,9 +2465,13 @@ internal static class TemplateFiles
     export default defineConfig({
       plugins: [vue()],
       resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
-      server: { port: 5173, proxy: { '/api': 'http://localhost:5000' } }
+      server: { port: {{webPort}}, proxy: { '/api': 'http://localhost:{{apiPort}}' } }
     });
     """;
+
+    private static int DevelopmentApiPort(string name) => 5000 + Math.Abs(name.Aggregate(17, (hash, character) => unchecked(hash * 31 + character))) % 1000;
+
+    private static int DevelopmentWebPort(string name) => 5173 + Math.Abs(name.Aggregate(23, (hash, character) => unchecked(hash * 31 + character))) % 1000;
 
     private static string MainTs() => """
     import { createApp } from 'vue';
@@ -2239,8 +2570,8 @@ internal static class TemplateFiles
     """
     };
 
-    private static string RoutesIndex(bool authenticationEnabled) => authenticationEnabled
-        ? """
+    private static string RoutesIndex(bool authenticationEnabled, bool notificationsEnabled, bool importsExportsEnabled, bool webhooksEnabled) => authenticationEnabled
+        ? $$"""
     import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
     import { me } from '../dotisan/services';
     import PortalLayout from '../layouts/PortalLayout.vue';
@@ -2256,9 +2587,12 @@ internal static class TemplateFiles
     import SessionsPage from '../pages/account/SessionsPage.vue';
     import ExternalLoginsPage from '../pages/account/ExternalLoginsPage.vue';
     import AuthorizationPage from '../pages/admin/AuthorizationPage.vue';
+    {{(notificationsEnabled ? "import NotificationsPage from '../pages/NotificationsPage.vue';" : string.Empty)}}
+    {{(importsExportsEnabled ? "import ImportsExportsPage from '../pages/ImportsExportsPage.vue';" : string.Empty)}}
+    {{(webhooksEnabled ? "import WebhooksPage from '../pages/WebhooksPage.vue';" : string.Empty)}}
 
     const routes: RouteRecordRaw[] = [
-      { path: '/', component: PortalLayout, meta: { requiresAuth: true }, children: [{ path: '', component: DashboardPage }, { path: 'profile', component: ProfilePage }, { path: 'security/mfa', component: MfaPage }, { path: 'security/sessions', component: SessionsPage }, { path: 'security/external-logins', component: ExternalLoginsPage }, { path: 'admin/authorization', component: AuthorizationPage, meta: { requiresPermission: 'authorization.manage' } }] },
+      { path: '/', component: PortalLayout, meta: { requiresAuth: true }, children: [{ path: '', component: DashboardPage }, {{(notificationsEnabled ? "{ path: 'notifications', component: NotificationsPage }," : string.Empty)}} {{(importsExportsEnabled ? "{ path: 'data', component: ImportsExportsPage }," : string.Empty)}} {{(webhooksEnabled ? "{ path: 'webhooks', component: WebhooksPage }," : string.Empty)}} { path: 'profile', component: ProfilePage }, { path: 'security/mfa', component: MfaPage }, { path: 'security/sessions', component: SessionsPage }, { path: 'security/external-logins', component: ExternalLoginsPage }, { path: 'admin/authorization', component: AuthorizationPage, meta: { requiresPermission: 'authorization.manage' } }] },
       { path: '/auth', component: AuthLayout, children: [{ path: 'login', name: 'login', component: LoginPage }, { path: 'register', name: 'register', component: RegisterPage }, { path: 'forgot-password', component: ForgotPasswordPage }, { path: 'confirm-email', component: EmailConfirmationPage }, { path: 'mfa-challenge', component: MfaChallengePage }] }
     ];
     // DOTISAN:ROUTES
@@ -2269,13 +2603,16 @@ internal static class TemplateFiles
     });
     export default router;
     """
-        : """
+    : $$"""
     import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
     import PortalLayout from '../layouts/PortalLayout.vue';
     import DashboardPage from '../pages/DashboardPage.vue';
+    {{(notificationsEnabled ? "import NotificationsPage from '../pages/NotificationsPage.vue';" : string.Empty)}}
+    {{(importsExportsEnabled ? "import ImportsExportsPage from '../pages/ImportsExportsPage.vue';" : string.Empty)}}
+    {{(webhooksEnabled ? "import WebhooksPage from '../pages/WebhooksPage.vue';" : string.Empty)}}
 
     const routes: RouteRecordRaw[] = [
-      { path: '/', component: PortalLayout, children: [{ path: '', component: DashboardPage }] }
+      { path: '/', component: PortalLayout, children: [{ path: '', component: DashboardPage }{{(notificationsEnabled ? ", { path: 'notifications', component: NotificationsPage }" : string.Empty)}}{{(importsExportsEnabled ? ", { path: 'data', component: ImportsExportsPage }" : string.Empty)}}{{(webhooksEnabled ? ", { path: 'webhooks', component: WebhooksPage }" : string.Empty)}}] }
     ];
     // DOTISAN:ROUTES
     export default createRouter({ history: createWebHistory(), routes });
@@ -2438,6 +2775,7 @@ internal static class TemplateFiles
             Assert.Contains("scheduled", "Durable scheduled messages survive process restarts", StringComparison.OrdinalIgnoreCase);
         }
     }
+
     """;
 
     private static string TenantContextTests(string identifier) => $$"""
@@ -2483,7 +2821,7 @@ internal static class TemplateFiles
             Assert.Throws<InvalidOperationException>(() => tenant.TenantId);
         }
 
-        private static IHostEnvironment Environment(string name) => new TestEnvironment { EnvironmentName = name };
+        private static TestEnvironment Environment(string name) => new() { EnvironmentName = name };
 
         private sealed class TestEnvironment : IHostEnvironment
         {
@@ -2656,14 +2994,45 @@ internal static class TemplateFiles
     </template>
     """;
 
+    private static string NotificationsPage() => """
+    <script setup lang="ts">
+    import { onMounted, ref } from 'vue';
+    import UiCard from '../components/ui/Card.vue';
+    const notifications = ref<Array<{ id: string; title: string; body: string; isRead: boolean }>>([]);
+    onMounted(async () => { const response = await fetch('/api/notifications'); if (response.ok) notifications.value = (await response.json()).notifications; });
+    async function markRead(id: string) { await fetch(`/api/notifications/${id}/read`, { method: 'POST' }); const item = notifications.value.find(value => value.id === id); if (item) item.isRead = true; }
+    </script>
+    <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Inbox</p><h2>Notifications</h2></div></div><UiCard v-for="item in notifications" :key="item.id" :class="{ unread: !item.isRead }"><h3>{{ item.title }}</h3><p>{{ item.body }}</p><button v-if="!item.isRead" @click="markRead(item.id)">Mark read</button></UiCard><p v-if="notifications.length === 0" class="muted">You are all caught up.</p></section></template>
+    """;
+
+    private static string ImportsExportsPage() => """
+    <script setup lang="ts">
+    import { ref } from 'vue';
+    const file = ref<File>(); const message = ref('');
+    async function importFile() { if (!file.value) return; const body = new FormData(); body.append('file', file.value); const response = await fetch('/api/data/imports', { method: 'POST', body }); message.value = response.ok ? 'Import queued.' : 'Import failed.'; }
+    </script>
+    <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Data</p><h2>Imports and exports</h2></div></div><form @submit.prevent="importFile"><input type="file" accept=".csv,.json" @change="file = ($event.target as HTMLInputElement).files?.[0]" /><button type="submit">Queue import</button></form><a href="/api/data/exports/csv">Download CSV export</a><p v-if="message" role="status">{{ message }}</p></section></template>
+    """;
+
+    private static string WebhooksPage() => """
+    <script setup lang="ts">
+    import { onMounted, ref } from 'vue';
+    const deliveries = ref<Array<{ id: string; eventType: string; endpoint: string; status: string; attempts: number }>>([]);
+    onMounted(async () => { const response = await fetch('/api/webhooks/deliveries'); if (response.ok) deliveries.value = await response.json(); });
+    async function replay(id: string) { await fetch(`/api/webhooks/deliveries/${id}/replay`, { method: 'POST' }); }
+    </script>
+    <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Integrations</p><h2>Webhook deliveries</h2></div></div><table><thead><tr><th>Event</th><th>Endpoint</th><th>Status</th><th>Attempts</th><th></th></tr></thead><tbody><tr v-for="delivery in deliveries" :key="delivery.id"><td>{{ delivery.eventType }}</td><td>{{ delivery.endpoint }}</td><td>{{ delivery.status }}</td><td>{{ delivery.attempts }}</td><td><button @click="replay(delivery.id)">Replay</button></td></tr></tbody></table><p v-if="deliveries.length === 0" class="muted">No webhook deliveries yet.</p></section></template>
+    """;
+
     private static string LoginPage() => """
     <script setup lang="ts">
-    import { ref } from 'vue'; import { useRoute, useRouter } from 'vue-router'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue'; import { issueAntiforgery, login } from '../../dotisan/services';
-    const router = useRouter(); const route = useRoute(); const email = ref(''); const password = ref(''); const rememberMe = ref(false); const error = ref(''); const pending = ref(false);
-    async function submit() { pending.value = true; error.value = ''; try { const token = await issueAntiforgery(); const result = await login({ email: email.value, password: password.value, rememberMe: rememberMe.value }, { headers: { 'X-XSRF-TOKEN': token.token } }); if (result.code === 'mfa_required') { await router.push({ path: '/auth/mfa-challenge', query: { redirect: String(route.query.redirect ?? '/') } }); return; } await router.push(String(route.query.redirect ?? '/')); } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Unable to sign in.'; } finally { pending.value = false; } }
+    import { ref } from 'vue'; import { useRoute, useRouter } from 'vue-router'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue'; import { ApiError, issueAntiforgery, login } from '../../dotisan/services';
+    const router = useRouter(); const route = useRoute(); const email = ref(''); const password = ref(''); const rememberMe = ref(false); const error = ref(''); const fieldErrors = ref<Record<string, string[]>>({}); const pending = ref(false);
+    function clearErrors() { error.value = ''; fieldErrors.value = {}; }
+    async function submit() { pending.value = true; clearErrors(); try { const token = await issueAntiforgery(); const result = await login({ email: email.value, password: password.value, rememberMe: rememberMe.value }, { headers: { 'X-XSRF-TOKEN': token.token } }); if (result.code === 'mfa_required') { await router.push({ path: '/auth/mfa-challenge', query: { redirect: String(route.query.redirect ?? '/') } }); return; } await router.push(String(route.query.redirect ?? '/')); } catch (exception) { if (exception instanceof ApiError) { error.value = exception.message; fieldErrors.value = exception.fieldErrors; } else { error.value = exception instanceof Error ? exception.message : 'Unable to sign in.'; } } finally { pending.value = false; } }
     </script>
     <template>
-    <UiCard><div class="auth-card-heading"><p class="eyebrow">Welcome back</p><h1>Sign in</h1><p class="muted">Continue to your workspace.</p></div><form class="form-stack" @submit.prevent="submit"><p v-if="error" class="form-error" role="alert" v-text="error"></p><label>Email<UiInput v-model="email" type="email" autocomplete="email" required /></label><label>Password<UiInput v-model="password" type="password" autocomplete="current-password" required /></label><label class="checkbox"><input v-model="rememberMe" type="checkbox" /> Remember me</label><UiButton type="submit" :disabled="pending"><span v-text="pending ? 'Signing in...' : 'Sign in'"></span></UiButton></form><p class="form-links"><RouterLink to="/auth/register">Create an account</RouterLink><RouterLink to="/auth/forgot-password">Forgot password?</RouterLink></p></UiCard>
+    <UiCard><div class="auth-card-heading"><p class="eyebrow">Welcome back</p><h1>Sign in</h1><p class="muted">Continue to your workspace.</p></div><form class="form-stack" @submit.prevent="submit"><p v-if="error" class="form-error" role="alert" v-text="error"></p><label for="login-email">Email<UiInput id="login-email" v-model="email" type="email" autocomplete="email" required :aria-invalid="fieldErrors.email?.length ? 'true' : undefined" aria-describedby="login-email-error" /></label><p v-if="fieldErrors.email?.length" id="login-email-error" class="field-error" v-text="fieldErrors.email.join(' ')"></p><label for="login-password">Password<UiInput id="login-password" v-model="password" type="password" autocomplete="current-password" required :aria-invalid="fieldErrors.password?.length ? 'true' : undefined" aria-describedby="login-password-error" /></label><p v-if="fieldErrors.password?.length" id="login-password-error" class="field-error" v-text="fieldErrors.password.join(' ')"></p><label class="checkbox"><input v-model="rememberMe" type="checkbox" /> Remember me</label><UiButton type="submit" :disabled="pending"><span v-text="pending ? 'Signing in...' : 'Sign in'"></span></UiButton></form><p class="form-links"><RouterLink to="/auth/register">Create an account</RouterLink><RouterLink to="/auth/forgot-password">Forgot password?</RouterLink></p></UiCard>
     </template>
     """;
 
@@ -2678,12 +3047,13 @@ internal static class TemplateFiles
 
     private static string RegisterPage() => """
     <script setup lang="ts">
-    import { ref } from 'vue'; import { useRouter } from 'vue-router'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue'; import { issueAntiforgery, register } from '../../dotisan/services';
-    const router = useRouter(); const email = ref(''); const password = ref(''); const error = ref(''); const pending = ref(false);
-    async function submit() { pending.value = true; error.value = ''; try { const token = await issueAntiforgery(); await register({ email: email.value, password: password.value }, { headers: { 'X-XSRF-TOKEN': token.token } }); await router.push({ path: '/auth/confirm-email', query: { email: email.value } }); } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Unable to create your account.'; } finally { pending.value = false; } }
+    import { ref } from 'vue'; import { useRouter } from 'vue-router'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue'; import { ApiError, issueAntiforgery, register } from '../../dotisan/services';
+    const router = useRouter(); const email = ref(''); const password = ref(''); const error = ref(''); const fieldErrors = ref<Record<string, string[]>>({}); const pending = ref(false);
+    function clearErrors() { error.value = ''; fieldErrors.value = {}; }
+    async function submit() { pending.value = true; clearErrors(); try { const token = await issueAntiforgery(); await register({ email: email.value, password: password.value }, { headers: { 'X-XSRF-TOKEN': token.token } }); await router.push({ path: '/auth/confirm-email', query: { email: email.value } }); } catch (exception) { if (exception instanceof ApiError) { error.value = exception.message; fieldErrors.value = exception.fieldErrors; } else { error.value = exception instanceof Error ? exception.message : 'Unable to create your account.'; } } finally { pending.value = false; } }
     </script>
     <template>
-    <UiCard><div class="auth-card-heading"><p class="eyebrow">Get started</p><h1>Create account</h1><p class="muted">Set up your workspace access.</p></div><form class="form-stack" @submit.prevent="submit"><p v-if="error" class="form-error" role="alert" v-text="error"></p><label>Email<UiInput v-model="email" type="email" autocomplete="email" required /></label><label>Password<UiInput v-model="password" type="password" autocomplete="new-password" required /></label><UiButton type="submit" :disabled="pending"><span v-text="pending ? 'Creating...' : 'Create account'"></span></UiButton></form><p class="form-links"><RouterLink to="/auth/login">Already have an account?</RouterLink></p></UiCard>
+    <UiCard><div class="auth-card-heading"><p class="eyebrow">Get started</p><h1>Create account</h1><p class="muted">Set up your workspace access.</p></div><form class="form-stack" @submit.prevent="submit"><p v-if="error" class="form-error" role="alert" v-text="error"></p><label for="register-email">Email<UiInput id="register-email" v-model="email" type="email" autocomplete="email" required :aria-invalid="fieldErrors.email?.length ? 'true' : undefined" aria-describedby="register-email-error" /></label><p v-if="fieldErrors.email?.length" id="register-email-error" class="field-error" v-text="fieldErrors.email.join(' ')"></p><label for="register-password">Password<UiInput id="register-password" v-model="password" type="password" autocomplete="new-password" required :aria-invalid="fieldErrors.password?.length ? 'true' : undefined" aria-describedby="register-password-error" /></label><p v-if="fieldErrors.password?.length" id="register-password-error" class="field-error" v-text="fieldErrors.password.join(' ')"></p><UiButton type="submit" :disabled="pending"><span v-text="pending ? 'Creating...' : 'Create account'"></span></UiButton></form><p class="form-links"><RouterLink to="/auth/login">Already have an account?</RouterLink></p></UiCard>
     </template>
     """;
 
@@ -2701,11 +3071,11 @@ internal static class TemplateFiles
     private static string EmailConfirmationPage() => """
     <script setup lang="ts">
     import { onMounted, ref } from 'vue'; import { useRoute } from 'vue-router'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue'; import { confirmEmail, issueAntiforgery, resendConfirmation } from '../../dotisan/services';
-    const route = useRoute(); const email = ref(String(route.query.email ?? '')); const status = ref('Confirming your email...'); const error = ref(''); const resent = ref(false); const pending = ref(false);
-    onMounted(async () => { try { await confirmEmail({ email: String(route.query.email ?? ''), token: String(route.query.token ?? '') }); status.value = 'Your email has been confirmed. You can sign in.'; } catch (exception) { error.value = exception instanceof Error ? exception.message : 'This confirmation link is invalid or expired.'; status.value = ''; } });
+    const route = useRoute(); const email = ref(String(route.query.email ?? '')); const status = ref(route.query.token ? 'Confirming your email...' : 'Check your email for a confirmation link.'); const error = ref(''); const resent = ref(false); const pending = ref(false); const showResend = ref(!route.query.token);
+    onMounted(async () => { if (!route.query.token) return; try { const token = await issueAntiforgery(); await confirmEmail({ email: String(route.query.email ?? ''), token: String(route.query.token) }, { headers: { 'X-XSRF-TOKEN': token.token } }); status.value = 'Your email has been confirmed. You can sign in.'; showResend.value = false; } catch (exception) { error.value = exception instanceof Error ? exception.message : 'This confirmation link is invalid or expired.'; status.value = ''; showResend.value = true; } });
     async function resend() { pending.value = true; error.value = ''; try { const token = await issueAntiforgery(); await resendConfirmation({ email: email.value }, { headers: { 'X-XSRF-TOKEN': token.token } }); resent.value = true; } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Unable to resend confirmation.'; } finally { pending.value = false; } }
     </script>
-    <template><UiCard><div class="auth-card-heading"><p class="eyebrow">Account security</p><h1>Email confirmation</h1><p v-if="status" class="muted" v-text="status"></p><p v-if="error" class="form-error" role="alert" v-text="error"></p><form v-if="!status" class="form-stack" @submit.prevent="resend"><label>Email<UiInput v-model="email" type="email" autocomplete="email" required /></label><UiButton type="submit" :disabled="pending"><span v-text="pending ? 'Sending...' : 'Resend confirmation email'"></span></UiButton><p v-if="resent" class="muted">If the account exists, a confirmation email has been sent.</p></form></div><p class="form-links"><RouterLink to="/auth/login">Continue to sign in</RouterLink></p></UiCard></template>
+    <template><UiCard><div class="auth-card-heading"><p class="eyebrow">Account security</p><h1>Email confirmation</h1><p v-if="status" class="muted" v-text="status"></p><p v-if="error" class="form-error" role="alert" v-text="error"></p><form v-if="showResend" class="form-stack" @submit.prevent="resend"><label>Email<UiInput v-model="email" type="email" autocomplete="email" required /></label><UiButton type="submit" :disabled="pending"><span v-text="pending ? 'Sending...' : 'Resend confirmation email'"></span></UiButton><p v-if="resent" class="muted">If the account exists, a confirmation email has been sent.</p></form></div><p class="form-links"><RouterLink to="/auth/login">Continue to sign in</RouterLink></p></UiCard></template>
     """;
 
     private static string ProfilePage() => """
@@ -2817,6 +3187,8 @@ internal static class TemplateFiles
     .form-stack label { display: grid; gap: .4rem; color: oklch(35% .03 255); font-size: .875rem; font-weight: 650; }
     .checkbox { display: flex !important; grid-template-columns: auto 1fr; align-items: center; gap: .5rem !important; font-weight: 500 !important; }
     .form-error { margin: 0; border-radius: .55rem; padding: .7rem .8rem; background: oklch(94% .045 25); color: oklch(40% .12 25); font-size: .875rem; }
+    .field-error { margin: -.55rem 0 0; color: oklch(43% .12 25); font-size: .78rem; line-height: 1.35; }
+    .ui-input[aria-invalid="true"] { border-color: oklch(58% .16 25); }
     .form-links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem; margin: 0; color: oklch(45% .08 75); font-size: .8rem; font-weight: 700; }
     .user-menu { position: relative; }
     .user-menu__panel { position: absolute; z-index: 2; right: 0; display: grid; min-width: 9rem; gap: .2rem; margin-top: .25rem; border: 1px solid oklch(88% .02 255); border-radius: .6rem; padding: .35rem; background: oklch(99% .004 255); box-shadow: 0 .8rem 2rem oklch(24% .03 255 / .12); }
@@ -2854,6 +3226,166 @@ internal static class TemplateFiles
     EXPOSE 8080
     HEALTHCHECK --interval=30s --timeout=5s CMD wget --spider --no-verbose http://localhost:8080/api/health || exit 1
     ENTRYPOINT ["dotnet", "{{name}}.Api.dll"]
+    """;
+
+    private static string Notifications(string identifier, bool authenticationEnabled, bool multiTenancyEnabled) => $$"""
+    using Microsoft.AspNetCore.SignalR;
+    using Microsoft.EntityFrameworkCore;
+    using Microsoft.EntityFrameworkCore.Metadata.Builders;
+    using Microsoft.AspNetCore.Routing;
+    using {{identifier}}.Api.Data;
+    {{(multiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty)}}
+
+    namespace {{identifier}}.Api.Integrations;
+
+    public sealed class NotificationRecord
+    {
+        public Guid Id { get; set; }
+        public string RecipientId { get; set; } = string.Empty;
+        public string? TenantId { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Body { get; set; } = string.Empty;
+        public bool IsRead { get; set; }
+        public DateTimeOffset CreatedAtUtc { get; set; }
+    }
+    public sealed class NotificationRecordConfiguration : IEntityTypeConfiguration<NotificationRecord>
+    {
+        public void Configure(EntityTypeBuilder<NotificationRecord> builder) { builder.HasKey(item => item.Id); builder.HasIndex(item => new { item.TenantId, item.RecipientId, item.IsRead }); builder.Property(item => item.Title).HasMaxLength(200); builder.Property(item => item.Body).HasMaxLength(4000); }
+    }
+    public interface INotificationStore
+    {
+        Task<IReadOnlyList<NotificationRecord>> ListAsync(string recipientId, string? tenantId, CancellationToken cancellationToken);
+        Task<NotificationRecord> AddAsync(string recipientId, string? tenantId, string title, string body, CancellationToken cancellationToken);
+        Task<bool> MarkReadAsync(Guid id, string recipientId, string? tenantId, CancellationToken cancellationToken);
+    }
+    public sealed class EfNotificationStore(AppDbContext db) : INotificationStore
+    {
+        public async Task<IReadOnlyList<NotificationRecord>> ListAsync(string recipientId, string? tenantId, CancellationToken cancellationToken) => await db.Notifications.AsNoTracking().Where(item => item.RecipientId == recipientId && item.TenantId == tenantId).OrderByDescending(item => item.CreatedAtUtc).ToListAsync(cancellationToken);
+        public async Task<NotificationRecord> AddAsync(string recipientId, string? tenantId, string title, string body, CancellationToken cancellationToken) { var item = new NotificationRecord { Id = Guid.NewGuid(), RecipientId = recipientId, TenantId = tenantId, Title = title, Body = body, CreatedAtUtc = DateTimeOffset.UtcNow }; db.Notifications.Add(item); await db.SaveChangesAsync(cancellationToken); return item; }
+        public async Task<bool> MarkReadAsync(Guid id, string recipientId, string? tenantId, CancellationToken cancellationToken) { var item = await db.Notifications.FirstOrDefaultAsync(x => x.Id == id && x.RecipientId == recipientId && x.TenantId == tenantId, cancellationToken); if (item is null) return false; item.IsRead = true; await db.SaveChangesAsync(cancellationToken); return true; }
+    }
+    public sealed class NotificationHub : Hub { }
+    public static class NotificationEndpoints
+    {
+        public static void Map(IEndpointRouteBuilder endpoints)
+        {
+            var group = endpoints.MapGroup("/api/notifications"); {{(authenticationEnabled ? "group.RequireAuthorization();" : string.Empty)}}
+            group.MapGet("", async (HttpContext httpContext, INotificationStore store{{(multiTenancyEnabled ? ", ITenantContext tenantContext" : string.Empty)}}, CancellationToken cancellationToken) => Results.Ok(new { notifications = await store.ListAsync(httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous", {{(multiTenancyEnabled ? "tenantContext.TenantId" : "null")}}, cancellationToken) }));
+            group.MapPost("", async (NotificationRequest request, HttpContext httpContext, INotificationStore store, IHubContext<NotificationHub> hub{{(multiTenancyEnabled ? ", ITenantContext tenantContext" : string.Empty)}}, CancellationToken cancellationToken) => { if (string.IsNullOrWhiteSpace(request.RecipientId) || string.IsNullOrWhiteSpace(request.Title) || string.IsNullOrWhiteSpace(request.Body)) return Results.ValidationProblem(new Dictionary<string, string[]> { ["notification"] = ["Recipient, title, and body are required."] }); var item = await store.AddAsync(request.RecipientId.Trim(), {{(multiTenancyEnabled ? "tenantContext.TenantId" : "null")}}, request.Title.Trim(), request.Body.Trim(), cancellationToken); await hub.Clients.User(item.RecipientId).SendAsync("notification", item, cancellationToken); return Results.Created($"/api/notifications/{item.Id}", item); });
+            group.MapPost("/{id:guid}/read", async (Guid id, HttpContext httpContext, INotificationStore store{{(multiTenancyEnabled ? ", ITenantContext tenantContext" : string.Empty)}}, CancellationToken cancellationToken) => await store.MarkReadAsync(id, httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "anonymous", {{(multiTenancyEnabled ? "tenantContext.TenantId" : "null")}}, cancellationToken) ? Results.NoContent() : Results.NotFound());
+        }
+        public sealed record NotificationRequest(string RecipientId, string Title, string Body);
+    }
+    """;
+
+    private static string Storage(string identifier, bool authenticationEnabled, bool multiTenancyEnabled) => $$"""
+    using Microsoft.AspNetCore.Routing;
+    namespace {{identifier}}.Api.Integrations;
+
+    public sealed record StoredFile(string Key, string ContentType, long Length, DateTimeOffset CreatedAtUtc);
+    public interface IFileStorage
+    {
+        Task<StoredFile> PutAsync(string key, Stream content, string contentType, CancellationToken cancellationToken = default);
+        Task<Stream?> OpenReadAsync(string key, CancellationToken cancellationToken = default);
+        Task DeleteAsync(string key, CancellationToken cancellationToken = default);
+    }
+    public sealed class LocalFileStorage(IHostEnvironment environment, IConfiguration configuration) : IFileStorage
+    {
+        private string Resolve(string key) { var root = Path.GetFullPath(configuration["Storage:LocalRoot"] ?? Path.Combine(environment.ContentRootPath, "storage")); var path = Path.GetFullPath(Path.Combine(root, key.Replace('/', Path.DirectorySeparatorChar))); if (!path.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Invalid storage key."); return path; }
+        public async Task<StoredFile> PutAsync(string key, Stream content, string contentType, CancellationToken cancellationToken = default) { if (content.Length > configuration.GetValue<long>("Storage:MaxBytes", 10_485_760)) throw new InvalidDataException("File exceeds configured size limit."); var path = Resolve(key); Directory.CreateDirectory(Path.GetDirectoryName(path)!); await using var target = File.Create(path); await content.CopyToAsync(target, cancellationToken); return new StoredFile(key, contentType, content.Length, DateTimeOffset.UtcNow); }
+        public Task<Stream?> OpenReadAsync(string key, CancellationToken cancellationToken = default) { var path = Resolve(key); return Task.FromResult<Stream?>(File.Exists(path) ? File.OpenRead(path) : null); }
+        public Task DeleteAsync(string key, CancellationToken cancellationToken = default) { var path = Resolve(key); if (File.Exists(path)) File.Delete(path); return Task.CompletedTask; }
+    }
+    public sealed class S3CompatibleFileStorage : IFileStorage
+    {
+        public Task<StoredFile> PutAsync(string key, Stream content, string contentType, CancellationToken cancellationToken = default) => throw new NotSupportedException("Implement the S3-compatible adapter using Storage:S3 configuration.");
+        public Task<Stream?> OpenReadAsync(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException("Implement the S3-compatible adapter using Storage:S3 configuration.");
+        public Task DeleteAsync(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException("Implement the S3-compatible adapter using Storage:S3 configuration.");
+    }
+    public static class StorageEndpoints
+    {
+        public static void Map(IEndpointRouteBuilder endpoints) { var group = endpoints.MapGroup("/api/files"); {{(authenticationEnabled ? "group.RequireAuthorization();" : string.Empty)}} group.MapPost("", async (IFormFile file, IFileStorage storage, CancellationToken cancellationToken) => { if (file.Length == 0 || string.IsNullOrWhiteSpace(file.ContentType)) return Results.BadRequest(new { code = "invalid_file" }); var key = $"uploads/{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}"; await using var stream = file.OpenReadStream(); return Results.Ok(await storage.PutAsync(key, stream, file.ContentType, cancellationToken)); }); group.MapGet("/{**key}", async (string key, IFileStorage storage, CancellationToken cancellationToken) => { var stream = await storage.OpenReadAsync(key, cancellationToken); return stream is null ? Results.NotFound() : Results.File(stream, "application/octet-stream"); }); group.MapDelete("/{**key}", async (string key, IFileStorage storage, CancellationToken cancellationToken) => { await storage.DeleteAsync(key, cancellationToken); return Results.NoContent(); }); }
+    }
+    """;
+
+    private static string Caching(string identifier) => $$"""
+    using Microsoft.Extensions.Caching.Memory;
+    using Microsoft.Extensions.Logging;
+    namespace {{identifier}}.Api.Integrations;
+
+    public interface IApplicationCache
+    {
+        Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default);
+        Task SetAsync<T>(string key, T value, TimeSpan duration, CancellationToken cancellationToken = default);
+        Task RemoveAsync(string key, CancellationToken cancellationToken = default);
+    }
+    public interface IDistributedApplicationCache : IApplicationCache { }
+    public sealed partial class MemoryApplicationCache(IMemoryCache cache, ILogger<MemoryApplicationCache> logger) : IDistributedApplicationCache
+    {
+        public Task<T?> GetAsync<T>(string key, CancellationToken cancellationToken = default) { cache.TryGetValue(key, out T? value); CacheLookup(logger, key, value is null ? "miss" : "hit"); return Task.FromResult(value); }
+        public Task SetAsync<T>(string key, T value, TimeSpan duration, CancellationToken cancellationToken = default) { cache.Set(key, value, duration); return Task.CompletedTask; }
+        public Task RemoveAsync(string key, CancellationToken cancellationToken = default) { cache.Remove(key); return Task.CompletedTask; }
+
+        [LoggerMessage(Level = LogLevel.Debug, Message = "Cache {CacheKey} {CacheResult}")]
+        private static partial void CacheLookup(ILogger logger, string cacheKey, string cacheResult);
+    }
+    public static class CacheKeys { public static string ForTenant(string tenantId, string resource, string key) => $"tenant:{tenantId}:{resource}:{key}"; }
+    """;
+
+    private static string ImportsExports(string identifier, bool authenticationEnabled, bool multiTenancyEnabled) => $$"""
+    using System.Collections.Concurrent;
+    using System.Text;
+    using Microsoft.AspNetCore.Routing;
+    using Wolverine;
+    namespace {{identifier}}.Api.Integrations;
+
+    public sealed record ImportJob(Guid Id, string Format, string Status, int Processed, int Failed, DateTimeOffset CreatedAtUtc);
+    public sealed record ImportStatus(Guid Id, string Status, int Processed, int Failed, string? ValidationReport);
+    public interface IDataExchangeService
+    {
+        Task<ImportJob> StartImportAsync(Stream content, string format, CancellationToken cancellationToken = default);
+        Task<ImportStatus?> GetStatusAsync(Guid id, CancellationToken cancellationToken = default);
+        Task<Stream> ExportAsync(string format, CancellationToken cancellationToken = default);
+    }
+    public sealed record ImportRequested(Guid Id, string Format, string? TenantId, byte[] Content);
+    public sealed class DataExchangeService(IMessageBus bus) : IDataExchangeService
+    {
+        private readonly ConcurrentDictionary<Guid, ImportStatus> statuses = new();
+        public async Task<ImportJob> StartImportAsync(Stream content, string format, CancellationToken cancellationToken = default) { if (format is not ("csv" or "json")) throw new ArgumentException("Only csv and json imports are supported.", nameof(format)); using var memory = new MemoryStream(); await content.CopyToAsync(memory, cancellationToken); var id = Guid.NewGuid(); statuses[id] = new ImportStatus(id, "queued", 0, 0, null); await bus.PublishAsync(new ImportRequested(id, format, null, memory.ToArray())); return new ImportJob(id, format, "queued", 0, 0, DateTimeOffset.UtcNow); }
+        public Task<ImportStatus?> GetStatusAsync(Guid id, CancellationToken cancellationToken = default) => Task.FromResult(statuses.TryGetValue(id, out var status) ? status : null);
+        public Task<Stream> ExportAsync(string format, CancellationToken cancellationToken = default) => format is "csv" or "json" ? Task.FromResult<Stream>(new MemoryStream(Encoding.UTF8.GetBytes(format == "csv" ? "id,name\n" : "[]"))) : throw new ArgumentException("Only csv and json exports are supported.", nameof(format));
+    }
+    public static class ImportExportEndpoints
+    {
+        public static void Map(IEndpointRouteBuilder endpoints) { var group = endpoints.MapGroup("/api/data"); {{(authenticationEnabled ? "group.RequireAuthorization();" : string.Empty)}} group.MapPost("/imports", async (IFormFile file, IDataExchangeService service, CancellationToken cancellationToken) => Results.Accepted(value: await service.StartImportAsync(file.OpenReadStream(), Path.GetExtension(file.FileName).TrimStart('.').ToLowerInvariant(), cancellationToken))); group.MapGet("/imports/{id:guid}", async (Guid id, IDataExchangeService service, CancellationToken cancellationToken) => { var status = await service.GetStatusAsync(id, cancellationToken); return status is null ? Results.NotFound() : Results.Ok(status); }); group.MapGet("/exports/{format}", async (string format, IDataExchangeService service, CancellationToken cancellationToken) => Results.File(await service.ExportAsync(format, cancellationToken), format == "csv" ? "text/csv" : "application/json", $"export.{format}")); }
+    }
+    """;
+
+    private static string Webhooks(string identifier, bool authenticationEnabled, bool multiTenancyEnabled) => $$"""
+    using System.Text.Json;
+    using System.Security.Cryptography;
+    using System.Text;
+    using Microsoft.AspNetCore.Routing;
+    using Microsoft.EntityFrameworkCore;
+    using {{identifier}}.Api.Data;
+    namespace {{identifier}}.Api.Integrations;
+
+    public sealed class WebhookDelivery { public Guid Id { get; set; } public string EventType { get; set; } = string.Empty; public string Endpoint { get; set; } = string.Empty; public string Signature { get; set; } = string.Empty; public string PayloadJson { get; set; } = "{}"; public string Status { get; set; } = "queued"; public int Attempts { get; set; } public int RetryCount { get; set; } public DateTimeOffset CreatedAtUtc { get; set; } }
+    public sealed record WebhookSubscription(Guid Id, string EventType, Uri Endpoint, bool Enabled);
+    public interface IWebhookDispatcher
+    {
+        Task DispatchAsync(string eventType, object payload, CancellationToken cancellationToken = default);
+        Task<bool> ReplayAsync(Guid deliveryId, CancellationToken cancellationToken = default);
+    }
+    public sealed class HmacWebhookDispatcher(AppDbContext db, IHttpClientFactory clients, IConfiguration configuration) : IWebhookDispatcher
+    {
+        public async Task DispatchAsync(string eventType, object payload, CancellationToken cancellationToken = default) { var body = JsonSerializer.Serialize(payload); var secret = configuration["Webhooks:SigningSecret"] ?? throw new InvalidOperationException("Webhooks:SigningSecret must be configured."); var signature = Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(body))); var maxAttempts = Math.Clamp(configuration.GetValue("Webhooks:MaxAttempts", 3), 1, 10); foreach (var endpoint in configuration.GetSection("Webhooks:Endpoints").Get<string[]>() ?? []) { var delivery = new WebhookDelivery { Id = Guid.NewGuid(), EventType = eventType, Endpoint = endpoint, Signature = signature, PayloadJson = body, CreatedAtUtc = DateTimeOffset.UtcNow }; db.WebhookDeliveries.Add(delivery); for (var attempt = 1; attempt <= maxAttempts; attempt++) { delivery.Attempts = attempt; try { using var request = new HttpRequestMessage(HttpMethod.Post, endpoint) { Content = new StringContent(body, Encoding.UTF8, "application/json") }; request.Headers.Add("X-Dotisan-Signature", signature); using var response = await clients.CreateClient().SendAsync(request, cancellationToken); if (response.IsSuccessStatusCode) { delivery.Status = "delivered"; break; } delivery.Status = "failed"; } catch { delivery.Status = "failed"; } if (attempt < maxAttempts) { delivery.RetryCount++; await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt - 1)), cancellationToken); } } await db.SaveChangesAsync(cancellationToken); } }
+        public async Task<bool> ReplayAsync(Guid deliveryId, CancellationToken cancellationToken = default) { var delivery = await db.WebhookDeliveries.SingleOrDefaultAsync(item => item.Id == deliveryId, cancellationToken); if (delivery is null) return false; using var request = new HttpRequestMessage(HttpMethod.Post, delivery.Endpoint) { Content = new StringContent(delivery.PayloadJson, Encoding.UTF8, "application/json") }; request.Headers.Add("X-Dotisan-Signature", delivery.Signature); using var response = await clients.CreateClient().SendAsync(request, cancellationToken); delivery.Attempts++; delivery.RetryCount++; delivery.Status = response.IsSuccessStatusCode ? "delivered" : "failed"; await db.SaveChangesAsync(cancellationToken); return response.IsSuccessStatusCode; }
+    }
+    public static class WebhookEndpoints
+    {
+        public static void Map(IEndpointRouteBuilder endpoints) { var group = endpoints.MapGroup("/api/webhooks"); {{(authenticationEnabled ? "group.RequireAuthorization();" : string.Empty)}} group.MapGet("/deliveries", async (AppDbContext db, CancellationToken cancellationToken) => Results.Ok(await db.WebhookDeliveries.AsNoTracking().OrderByDescending(x => x.CreatedAtUtc).Take(100).ToListAsync(cancellationToken))); group.MapPost("/deliveries/{id:guid}/replay", async (Guid id, IWebhookDispatcher dispatcher, CancellationToken cancellationToken) => await dispatcher.ReplayAsync(id, cancellationToken) ? Results.Accepted($"/api/webhooks/deliveries/{id}", new { deliveryId = id, status = "delivered" }) : Results.NotFound()); }
+    }
     """;
 
     private static string Solution(string name) => $$"""

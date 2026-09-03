@@ -38,6 +38,9 @@ public static class DoctorService
             AddFileCheck(results, "Health endpoint", apiDirectory is null ? null : Path.Combine(apiDirectory, "Features", "Health", "HealthEndpoints.cs"), "Restore the generated health endpoint before deployment.");
             AddContentCheck(results, "HTTPS enforcement", apiDirectory is null ? null : Path.Combine(apiDirectory, "Program.cs"), "UseHttpsRedirection", "Enable HTTPS redirection in the generated API pipeline.");
             AddContentCheck(results, "Authentication rate limiting", apiDirectory is null ? null : Path.Combine(apiDirectory, "Program.cs"), "AddRateLimiter", "Configure rate limiting for authentication endpoints before deployment.");
+            AddContentCheck(results, "Frontend URL validation", apiDirectory is null ? null : Path.Combine(apiDirectory, "Program.cs"), "FrontendUrl must be an absolute HTTPS URL", "Configure FrontendUrl as an absolute HTTPS URL for the deployed frontend.");
+            AddContentCheck(results, "Data-protection key persistence", apiDirectory is null ? null : Path.Combine(apiDirectory, "Program.cs"), "DataProtection:KeyDirectory", "Configure persistent DataProtection:KeyDirectory storage before deployment.");
+            AddContentCheck(results, "Health probes", apiDirectory is null ? null : Path.Combine(apiDirectory, "Features", "Health", "HealthEndpoints.cs"), "/health/ready", "Expose separate liveness and readiness health probes before deployment.");
         }
 
         if (services.Database != DatabaseProvider.SQLite)

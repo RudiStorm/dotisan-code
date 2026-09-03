@@ -12,10 +12,24 @@ public static class FetchClientGenerator
         var models = manifest.Models.Select(model => model.Name).OrderBy(name => name, StringComparer.Ordinal).ToArray();
         if (models.Length > 0)
             builder.Append("import type { ").Append(string.Join(", ", models)).AppendLine(" } from \"./models\";\n");
-        builder.AppendLine("export type ProblemDetails = { title?: string; detail?: string; status?: number; errors?: Record<string, string[]>; };\n");
+        builder.AppendLine("export type ApiFieldErrors = Record<string, string[]>;");
+        builder.AppendLine("export type ProblemDetails = { type?: string; title?: string; status?: number; detail?: string; instance?: string; code?: string; correlationId?: string; errors?: ApiFieldErrors; };\n");
+        builder.AppendLine("function normalizeFieldErrors(errors: ApiFieldErrors | undefined): ApiFieldErrors {");
+        builder.AppendLine("  return Object.entries(errors ?? {}).reduce<ApiFieldErrors>((result, [key, messages]) => { result[key.charAt(0).toLowerCase() + key.slice(1)] = messages; return result; }, {});");
+        builder.AppendLine("}");
+        builder.AppendLine("function getErrorMessage(status: number, problem: ProblemDetails, fieldErrors: ApiFieldErrors): string {");
+        builder.AppendLine("  if (status === 401) return \"Invalid email or password.\";");
+        builder.AppendLine("  if (Object.keys(fieldErrors).length > 0) return \"Please fix the highlighted fields.\";");
+        builder.AppendLine("  return problem.detail ?? (problem.title && problem.title !== \"One or more validation errors occurred.\" ? problem.title : \"Request failed.\");");
+        builder.AppendLine("}\n");
         builder.AppendLine("export class ApiError extends Error {");
+        builder.AppendLine("  public readonly fieldErrors: ApiFieldErrors;");
+        builder.AppendLine("  public readonly correlationId?: string;");
         builder.AppendLine("  constructor(public readonly status: number, public readonly problem: ProblemDetails) {");
-        builder.AppendLine("    super(problem.detail ?? problem.title ?? \"Request failed\");");
+        builder.AppendLine("    const fieldErrors = normalizeFieldErrors(problem.errors);");
+        builder.AppendLine("    this.correlationId = problem.correlationId;");
+        builder.AppendLine("    super(getErrorMessage(status, problem, fieldErrors));");
+        builder.AppendLine("    this.fieldErrors = fieldErrors;");
         builder.AppendLine("  }");
         builder.AppendLine("}").AppendLine();
         builder.AppendLine("async function request<T>(url: string, init: RequestInit = {}): Promise<T> {");

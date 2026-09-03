@@ -68,6 +68,23 @@ public sealed class TypeScriptTypeMapperTests
     }
 
     [Fact]
+    public void Generated_services_expose_friendly_validation_messages_and_field_errors()
+    {
+        var manifest = new ContractManifest(
+            1,
+            [new EndpointManifestEntry("account.register", "Account", "Register", "POST", "/api/account/register", "RegisterRequest", "void", false, null, null, ["Account"], true, false)],
+            [],
+            [new EndpointContractMetadata(null, [], [], 204, ["Account"], new EndpointValidationMetadata(true, []))]);
+
+        var services = TypeScriptContractGenerator.GenerateAll(manifest).Single(file => file.Path == "services.ts").Content;
+
+        Assert.Contains("export type ApiFieldErrors = Record<string, string[]>;", services);
+        Assert.Contains("fieldErrors: ApiFieldErrors", services);
+        Assert.Contains("Please fix the highlighted fields.", services);
+        Assert.Contains("if (status === 401) return \"Invalid email or password.\"", services);
+    }
+
+    [Fact]
     public void Generated_file_manifest_hash_is_stable_for_file_order()
     {
         var files = new[]

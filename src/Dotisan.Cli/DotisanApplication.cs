@@ -7,7 +7,7 @@ namespace Dotisan.Cli;
 
 public sealed class DotisanApplication
 {
-    public const string Version = "0.7.0";
+    public const string Version = "0.8.6";
 
     private readonly DotisanCommandRegistry registry;
     private readonly CommandContext context;
@@ -23,12 +23,12 @@ public sealed class DotisanApplication
         context = new CommandContext(console, prompts, projectGenerator, services);
     }
 
-    public static DotisanApplication CreateDefault(IConsole? console = null, IDotisanServices? services = null)
+    public static DotisanApplication CreateDefault(IConsole? console = null, IDotisanServices? services = null, IPrompts? prompts = null, IProjectGenerator? projectGenerator = null)
     {
         var output = console ?? new SystemConsole();
         var registry = new DotisanCommandRegistry();
-        var prompts = new DefaultPrompts(output);
-        var application = new DotisanApplication(registry, output, prompts, new GoldenTemplateGenerator(), services ?? new DefaultDotisanServices());
+        var resolvedPrompts = prompts ?? new DefaultPrompts(output);
+        var application = new DotisanApplication(registry, output, resolvedPrompts, projectGenerator ?? new GoldenTemplateGenerator(), services ?? new DefaultDotisanServices());
         application.RegisterBuiltIns();
         return application;
     }

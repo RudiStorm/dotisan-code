@@ -121,12 +121,12 @@ internal sealed class MigrateCommand : WorkspaceCommand
             return Fail(context.Console, "Workspace services are unavailable.");
 
         var efArguments = new List<string> { "ef" };
-        if (arguments.SequenceEqual(["status"], StringComparer.OrdinalIgnoreCase))
+        if (arguments.SequenceEqual(["status"], StringComparer.OrdinalIgnoreCase) || arguments.SequenceEqual(["--dry-run"], StringComparer.OrdinalIgnoreCase))
             efArguments.AddRange(["migrations", "list"]);
         else if (arguments.Count == 0 || arguments.SequenceEqual(["--production"], StringComparer.OrdinalIgnoreCase))
             efArguments.AddRange(["database", "update"]);
         else
-            return Fail(context.Console, "Usage: dotisan migrate [status|--production]. Use 'dotnet ef' directly for migration authoring and rollback.", DotisanExitCode.UsageError);
+            return Fail(context.Console, "Usage: dotisan migrate [status|--dry-run|--production]. Use 'dotnet ef' directly for migration authoring and rollback.", DotisanExitCode.UsageError);
 
         if (services.ApiProjectPath is null)
             return Fail(context.Console, "Could not find an API project. Run this command from a generated Dotisan project.");
@@ -241,7 +241,7 @@ internal sealed class AddIntegrationCommand : WorkspaceCommand
         var dryRun = arguments.Contains("--dry-run", StringComparer.OrdinalIgnoreCase);
         var names = arguments.Where(argument => !argument.Equals("--dry-run", StringComparison.OrdinalIgnoreCase)).ToArray();
         if (names.Length != 1)
-            return Fail(context.Console, "Usage: dotisan add:integration <aspire|sendgrid|mailgun|signoz> [--dry-run].", DotisanExitCode.UsageError);
+            return Fail(context.Console, "Usage: dotisan add:integration <aspire|sendgrid|mailgun|signoz|notifications|storage|caching|imports-exports|webhooks> [--dry-run].", DotisanExitCode.UsageError);
         if (!IntegrationRecipes.TryGetValue(names[0], out var recipe))
             return Fail(context.Console, $"Unknown integration '{names[0]}'. Supported integrations: {string.Join(", ", IntegrationRecipes.Keys)}.", DotisanExitCode.UsageError);
         if (!TryGetServices(context, out var services) || services.SolutionPath is null)
@@ -267,7 +267,12 @@ internal sealed class AddIntegrationCommand : WorkspaceCommand
         ["aspire"] = "# Aspire Dashboard\n\nUse `dotisan dev --observability`. Configure OTLP through `OTEL_EXPORTER_OTLP_ENDPOINT`.\n",
         ["sendgrid"] = "# SendGrid\n\nAdd a provider adapter implementing `IEmailProvider`. Configure `SendGrid:ApiKey` and `SendGrid:From` through deployment secrets.\n",
         ["mailgun"] = "# Mailgun\n\nAdd a provider adapter implementing `IEmailProvider`. Configure `Mailgun:ApiKey`, `Mailgun:Domain`, and `Mailgun:From` through deployment secrets.\n",
-        ["signoz"] = "# SigNoz\n\nSet `OTEL_EXPORTER_OTLP_ENDPOINT` to the SigNoz collector endpoint and enable export with `OpenTelemetry:Enabled=true`.\n"
+        ["signoz"] = "# SigNoz\n\nSet `OTEL_EXPORTER_OTLP_ENDPOINT` to the SigNoz collector endpoint and enable export with `OpenTelemetry:Enabled=true`.\n",
+        ["notifications"] = "# Notifications\n\nGenerate with `dotisan new <Name> --notifications yes`. Add application-specific notification persistence and use the generated SignalR boundary for live updates.\n",
+        ["storage"] = "# File storage\n\nGenerate with `dotisan new <Name> --storage yes`. Implement `IFileStorage` with the local development adapter or an S3-compatible adapter configured through deployment secrets.\n",
+        ["caching"] = "# Caching\n\nGenerate with `dotisan new <Name> --caching yes`. Use the in-memory development boundary and configure a distributed provider for multi-instance deployments.\n",
+        ["imports-exports"] = "# Imports and exports\n\nGenerate with `dotisan new <Name> --imports-exports yes`. Route long-running imports through Wolverine and keep export formats explicit.\n",
+        ["webhooks"] = "# Webhooks\n\nGenerate with `dotisan new <Name> --webhooks yes`. Add HMAC signing, retry policy, delivery history, and endpoint authorization before production use.\n"
     };
 }
 
@@ -535,7 +540,7 @@ internal sealed class DevCommand : WorkspaceCommand
                 context.Console.WriteLine("Aspire Dashboard: http://localhost:18888");
             }
 
-            var apiArguments = new List<string> { "watch", "--project", services.ApiProjectPath, "run", "--", "--environment", environment, "--urls", "http://localhost:5000" };
+            var apiArguments = new List<string> { "watch", "--project", services.ApiProjectPath, "run", "--", "--environment", environment, "--urls", $"http://localhost:{services.ApiPort}" };
             if (arguments.Contains("--observability", StringComparer.OrdinalIgnoreCase))
                 apiArguments.Add("--dotisan-observability");
             processes.Add(await services.StartAsync("dotnet", apiArguments, services.WorkingDirectory, context.Console, cancellationToken));
@@ -544,7 +549,7 @@ internal sealed class DevCommand : WorkspaceCommand
                 if (services.FrontendDirectory is null)
                     return Fail(context.Console, "Could not find the Vue frontend. Use --lean to run the API only.");
                 var packageManager = services is DefaultDotisanServices defaultServices ? defaultServices.PackageManager : "pnpm";
-                processes.Add(await services.StartAsync(packageManager, ["run", "dev"], services.FrontendDirectory, context.Console, cancellationToken));
+                processes.Add(await services.StartAsync(packageManager, ["run", "dev", "--", "--port", services.WebPort.ToString(System.Globalization.CultureInfo.InvariantCulture)], services.FrontendDirectory, context.Console, cancellationToken));
             }
 
             var cancellationTask = Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
@@ -650,6 +655,11 @@ internal sealed class NewCommand : IDotisanCommand
         var multiTenancyEnabled = false;
         var packageManager = PackageManager.Pnpm;
         var mailProvider = MailProvider.Console;
+        var notificationsEnabled = false;
+        var storageEnabled = false;
+        var cachingEnabled = false;
+        var importsExportsEnabled = false;
+        var webhooksEnabled = false;
         var restore = true;
 
         for (var index = 1; index < arguments.Count; index++)
@@ -707,6 +717,26 @@ internal sealed class NewCommand : IDotisanCommand
                     if (!TryReadValue(arguments, ref index, out var mailValue) || !TryParseMailProvider(mailValue, out mailProvider))
                         return UsageError(context, "--mail-provider must be console, mailpit, or smtp.");
                     break;
+                case "--notifications":
+                    if (!TryReadValue(arguments, ref index, out var notificationsValue) || !TryParseYesNo(notificationsValue, out notificationsEnabled))
+                        return UsageError(context, "--notifications must be yes or no.");
+                    break;
+                case "--storage":
+                    if (!TryReadValue(arguments, ref index, out var storageValue) || !TryParseYesNo(storageValue, out storageEnabled))
+                        return UsageError(context, "--storage must be yes or no.");
+                    break;
+                case "--caching":
+                    if (!TryReadValue(arguments, ref index, out var cachingValue) || !TryParseYesNo(cachingValue, out cachingEnabled))
+                        return UsageError(context, "--caching must be yes or no.");
+                    break;
+                case "--imports-exports":
+                    if (!TryReadValue(arguments, ref index, out var importsExportsValue) || !TryParseYesNo(importsExportsValue, out importsExportsEnabled))
+                        return UsageError(context, "--imports-exports must be yes or no.");
+                    break;
+                case "--webhooks":
+                    if (!TryReadValue(arguments, ref index, out var webhooksValue) || !TryParseYesNo(webhooksValue, out webhooksEnabled))
+                        return UsageError(context, "--webhooks must be yes or no.");
+                    break;
                 case "--no-restore":
                     restore = false;
                     break;
@@ -715,7 +745,7 @@ internal sealed class NewCommand : IDotisanCommand
             }
         }
 
-        ProjectOptions options;
+        ProjectOptions? options;
         try
         {
             options = yes
@@ -727,6 +757,11 @@ internal sealed class NewCommand : IDotisanCommand
                     MultiTenancyEnabled = multiTenancyEnabled,
                     PackageManager = packageManager
                     ,MailProvider = mailProvider
+                    ,NotificationsEnabled = notificationsEnabled
+                    ,StorageEnabled = storageEnabled
+                    ,CachingEnabled = cachingEnabled
+                    ,ImportsExportsEnabled = importsExportsEnabled
+                    ,WebhooksEnabled = webhooksEnabled
                 }
                 : context.Prompts.AskForProject(name, outputDirectory);
         }
@@ -734,6 +769,9 @@ internal sealed class NewCommand : IDotisanCommand
         {
             return UsageError(context, exception.Message);
         }
+
+        if (options is null)
+            return DotisanExitCode.Canceled;
 
         var result = await context.ProjectGenerator.GenerateAsync(options, cancellationToken);
         if (!result.Success)

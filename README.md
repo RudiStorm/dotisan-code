@@ -2,7 +2,7 @@
 
 Dotisan is a .NET 10 application scaffolding CLI for building ordinary ASP.NET Core and Vue applications. It gives you a working API, frontend, database wiring, typed frontend contracts, optional authentication, resource scaffolding, and durable background jobs without hiding the generated source code behind a proprietary runtime.
 
-The current release is v0.7.0.
+The current release is v0.8.6.
 
 ## What you get
 
@@ -15,6 +15,7 @@ The current release is v0.7.0.
 - Generated OpenAPI, TypeScript models, Zod schemas, fetch services, and TanStack Query helpers.
 - Optional ASP.NET Core Identity cookie authentication and role-claim authorization.
 - Wolverine-backed durable local queues, delayed messages, recurring sample scheduling, and retries.
+- Opt-in provider-neutral notifications, local file storage, caching, CSV/JSON imports and exports, and signed webhooks.
 - A solution file, `dotisan.config`, appsettings, local development defaults, and editable source boundaries.
 
 Dotisan owns the initial scaffold. After that, the generated application is yours: edit the files under `src/<Name>.Api` and `src/<Name>.Web`, use standard .NET and frontend tooling, and keep generated contract output refreshed with `dotisan generate`.
@@ -24,20 +25,20 @@ Dotisan owns the initial scaffold. After that, the generated application is your
 Install the .NET tool from NuGet:
 
 ```powershell
-dotnet tool install --global Dotisan --version 0.7.0
+dotnet tool install --global Dotisan --version 0.8.6
 dotisan --version
 ```
 
 For a locally built package:
 
 ```powershell
-dotnet tool install --global Dotisan --add-source .\artifacts --version 0.7.0
+dotnet tool install --global Dotisan --add-source .\artifacts --version 0.8.6
 ```
 
 Upgrade an existing installation with:
 
 ```powershell
-dotnet tool update --global Dotisan --version 0.7.0
+dotnet tool update --global Dotisan --version 0.8.6
 ```
 
 ## Create and run an application
@@ -261,6 +262,8 @@ dotisan new AuthApp --auth yes --registration public
 
 Authenticated projects use standard ASP.NET Core Identity, EF Core stores, cookie authentication, antiforgery, and ProblemDetails. They include registration, login, logout, current-user, email-confirmation, password-reset, TOTP MFA/recovery-code, and session/device endpoints. Login returns `mfa_required` when a second factor is needed, and the generated Vue portal includes setup, challenge, and session-management screens. Password-reset requests are anti-enumeration safe and use the generated mail-provider selector: `console`, `mailpit`, or `smtp`. Select Mailpit with `dotisan new AuthApp --auth yes --mail-provider mailpit`; this generates Compose service ports `1025` and `8025`, and `dotisan dev` starts it automatically. Staging and production can select `smtp` through `Mail__Provider` and standard `Mail__Smtp__*` configuration.
 
+Outside Development, generated APIs fail fast unless `Dotisan__Security__FrontendUrl` is an absolute HTTPS URL and `Dotisan__Security__DataProtectionKeyDirectory` points to persistent storage. Configure `Dotisan__Security__KnownProxies` only with trusted proxy IPs. Authenticated production environments must use SMTP or a custom `IEmailProvider`; console mail and Mailpit are development-only. Store SMTP credentials, data-protection keys, database credentials, and provider secrets in Secret Manager or the deployment platform's secret store.
+
 When Mailpit is selected, use `dotisan mail` to print the local inbox URL or `dotisan mail --open` to open it in a browser. Mailpit is Development-only; generated APIs reject `Mail:Provider=mailpit` in other environments. Use SMTP for staging and production and keep credentials in deployment secrets. `Integrations/IntegrationExamples.cs` contains optional SendGrid, Mailgun, and configuration-driven OAuth2 examples; register only the adapter you have configured through deployment secrets. External login registration, linking, callback, and unlinking are exposed through the provider-neutral `IExternalLoginProvider` contract.
 
 Before starting the app, create and apply the Identity schema:
@@ -322,4 +325,4 @@ The package is a .NET global tool with the command name `dotisan` and is license
 
 ### NuGet signing
 
-The v0.7.0 package is currently unsigned. NuGet signing is not required for the v0.7.0 build or artifact validation, and no signing certificate or publishing secret is included in this repository. If the project adopts a signed-package policy for public releases, configure certificate-based signing in the protected publishing workflow; never commit the certificate or its password to source control.
+The v0.8.6 package is currently unsigned. NuGet signing is not required for the v0.8.6 build or artifact validation, and no signing certificate or publishing secret is included in this repository. If the project adopts a signed-package policy for public releases, configure certificate-based signing in the protected publishing workflow; never commit the certificate or its password to source control.

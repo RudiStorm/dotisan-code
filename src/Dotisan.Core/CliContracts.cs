@@ -5,7 +5,8 @@ public enum DotisanExitCode
     Success = 0,
     UsageError = 2,
     NotImplemented = 3,
-    GenerationError = 4
+    GenerationError = 4,
+    Canceled = 130
 }
 
 public interface IConsole
@@ -16,7 +17,7 @@ public interface IConsole
 
 public interface IPrompts
 {
-    ProjectOptions AskForProject(string name, string outputDirectory);
+    ProjectOptions? AskForProject(string name, string outputDirectory);
 }
 
 public sealed record CommandContext(
@@ -37,6 +38,8 @@ public interface IDotisanServices
     string WorkingDirectory { get; }
     DatabaseProvider Database { get; }
     MailProvider MailProvider { get; }
+    int ApiPort { get; }
+    int WebPort { get; }
     string? SolutionPath { get; }
     string? ApiProjectPath { get; }
     string? FrontendDirectory { get; }

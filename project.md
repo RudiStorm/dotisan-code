@@ -60,7 +60,7 @@ Providers are explicit source/configuration recipes. `dotisan add:integration <n
 
 ### Provider commands
 ```
-dotisan add:integration <aspire|sendgrid|mailgun|signoz> [--dry-run]
+dotisan add:integration <aspire|sendgrid|mailgun|signoz|notifications|storage|caching|imports-exports|webhooks> [--dry-run]
 dotisan remove:integration <name> --force
 ```
 

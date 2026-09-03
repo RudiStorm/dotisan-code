@@ -77,11 +77,15 @@ public sealed class DefaultDotisanServices : IDotisanServices
         PackageManager = ReadPackageManager(workspace?.Root);
         Database = ReadDatabaseProvider(workspace?.Root);
         MailProvider = ReadMailProvider(workspace?.Root);
+        ApiPort = ReadApiPort(workspace?.Root);
+        WebPort = ReadWebPort(workspace?.Root);
     }
 
     public string WorkingDirectory => workspace?.Root ?? root;
     public DatabaseProvider Database { get; }
     public MailProvider MailProvider { get; }
+    public int ApiPort { get; }
+    public int WebPort { get; }
     public string? SolutionPath => workspace?.SolutionPath;
     public string? ApiProjectPath => workspace?.ApiProjectPath;
     public string? FrontendDirectory => workspace?.FrontendDirectory;
@@ -166,6 +170,32 @@ public sealed class DefaultDotisanServices : IDotisanServices
         if (!File.Exists(value)) return MailProvider.Console;
         var provider = File.ReadLines(value).Select(line => line.Trim()).Where(line => line.StartsWith("mail_provider:", StringComparison.OrdinalIgnoreCase)).Select(line => line["mail_provider:".Length..].Trim().ToLowerInvariant()).FirstOrDefault();
         return provider switch { "mailpit" => MailProvider.Mailpit, "smtp" => MailProvider.Smtp, _ => MailProvider.Console };
+    }
+
+    private static int ReadApiPort(string? projectRoot)
+    {
+        if (projectRoot is null) return 5000;
+        var configPath = Path.Combine(projectRoot, "dotisan.config");
+        if (!File.Exists(configPath)) return 5000;
+        var value = File.ReadLines(configPath)
+            .Select(line => line.Trim())
+            .Where(line => line.StartsWith("api_port:", StringComparison.OrdinalIgnoreCase))
+            .Select(line => line["api_port:".Length..].Trim())
+            .FirstOrDefault();
+        return int.TryParse(value, out var port) && port is >= 1024 and <= 65535 ? port : 5000;
+    }
+
+    private static int ReadWebPort(string? projectRoot)
+    {
+        if (projectRoot is null) return 5173;
+        var configPath = Path.Combine(projectRoot, "dotisan.config");
+        if (!File.Exists(configPath)) return 5173;
+        var value = File.ReadLines(configPath)
+            .Select(line => line.Trim())
+            .Where(line => line.StartsWith("web_port:", StringComparison.OrdinalIgnoreCase))
+            .Select(line => line["web_port:".Length..].Trim())
+            .FirstOrDefault();
+        return int.TryParse(value, out var port) && port is >= 1024 and <= 65535 ? port : 5173;
     }
 }
 

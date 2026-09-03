@@ -34,7 +34,7 @@ Multi-tenancy: No
 Package manager: pnpm
 ~~~
 
-All wizard menus show numbered choices. Enter `1`, `2`, or another displayed number to choose quickly; Enter accepts the default, and the text labels remain supported.
+The interactive wizard is keyboard-driven: use Up/Down to move through choices, Enter to select, Left to go back, and Escape to cancel. A review screen shows the complete configuration before any files are created. `dotisan new` still falls back to defaults when input is redirected, and `--yes` remains available for scripts and CI.
 
 SQLite is the default because it is file-based and requires no separate database service. The wizard also supports SQL Server, PostgreSQL, and MySQL. Each choice generates the matching EF Core package, provider registration, and local connection-string example in `src/TodoApp.Api/appsettings.json`.
 
@@ -167,7 +167,11 @@ Before deployment, run the read-only production readiness checks:
 dotisan doctor --production
 ~~~
 
+For staging and production, set `Dotisan__Security__FrontendUrl` to the deployed HTTPS frontend URL, configure persistent data-protection keys with `Dotisan__Security__DataProtectionKeyDirectory`, and list only trusted reverse-proxy IPs in `Dotisan__Security__KnownProxies`. Use `Mail__Provider=smtp` or register a custom email provider; console mail and Mailpit are restricted to Development.
+
 The command reports `PASS`, `WARNING`, and `BLOCKING` results for the generated workspace, migrations, health endpoint, Dockerfile, frontend, and provider configuration.
+
+Use `dotisan migrate --dry-run` to list committed migrations without changing the database. `dotisan migrate` is the explicit schema-application boundary; generated application startup does not apply migrations automatically.
 
 ## Observability
 

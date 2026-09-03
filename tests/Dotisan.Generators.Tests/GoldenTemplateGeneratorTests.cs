@@ -55,7 +55,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "routes", "index.ts")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "components", "ui", "Button.vue")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "layouts", "PortalLayout.vue")));
-            Assert.Contains("http://localhost:5000", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "vite.config.ts")));
+            Assert.Contains("proxy: { '/api': 'http://localhost:", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "vite.config.ts")));
             var mainTs = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "src", "main.ts"));
             Assert.Contains("VueQueryPlugin", mainTs);
             var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs"));
@@ -64,7 +64,7 @@ public sealed class GoldenTemplateGeneratorTests
             var export = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Infrastructure", "DotisanContractExport.cs"));
             Assert.Contains("schemaVersion", export);
             Assert.Contains("DOTISAN_CONTRACT_FALLBACK", export);
-            Assert.Contains("\"version\": \"0.7.0\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
+            Assert.Contains("\"version\": \"0.8.6\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditEntry.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "IAuditWriter.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditWriter.cs")));
@@ -121,7 +121,11 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.DoesNotContain("src/TodoApp.Api/Jobs/JobEndpoints.cs", generatedPaths);
             Assert.Contains("UseWolverine", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.Contains("\"Jobs\":", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
-            Assert.Contains("Data Source=app.db", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
+            Assert.Contains("Data Source=Data/TodoApp.db", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
+            var config = await File.ReadAllTextAsync(Path.Combine(output, "dotisan.config"));
+            var vite = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "vite.config.ts"));
+            Assert.Contains("api_port:", config);
+            Assert.Contains("proxy: { '/api': 'http://localhost:", vite);
             Assert.Contains("profile: quick", await File.ReadAllTextAsync(Path.Combine(output, "dotisan.config")));
             var readme = await File.ReadAllTextAsync(Path.Combine(output, "README.md"));
             Assert.Contains("AuditEntry", readme);
@@ -224,6 +228,146 @@ public sealed class GoldenTemplateGeneratorTests
     }
 
     [Fact]
+    public async Task Email_confirmation_page_fetches_antiforgery_before_confirming()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-email-confirmation-page-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var generated = await new GoldenTemplateGenerator().GenerateAsync(ProjectOptions.Quick("ConfirmApp", output) with
+            {
+                AuthenticationEnabled = true
+            }, CancellationToken.None);
+            Assert.True(generated.Success, generated.ErrorMessage);
+
+            var page = await File.ReadAllTextAsync(Path.Combine(output, "src", "ConfirmApp.Web", "src", "pages", "auth", "EmailConfirmationPage.vue"));
+            Assert.Contains("const token = await issueAntiforgery();", page);
+            Assert.Contains("confirmEmail({ email: String(route.query.email ?? ''), token: String(route.query.token) }, { headers: { 'X-XSRF-TOKEN': token.token } })", page);
+        }
+        finally
+        {
+            if (Directory.Exists(output))
+                Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Auth_pages_render_structured_validation_errors()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-auth-errors-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var generated = await new GoldenTemplateGenerator().GenerateAsync(
+                ProjectOptions.Quick("AuthErrorsApp", output) with { AuthenticationEnabled = true }, CancellationToken.None);
+            Assert.True(generated.Success, generated.ErrorMessage);
+
+            var login = await File.ReadAllTextAsync(Path.Combine(output, "src", "AuthErrorsApp.Web", "src", "pages", "auth", "LoginPage.vue"));
+            var register = await File.ReadAllTextAsync(Path.Combine(output, "src", "AuthErrorsApp.Web", "src", "pages", "auth", "RegisterPage.vue"));
+
+            Assert.Contains("ApiError", login);
+            Assert.Contains("fieldErrors", login);
+            Assert.Contains("field-error", login);
+            Assert.Contains("fieldErrors", register);
+            Assert.Contains("field-error", register);
+        }
+        finally
+        {
+            if (Directory.Exists(output))
+                Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task V080_integrations_are_opt_in_and_generate_provider_neutral_contracts()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-v080-integrations-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var generated = await new GoldenTemplateGenerator().GenerateAsync(ProjectOptions.Quick("IntegrationApp", output) with
+            {
+                NotificationsEnabled = true,
+                StorageEnabled = true,
+                CachingEnabled = true,
+                ImportsExportsEnabled = true,
+                WebhooksEnabled = true
+            }, CancellationToken.None);
+            Assert.True(generated.Success, generated.ErrorMessage);
+
+            var integrations = Path.Combine(output, "src", "IntegrationApp.Api", "Integrations");
+            Assert.True(File.Exists(Path.Combine(integrations, "Notifications.cs")));
+            Assert.True(File.Exists(Path.Combine(integrations, "Storage.cs")));
+            Assert.True(File.Exists(Path.Combine(integrations, "Caching.cs")));
+            Assert.True(File.Exists(Path.Combine(integrations, "ImportsExports.cs")));
+            Assert.True(File.Exists(Path.Combine(integrations, "Webhooks.cs")));
+            var config = await File.ReadAllTextAsync(Path.Combine(output, "dotisan.config"));
+            Assert.Contains("notifications: enabled", config);
+            Assert.Contains("webhooks: enabled", config);
+            Assert.Contains("api_port:", config);
+            Assert.Contains("web_port:", config);
+            Assert.Contains("\"FrontendUrl\": \"http://localhost:", await File.ReadAllTextAsync(Path.Combine(output, "src", "IntegrationApp.Api", "appsettings.json")));
+            Assert.Contains("EntityTypeBuilder<NotificationRecord>", await File.ReadAllTextAsync(Path.Combine(integrations, "Notifications.cs")));
+            Assert.Contains("IFileStorage", await File.ReadAllTextAsync(Path.Combine(integrations, "Storage.cs")));
+            Assert.Contains("LocalFileStorage", await File.ReadAllTextAsync(Path.Combine(integrations, "Storage.cs")));
+            var caching = await File.ReadAllTextAsync(Path.Combine(integrations, "Caching.cs"));
+            Assert.Contains("IDistributedApplicationCache", caching);
+            Assert.Contains("LoggerMessage", caching);
+            Assert.Contains("IMessageBus", await File.ReadAllTextAsync(Path.Combine(integrations, "ImportsExports.cs")));
+            Assert.Contains("HMACSHA256", await File.ReadAllTextAsync(Path.Combine(integrations, "Webhooks.cs")));
+            Assert.Contains("RetryCount", await File.ReadAllTextAsync(Path.Combine(integrations, "Webhooks.cs")));
+            Assert.Contains("ImportStatus", await File.ReadAllTextAsync(Path.Combine(integrations, "ImportsExports.cs")));
+            Assert.Contains("GetStatusAsync", await File.ReadAllTextAsync(Path.Combine(integrations, "ImportsExports.cs")));
+            Assert.Contains("S3CompatibleFileStorage", await File.ReadAllTextAsync(Path.Combine(integrations, "Storage.cs")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "IntegrationApp.Web", "src", "pages", "NotificationsPage.vue")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "IntegrationApp.Web", "src", "pages", "ImportsExportsPage.vue")));
+            Assert.True(File.Exists(Path.Combine(output, "src", "IntegrationApp.Web", "src", "pages", "WebhooksPage.vue")));
+            Assert.Contains("ReplayAsync", await File.ReadAllTextAsync(Path.Combine(integrations, "Webhooks.cs")));
+            Assert.Contains("PayloadJson", await File.ReadAllTextAsync(Path.Combine(integrations, "Webhooks.cs")));
+        }
+        finally
+        {
+            if (Directory.Exists(output))
+                Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task V080_integrations_disabled_emit_no_feature_source_or_frontend()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-v080-disabled-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var generated = await new GoldenTemplateGenerator().GenerateAsync(ProjectOptions.Quick("PlainApp", output), CancellationToken.None);
+            Assert.True(generated.Success, generated.ErrorMessage);
+            Assert.False(Directory.Exists(Path.Combine(output, "src", "PlainApp.Api", "Integrations")));
+            Assert.False(File.Exists(Path.Combine(output, "src", "PlainApp.Web", "src", "pages", "NotificationsPage.vue")));
+            Assert.DoesNotContain("notifications: enabled", await File.ReadAllTextAsync(Path.Combine(output, "dotisan.config")));
+        }
+        finally
+        {
+            if (Directory.Exists(output))
+                Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task Generated_sqlite_connection_is_rooted_to_the_api_content_directory()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-sqlite-path-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var generated = await new GoldenTemplateGenerator().GenerateAsync(ProjectOptions.Quick("SqliteApp", output), CancellationToken.None);
+            Assert.True(generated.Success, generated.ErrorMessage);
+            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "SqliteApp.Api", "Program.cs"));
+            Assert.Contains("Path.Combine(contentRoot, dataSource)", program);
+            Assert.Contains("builder.Environment.ContentRootPath", program);
+        }
+        finally
+        {
+            if (Directory.Exists(output))
+                Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Generated_api_contains_aspire_and_complete_opentelemetry_wiring()
     {
         var output = Path.Combine(Path.GetTempPath(), "dotisan-observability-test-" + Guid.NewGuid().ToString("N"));
@@ -246,7 +390,7 @@ public sealed class GoldenTemplateGeneratorTests
     }
 
     [Theory]
-    [InlineData(DatabaseProvider.SQLite, "Microsoft.EntityFrameworkCore.Sqlite", "UseSqlite", "Data Source=app.db", "SQLite")]
+    [InlineData(DatabaseProvider.SQLite, "Microsoft.EntityFrameworkCore.Sqlite", "UseSqlite", "Data Source=Data/DataApp.db", "SQLite")]
     [InlineData(DatabaseProvider.SqlServer, "Microsoft.EntityFrameworkCore.SqlServer", "UseSqlServer", "Server=localhost,1433;Database=DataApp;User Id=sa;Password=DotisanDev123!;TrustServerCertificate=True", "SQL Server")]
     [InlineData(DatabaseProvider.PostgreSQL, "Npgsql.EntityFrameworkCore.PostgreSQL", "UseNpgsql", "Host=localhost;Database=dataapp;Username=postgres;Password=postgres", "PostgreSQL")]
     [InlineData(DatabaseProvider.MySQL, "Pomelo.EntityFrameworkCore.MySql", "UseMySql", "Server=localhost;Database=dataapp;User=root;Password=root", "MySQL")]
@@ -273,6 +417,11 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains(registration, program);
             Assert.Contains(connectionString, appsettings);
             Assert.Contains($"EF Core {displayName}", readme);
+            if (provider == DatabaseProvider.SQLite)
+            {
+                Assert.Contains("Directory.CreateDirectory", program);
+                Assert.Contains("Path.Combine(contentRoot, dataSource)", program);
+            }
             if (provider != DatabaseProvider.SQLite)
             {
                 Assert.DoesNotContain("Microsoft.EntityFrameworkCore.Sqlite", apiProject);
@@ -466,6 +615,8 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("register", authServices);
             Assert.Contains("logout", authServices);
             Assert.Contains("me", authServices);
+            Assert.Contains("correlationId?: string", authServices);
+            Assert.Contains("readonly correlationId", authServices);
             Assert.DoesNotContain("login", await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Web", "src", "dotisan", "services.ts")));
             var apiProject = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "AuthApp.Api.csproj"));
             var testProject = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "tests", "AuthApp.Api.Tests", "AuthApp.Api.Tests.csproj"));
@@ -479,6 +630,22 @@ public sealed class GoldenTemplateGeneratorTests
             var dbContext = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Data", "AppDbContext.cs"));
             var user = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Identity", "ApplicationUser.cs"));
             var authenticatedProgram = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Program.cs"));
+            var productionConfiguration = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Infrastructure", "DotisanProductionConfiguration.cs"));
+            Assert.Contains("X-Correlation-ID", authenticatedProgram);
+            Assert.Contains("CustomizeProblemDetails", authenticatedProgram);
+            Assert.Contains("DotisanProductionConfiguration.Validate", authenticatedProgram);
+            Assert.Contains("Dotisan:Security:FrontendUrl must be an absolute HTTPS URL outside Development", productionConfiguration);
+            Assert.Contains("Dotisan:Security:DataProtectionKeyDirectory is required outside Development", productionConfiguration);
+            Assert.Contains("Mail:Provider must be smtp or a custom provider outside Development", authenticatedProgram);
+            Assert.Contains("UseForwardedHeaders", authenticatedProgram);
+            Assert.Contains("KnownProxies", authenticatedProgram);
+            Assert.Contains("CookieSecurePolicy.Always", authenticatedProgram);
+            Assert.Contains("WithOrigins", authenticatedProgram);
+            Assert.Contains("DotisanSecurityOptions", authenticatedProgram);
+            Assert.Contains("ValidateOnStart", authenticatedProgram);
+            Assert.DoesNotContain("Database.Migrate()", authenticatedProgram);
+            Assert.Contains("/health/live", await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Features", "Health", "HealthEndpoints.cs")));
+            Assert.Contains("/health/ready", await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Features", "Health", "HealthEndpoints.cs")));
             var plainProgram = await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Api", "Program.cs"));
             var authenticatedEndpointRegistry = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Infrastructure", "DotisanEndpointExtensions.cs"));
             var plainEndpointRegistry = await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Api", "Infrastructure", "DotisanEndpointExtensions.cs"));
@@ -540,6 +707,9 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("password-reset/request", authServices);
             Assert.Contains("email-confirmation/confirm", authServices);
             Assert.True(File.Exists(Path.Combine(authenticatedOutput, "src", "AuthApp.Web", "src", "pages", "auth", "EmailConfirmationPage.vue")));
+            var confirmationPage = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Web", "src", "pages", "auth", "EmailConfirmationPage.vue"));
+            Assert.Contains("if (!route.query.token)", confirmationPage);
+            Assert.Contains("Check your email", confirmationPage);
             Assert.Contains("email-confirmation/resend", authServices);
             Assert.Contains("Connect", await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Web", "src", "pages", "account", "ExternalLoginsPage.vue")));
             Assert.DoesNotContain("IntegrationExamples.cs", plainPaths);
@@ -616,5 +786,58 @@ public sealed class GoldenTemplateGeneratorTests
             if (Directory.Exists(plainOutput))
                 Directory.Delete(plainOutput, recursive: true);
         }
+    }
+
+    [Fact]
+    public async Task Generation_is_reproducible_for_the_same_feature_matrix()
+    {
+        var first = Path.Combine(Path.GetTempPath(), "dotisan-repro-first-" + Guid.NewGuid().ToString("N"));
+        var second = Path.Combine(Path.GetTempPath(), "dotisan-repro-second-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var options = ProjectOptions.Quick("ReproApp", first) with
+            {
+                AuthenticationEnabled = true,
+                Registration = RegistrationPolicy.Public,
+                MultiTenancyEnabled = true,
+                NotificationsEnabled = true,
+                StorageEnabled = true,
+                CachingEnabled = true,
+                ImportsExportsEnabled = true,
+                WebhooksEnabled = true,
+                MailProvider = MailProvider.Mailpit,
+                PackageManager = PackageManager.Npm
+            };
+            Assert.True((await new GoldenTemplateGenerator().GenerateAsync(options, CancellationToken.None)).Success);
+            Assert.True((await new GoldenTemplateGenerator().GenerateAsync(options with { OutputDirectory = second }, CancellationToken.None)).Success);
+
+            var firstFiles = Directory.GetFiles(first, "*", SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(first, path).Replace(Path.DirectorySeparatorChar, '/'))
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .ToArray();
+            var secondFiles = Directory.GetFiles(second, "*", SearchOption.AllDirectories)
+                .Select(path => Path.GetRelativePath(second, path).Replace(Path.DirectorySeparatorChar, '/'))
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .ToArray();
+
+            Assert.Equal(firstFiles, secondFiles);
+            foreach (var relativePath in firstFiles)
+            {
+                var firstHash = await HashAsync(Path.Combine(first, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+                var secondHash = await HashAsync(Path.Combine(second, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+                Assert.Equal(firstHash, secondHash);
+            }
+        }
+        finally
+        {
+            if (Directory.Exists(first)) Directory.Delete(first, recursive: true);
+            if (Directory.Exists(second)) Directory.Delete(second, recursive: true);
+        }
+    }
+
+    private static async Task<string> HashAsync(string path)
+    {
+        await using var stream = File.OpenRead(path);
+        return Convert.ToHexString(await System.Security.Cryptography.SHA256.HashDataAsync(stream));
     }
 }

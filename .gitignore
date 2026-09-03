@@ -7,6 +7,9 @@ obj/
 .worktrees/
 .superpowers/
 
+# Local documentation and planning artifacts
+docs/
+
 ## Node
 node_modules/
 dist/
@@ -20,3 +23,13 @@ dist/
 ## Test output
 TestResults/
 coverage/
+tests/browser/test-results/
+
+# Generated validation fixtures
+validation/**/bin/
+validation/**/obj/
+validation/**/node_modules/
+validation/**/dist/
+validation/**/*.db
+validation/**/*.db-shm
+validation/**/*.db-wal
