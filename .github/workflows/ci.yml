@@ -9,11 +9,11 @@ jobs:
   repository:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.x'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22.x'
       - run: dotnet restore Dotisan.sln
@@ -42,11 +42,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: repository
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.x'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22.x'
       - name: Generate authenticated frontend
@@ -75,11 +75,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: repository
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.x'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22.x'
       - run: dotnet restore Dotisan.sln
@@ -91,8 +91,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [repository, generated-api, browser-smoke, dependency-audit]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.x'
       - run: dotnet restore Dotisan.sln
@@ -102,8 +102,9 @@ jobs:
         run: |
           test "$(find artifacts -name '*.nupkg' | wc -l)" -eq 1
           archive=$(find artifacts -name '*.nupkg' | head -n 1)
-          tar -tf "$archive" | grep 'Dotisan.Cli.dll' >/dev/null
-          if tar -tf "$archive" | grep -E '(^|/)(node_modules|bin|obj|.*\.db|.*\.(pfx|pem|key)$)' >/dev/null; then
+          tar -tf "$archive" > package-contents.txt
+          grep 'Dotisan.Cli.dll' package-contents.txt >/dev/null
+          if grep -E '(^|/)(node_modules|bin|obj|.*\.db|.*\.(pfx|pem|key)$)' package-contents.txt >/dev/null; then
             echo 'Package contains forbidden generated artifacts.' >&2
             exit 1
           fi
@@ -118,8 +119,8 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.x'
       - run: dotnet restore Dotisan.sln
@@ -139,8 +140,8 @@ jobs:
       matrix:
         feature: [plain, integrations]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.x'
       - name: Generate project
