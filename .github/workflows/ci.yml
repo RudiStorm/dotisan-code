@@ -96,6 +96,9 @@ jobs:
         with:
           dotnet-version: '10.x'
       - run: dotnet restore Dotisan.sln
+      - name: Clean package output directory
+        shell: bash
+        run: find artifacts -maxdepth 1 -type f -name '*.nupkg' -delete
       - run: dotnet pack src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release --no-restore --output artifacts
       - name: Inspect package contents
         shell: bash
