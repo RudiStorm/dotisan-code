@@ -43,7 +43,7 @@ internal static class TemplateFiles
             "@vue/test-utils": "^2.4.0",
             "@playwright/test": "^1.49.0",
             "tailwindcss": "^3.4.0",
-            "postcss": "^8.4.0",
+            "postcss": "8.4.49",
             "autoprefixer": "^10.4.0",
             "jsdom": "^25.0.0"
           }
@@ -136,8 +136,8 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/package.json", packageJson),
             new($"src/{options.Name}.Web/index.html", WebIndex(options.Name)),
             new($"src/{options.Name}.Web/tsconfig.json", "{\n  \"files\": [],\n  \"references\": [{ \"path\": \"./tsconfig.app.json\" }, { \"path\": \"./tsconfig.node.json\" }]\n}\n"),
-            new($"src/{options.Name}.Web/tsconfig.app.json", "{\n  \"extends\": \"@vue/tsconfig/tsconfig.dom.json\",\n  \"include\": [\"src/**/*.ts\", \"src/**/*.tsx\", \"src/**/*.vue\"],\n  \"compilerOptions\": {\n    \"composite\": true,\n    \"tsBuildInfoFile\": \"./node_modules/.tmp/tsconfig.app.tsbuildinfo\",\n    \"strict\": true,\n    \"target\": \"ES2022\",\n    \"lib\": [\"ES2022\", \"DOM\", \"DOM.Iterable\"],\n    \"moduleResolution\": \"Bundler\"\n  }\n}\n"),
-            new($"src/{options.Name}.Web/tsconfig.node.json", "{\n  \"compilerOptions\": {\n    \"composite\": true,\n    \"tsBuildInfoFile\": \"./node_modules/.tmp/tsconfig.node.tsbuildinfo\",\n    \"module\": \"ESNext\",\n    \"moduleResolution\": \"Bundler\",\n    \"allowSyntheticDefaultImports\": true,\n    \"target\": \"ES2022\",\n    \"types\": [\"node\"]\n  },\n  \"include\": [\"vite.config.ts\"]\n}\n"),
+            new($"src/{options.Name}.Web/tsconfig.app.json", "{\n  \"extends\": \"@vue/tsconfig/tsconfig.dom.json\",\n  \"include\": [\"src/**/*.ts\", \"src/**/*.tsx\", \"src/**/*.vue\"],\n  \"compilerOptions\": {\n    \"composite\": true,\n    \"tsBuildInfoFile\": \"./node_modules/.tmp/tsconfig.app.tsbuildinfo\",\n    \"strict\": true,\n    \"skipLibCheck\": true,\n    \"target\": \"ES2022\",\n    \"lib\": [\"ES2022\", \"DOM\", \"DOM.Iterable\"],\n    \"moduleResolution\": \"Bundler\"\n  }\n}\n"),
+            new($"src/{options.Name}.Web/tsconfig.node.json", "{\n  \"compilerOptions\": {\n    \"composite\": true,\n    \"tsBuildInfoFile\": \"./node_modules/.tmp/tsconfig.node.tsbuildinfo\",\n    \"module\": \"ESNext\",\n    \"moduleResolution\": \"Bundler\",\n    \"allowSyntheticDefaultImports\": true,\n    \"skipLibCheck\": true,\n    \"target\": \"ES2022\",\n    \"types\": [\"node\"]\n  },\n  \"include\": [\"vite.config.ts\"]\n}\n"),
             new($"src/{options.Name}.Web/vite.config.ts", ViteConfig(DevelopmentApiPort(options.Name), DevelopmentWebPort(options.Name))),
             new($"src/{options.Name}.Web/tailwind.config.ts", TailwindConfig()),
             new($"src/{options.Name}.Web/postcss.config.cjs", PostCssConfig()),
@@ -472,7 +472,7 @@ internal static class TemplateFiles
 
     public static class DotisanProductionConfiguration
     {
-        public static void Validate(IConfiguration configuration, string environmentName, bool emailConfirmationEnabled = {{emailConfirmationEnabled.ToString().ToLowerInvariant()}})
+        public static void Validate(IConfiguration configuration, string environmentName, bool emailConfirmationEnabled = {{emailConfirmationEnabled.ToString().ToLowerInvariant()}}, bool dataProtectionEnabled = true)
         {
             if (string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(environmentName, "Testing", StringComparison.OrdinalIgnoreCase))
@@ -482,9 +482,12 @@ internal static class TemplateFiles
             if (!Uri.TryCreate(frontendUrl, UriKind.Absolute, out var parsedFrontendUrl) || parsedFrontendUrl.Scheme != Uri.UriSchemeHttps)
                 throw new InvalidOperationException("Dotisan:Security:FrontendUrl must be an absolute HTTPS URL outside Development.");
 
-            var keyDirectory = configuration["Dotisan:Security:DataProtectionKeyDirectory"] ?? configuration["DataProtection:KeyDirectory"];
-            if (string.IsNullOrWhiteSpace(keyDirectory))
-                throw new InvalidOperationException("Dotisan:Security:DataProtectionKeyDirectory is required outside Development.");
+            if (dataProtectionEnabled)
+            {
+                var keyDirectory = configuration["Dotisan:Security:DataProtectionKeyDirectory"] ?? configuration["DataProtection:KeyDirectory"];
+                if (string.IsNullOrWhiteSpace(keyDirectory))
+                    throw new InvalidOperationException("Dotisan:Security:DataProtectionKeyDirectory is required outside Development.");
+            }
 
             if (emailConfirmationEnabled)
             {
@@ -740,11 +743,7 @@ internal static class TemplateFiles
     builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
     if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing"))
     {
-        DotisanProductionConfiguration.Validate(builder.Configuration, builder.Environment.EnvironmentName, emailConfirmationEnabled: false);
-        var keyDirectory = builder.Configuration["Dotisan:Security:DataProtectionKeyDirectory"] ?? builder.Configuration["DataProtection:KeyDirectory"];
-        var resolvedKeyDirectory = Path.GetFullPath(keyDirectory!, builder.Environment.ContentRootPath);
-        Directory.CreateDirectory(resolvedKeyDirectory);
-        builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(resolvedKeyDirectory));
+        DotisanProductionConfiguration.Validate(builder.Configuration, builder.Environment.EnvironmentName, emailConfirmationEnabled: false, dataProtectionEnabled: false);
     }
     builder.Services.AddScoped<IAuditWriter, AuditWriter>();
     {{(notificationsEnabled ? "builder.Services.AddSignalR();\n    builder.Services.AddScoped<INotificationStore, EfNotificationStore>();" : string.Empty)}}

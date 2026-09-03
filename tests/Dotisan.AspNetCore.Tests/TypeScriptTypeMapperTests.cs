@@ -82,6 +82,7 @@ public sealed class TypeScriptTypeMapperTests
         Assert.Contains("fieldErrors: ApiFieldErrors", services);
         Assert.Contains("Please fix the highlighted fields.", services);
         Assert.Contains("if (status === 401) return \"Invalid email or password.\"", services);
+        Assert.True(services.IndexOf("super(getErrorMessage", StringComparison.Ordinal) < services.IndexOf("this.correlationId", StringComparison.Ordinal));
     }
 
     [Fact]

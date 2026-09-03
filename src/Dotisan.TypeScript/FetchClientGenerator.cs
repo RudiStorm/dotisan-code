@@ -27,8 +27,8 @@ public static class FetchClientGenerator
         builder.AppendLine("  public readonly correlationId?: string;");
         builder.AppendLine("  constructor(public readonly status: number, public readonly problem: ProblemDetails) {");
         builder.AppendLine("    const fieldErrors = normalizeFieldErrors(problem.errors);");
-        builder.AppendLine("    this.correlationId = problem.correlationId;");
         builder.AppendLine("    super(getErrorMessage(status, problem, fieldErrors));");
+        builder.AppendLine("    this.correlationId = problem.correlationId;");
         builder.AppendLine("    this.fieldErrors = fieldErrors;");
         builder.AppendLine("  }");
         builder.AppendLine("}").AppendLine();
