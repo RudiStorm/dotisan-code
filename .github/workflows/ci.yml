@@ -144,7 +144,7 @@ jobs:
         shell: pwsh
         run: |
           if ('${{ matrix.feature }}' -eq 'integrations') {
-            dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- new GeneratedApp${{ matrix.feature }} --yes --auth yes --tenant yes --notifications yes --storage yes --caching yes --imports-exports yes --webhooks yes --no-restore --output ${{ github.workspace }}/generated/${{ matrix.feature }}
+            dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- new GeneratedApp${{ matrix.feature }} --yes --auth yes --registration public --tenant yes --notifications yes --storage yes --caching yes --imports-exports yes --webhooks yes --no-restore --output ${{ github.workspace }}/generated/${{ matrix.feature }}
           } else {
             dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- new GeneratedApp${{ matrix.feature }} --yes --no-restore --output ${{ github.workspace }}/generated/${{ matrix.feature }}
           }
