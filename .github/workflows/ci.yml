@@ -103,7 +103,10 @@ jobs:
           test "$(find artifacts -name '*.nupkg' | wc -l)" -eq 1
           archive=$(find artifacts -name '*.nupkg' | head -n 1)
           tar -tf "$archive" | grep 'Dotisan.Cli.dll' >/dev/null
-          ! tar -tf "$archive" | grep -E '(^|/)(node_modules|bin|obj|.*\.db|.*\.(pfx|pem|key)$)'
+          if tar -tf "$archive" | grep -E '(^|/)(node_modules|bin|obj|.*\.db|.*\.(pfx|pem|key)$)' >/dev/null; then
+            echo 'Package contains forbidden generated artifacts.' >&2
+            exit 1
+          fi
 
   publish-nuget:
     name: Publish NuGet package (trusted publishing)
