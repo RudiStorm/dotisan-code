@@ -11,6 +11,7 @@ namespace Dotisan.SourceGenerators;
 
 [Generator]
 [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+[Obsolete("The source-generator contract path is deprecated and will be removed after the OpenAPI migration release. Use build-produced OpenAPI contracts instead.", false)]
 public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
 {
     private const string MarkerName = "Dotisan.Core.IDotisanEndpoint";

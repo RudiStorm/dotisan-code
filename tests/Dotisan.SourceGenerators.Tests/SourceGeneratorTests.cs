@@ -1,4 +1,5 @@
 using Dotisan.Core;
+#pragma warning disable CS0618
 using Dotisan.SourceGenerators;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
