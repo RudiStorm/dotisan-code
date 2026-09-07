@@ -128,14 +128,23 @@ jobs:
           dotnet-version: '10.x'
       - run: dotnet restore Dotisan.sln
       - name: Pack release package
-        run: dotnet pack src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release --no-restore --output artifacts
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:[-+].*)?$') { throw "Release builds must run from a semantic-version tag (received '$version')." }
+          dotnet pack src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release --no-restore --output artifacts -p:Version=$version
       - name: Exchange GitHub OIDC identity for a temporary NuGet credential
         id: nuget-login
         uses: NuGet/login@v1
         with:
           user: ${{ secrets.NUGET_USER }}
       - name: Publish package
-        run: dotnet nuget push artifacts/Dotisan.0.8.6.nupkg --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          $package = Get-ChildItem artifacts -Filter "Dotisan.$version.nupkg" | Select-Object -First 1
+          if ($null -eq $package) { throw "Expected package Dotisan.$version.nupkg was not produced." }
+          dotnet nuget push $package.FullName --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
 
   generated-api:
     runs-on: ubuntu-latest
