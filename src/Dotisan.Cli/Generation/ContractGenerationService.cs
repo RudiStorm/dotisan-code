@@ -35,6 +35,17 @@ public static class ContractGenerationService
                 if (services.ApiProjectPath is null)
                     return ContractGenerationResult.Failed("Could not find an API project. Run this command from a generated Dotisan project.");
 
+                var openApiPath = FindBuildOpenApiDocument(services.ApiProjectPath);
+                if (openApiPath is not null)
+                {
+                    json = await File.ReadAllTextAsync(openApiPath, cancellationToken);
+                    manifest = OpenApiContractReader.Read(json);
+                    var derivedJson = manifest.ToJson();
+                    if (check && (!File.Exists(manifestPath) || !string.Equals(await File.ReadAllTextAsync(manifestPath, cancellationToken), derivedJson, StringComparison.Ordinal)))
+                        return ContractGenerationResult.Failed($"The derived contract manifest is stale: {manifestPath}. Run 'dotisan generate'.");
+                    goto ContractLoaded;
+                }
+
                 Directory.CreateDirectory(Path.GetDirectoryName(exportPath)!);
                 var export = await services.RunAsync(
                     "dotnet",
@@ -46,10 +57,10 @@ public static class ContractGenerationService
                     return ContractGenerationResult.Failed(export.ErrorMessage ?? "The generated API could not export its contract manifest.");
 
                 json = await File.ReadAllTextAsync(exportPath, cancellationToken);
-                if (check && (!File.Exists(manifestPath) || !string.Equals(await File.ReadAllTextAsync(manifestPath, cancellationToken), json, StringComparison.Ordinal)))
+                manifest = ContractManifest.FromJson(json);
+                if (check && (!File.Exists(manifestPath) || !string.Equals(await File.ReadAllTextAsync(manifestPath, cancellationToken), manifest.ToJson(), StringComparison.Ordinal)))
                     return ContractGenerationResult.Failed($"The compiled contract manifest is stale: {manifestPath}. Run 'dotisan generate'.");
-                if (!check)
-                    await File.WriteAllTextAsync(manifestPath, json, cancellationToken);
+                goto ContractLoaded;
             }
             else
             {
@@ -59,6 +70,8 @@ public static class ContractGenerationService
             }
 
             manifest = ContractManifest.FromJson(json);
+        ContractLoaded:
+            ;
         }
         catch (Exception exception) when (exception is System.Text.Json.JsonException or ArgumentException or NotSupportedException)
         {
@@ -122,6 +135,18 @@ public static class ContractGenerationService
 
         TryDeleteExport(exportPath);
         return ContractGenerationResult.Succeeded();
+    }
+
+    private static string? FindBuildOpenApiDocument(string apiProjectPath)
+    {
+        var projectDirectory = Path.GetDirectoryName(apiProjectPath);
+        var obj = projectDirectory is null ? null : Path.Combine(projectDirectory, "obj");
+        if (obj is null || !Directory.Exists(obj))
+            return null;
+        return Directory.EnumerateFiles(obj, "openapi.json", SearchOption.AllDirectories)
+            .Where(path => !path.Contains("\\ref\\", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .FirstOrDefault();
     }
 
     private static void TryDeleteExport(string path)
