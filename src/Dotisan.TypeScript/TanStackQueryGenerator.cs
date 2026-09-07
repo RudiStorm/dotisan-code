@@ -21,14 +21,11 @@ public static class TanStackQueryGenerator
             }
             else
             {
-                var requestType = NormalizeType(endpoint.Request);
                 builder.Append("export function ").Append(hookName).AppendLine("Mutation() {");
-                if (UsesBody(endpoint.Method) && requestType != "void")
-                    builder.Append("  return useMutation({ mutationFn: (body: Parameters<typeof services.").Append(functionName).AppendLine(">[0]) => services." + functionName + "(body) });");
-                else if (endpoint.Route.Contains('{'))
-                    builder.Append("  return useMutation({ mutationFn: (value: Parameters<typeof services.").Append(functionName).Append(">[0]) => services.").Append(functionName).AppendLine("(value) });");
-                else
-                    builder.Append("  return useMutation({ mutationFn: () => services.").Append(functionName).AppendLine("() });");
+                // Forward the complete generated service signature. This keeps route parameters,
+                // query options, request bodies, and RequestInit options usable from mutations.
+                builder.Append("  return useMutation({ mutationFn: (...args: Parameters<typeof services.")
+                    .Append(functionName).Append(">) => services.").Append(functionName).AppendLine("(...args) });");
                 builder.AppendLine("}").AppendLine();
             }
         }
@@ -37,6 +34,5 @@ public static class TanStackQueryGenerator
     }
 
     private static string ToCamelCase(string value) => string.IsNullOrEmpty(value) ? "request" : char.ToLowerInvariant(value[0]) + value[1..];
-    private static bool UsesBody(string method) => method.ToUpperInvariant() is "POST" or "PUT" or "PATCH";
     private static string NormalizeType(string type) => string.IsNullOrWhiteSpace(type) || type == "System.Void" ? "void" : type.Replace("global::", string.Empty, StringComparison.Ordinal);
 }
