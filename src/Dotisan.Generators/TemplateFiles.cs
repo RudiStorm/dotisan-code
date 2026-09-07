@@ -813,6 +813,7 @@ internal static class TemplateFiles
     using {{identifier}}.Api.Infrastructure;
     {{(jobsEnabled ? $"using {identifier}.Api.Jobs;" : string.Empty)}}
     using {{identifier}}.Api.Features.Health;
+    using Microsoft.AspNetCore.SignalR;
     using Microsoft.AspNetCore.DataProtection;
     {{(multiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty)}}
     {{(jobsEnabled ? "using Wolverine;" : string.Empty)}}
@@ -3268,6 +3269,7 @@ internal static class TemplateFiles
 
     private static string Storage(string identifier, bool authenticationEnabled, bool multiTenancyEnabled) => $$"""
     using Microsoft.AspNetCore.Routing;
+    {{(authenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty)}}
     namespace {{identifier}}.Api.Integrations;
 
     public sealed record StoredFile(string Key, string ContentType, long Length, DateTimeOffset CreatedAtUtc);
