@@ -1,6 +1,7 @@
 using Dotisan.Cli;
 using Dotisan.Cli.Generation;
 using Dotisan.Core;
+using Dotisan.OpenApi;
 using Dotisan.Testing;
 
 namespace Dotisan.Cli.Tests;
@@ -22,13 +23,29 @@ public sealed class GoldenPathTests
         var console = new MemoryConsole();
         var app = DotisanApplication.CreateDefault(console, new DefaultDotisanServices(root));
         Assert.Equal(DotisanExitCode.Success, await app.RunAsync(["make:resource", "Customer"]));
-        var generation = await ContractGenerationService.GenerateAsync(root, check: false, CancellationToken.None);
+        var customerManifest = new ContractManifest(
+            1,
+            [
+                new EndpointManifestEntry("listCustomers", "Customers", "listCustomers", "GET", "/api/customers", "void", "global::Customer", false, null, null, ["Customers"], false, false),
+                new EndpointManifestEntry("getCustomer", "Customers", "getCustomer", "GET", "/api/customers/{id:guid}", "void", "global::Customer", false, null, null, ["Customers"], false, false)
+            ],
+            [new ContractModel("Customer", "global::Customer", [new ContractProperty("customerId", new ContractTypeDescriptor(ContractTypeKind.Guid), false, false)], [])],
+            [
+                EndpointContractMetadata.Create("GET", "/api/customers", null, [], ["Customers"], false),
+                EndpointContractMetadata.Create("GET", "/api/customers/{id:guid}", null, [new EndpointParameterMetadata("id", new ContractTypeDescriptor(ContractTypeKind.Guid), false, false)], ["Customers"], false)
+            ]);
+        var apiObj = Path.Combine(root, "src", "GoldenApp.Api", "obj");
+        Directory.CreateDirectory(apiObj);
+        await File.WriteAllTextAsync(Path.Combine(apiObj, "GoldenApp.Api.json"), OpenApiDocumentGenerator.Generate(customerManifest, "GoldenApp", "v1").Json);
+        var generation = await ContractGenerationService.GenerateAsync(root, check: false, CancellationToken.None, noOpenApi: true, services: new DefaultDotisanServices(root), console: console);
         Assert.True(generation.Success, generation.ErrorMessage);
 
         var generatedServices = await File.ReadAllTextAsync(
             Path.Combine(root, "src", "GoldenApp.Web", "src", "dotisan", "services.ts"));
         Assert.Contains("listCustomers", generatedServices, StringComparison.Ordinal);
-        Assert.Contains("customerId", generatedServices, StringComparison.Ordinal);
+        var generatedModels = await File.ReadAllTextAsync(
+            Path.Combine(root, "src", "GoldenApp.Web", "src", "dotisan", "models.ts"));
+        Assert.Contains("customerId", generatedModels, StringComparison.Ordinal);
     }
 
     private sealed class MemoryConsole : IConsole
