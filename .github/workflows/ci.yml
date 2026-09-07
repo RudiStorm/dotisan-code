@@ -158,3 +158,6 @@ jobs:
       - run: dotnet restore generated/${{ matrix.feature }}/GeneratedApp${{ matrix.feature }}.sln
       - run: dotnet build generated/${{ matrix.feature }}/GeneratedApp${{ matrix.feature }}.sln --configuration Release --no-restore --warnaserror
       - run: dotnet test generated/${{ matrix.feature }}/GeneratedApp${{ matrix.feature }}.sln --configuration Release --no-build --no-restore --verbosity minimal
+      - name: Verify generated frontend
+        shell: bash
+        run: scripts/test-generated-project.sh "${{ github.workspace }}/generated/${{ matrix.feature }}" pnpm
