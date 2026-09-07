@@ -154,6 +154,7 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/src/components/ui/Badge.vue", UiBadge()),
             new($"src/{options.Name}.Web/src/lib/utils.ts", ShadcnUtils()),
             new($"src/{options.Name}.Web/src/components/ui/Badge.test.ts", UiBadgeTest()),
+            new($"src/{options.Name}.Web/src/api/client.test.ts", ApiClientTest()),
             new($"src/{options.Name}.Web/tests/e2e/shell.spec.ts", FrontendSmokeTest()),
             new($"src/{options.Name}.Web/src/components/AppSidebar.vue", AppSidebar(options.Name, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Web/src/components/AppHeader.vue", AppHeader(options.Name, options.AuthenticationEnabled)),
@@ -2598,6 +2599,27 @@ internal static class TemplateFiles
       if (!response.ok) throw new Error(`Request failed (${response.status}).`);
       return response.status === 204 ? undefined as T : await response.json() as T;
     }
+    """;
+
+    private static string ApiClientTest() => """
+    import { afterEach, describe, expect, it, vi } from 'vitest';
+    import { request } from './client';
+
+    describe('request', () => {
+      afterEach(() => vi.unstubAllGlobals());
+
+      it('propagates an antiforgery token for mutations', async () => {
+        const fetchMock = vi.fn()
+          .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'csrf-token' }), { status: 200 }))
+          .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+        vi.stubGlobal('fetch', fetchMock);
+
+        await expect(request<{ ok: boolean }>('/api/example', { method: 'POST', body: '{}' })).resolves.toEqual({ ok: true });
+        expect(fetchMock).toHaveBeenLastCalledWith('/api/example', expect.objectContaining({ credentials: 'include' }));
+        const options = fetchMock.mock.calls[1][1] as RequestInit;
+        expect(new Headers(options.headers).get('X-XSRF-TOKEN')).toBe('csrf-token');
+      });
+    });
     """;
 
     private static string JobTests(string identifier, bool authenticationEnabled) => $$"""
