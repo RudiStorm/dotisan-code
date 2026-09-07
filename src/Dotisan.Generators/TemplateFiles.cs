@@ -397,7 +397,6 @@ internal static class TemplateFiles
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Routing;
     {{(authenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty)}}
-    {{(authenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty)}}
     using Wolverine;
     using {{identifier}}.Api.Jobs;
     {{(authenticationEnabled ? $"using {identifier}.Api.Security;" : string.Empty)}}
@@ -652,6 +651,7 @@ internal static class TemplateFiles
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Routing;
+    using Microsoft.AspNetCore.Antiforgery;
 
     namespace {{identifier}}.Api.Features.Authorization;
 
@@ -673,7 +673,7 @@ internal static class TemplateFiles
                 if (user is null || !await roles.RoleExistsAsync(roleName)) return Results.NotFound();
                 var result = await users.AddToRoleAsync(user, roleName);
                 return result.Succeeded ? Results.NoContent() : Results.ValidationProblem(result.Errors.GroupBy(error => error.Code).ToDictionary(group => group.Key, group => group.Select(error => error.Description).ToArray()));
-            }).RequireAuthorization(Permissions.AuthorizationManage).WithName("AuthorizationAssignRole").WithTags("Authorization");
+            }).RequireAuthorization(Permissions.AuthorizationManage).WithMetadata(new RequireAntiforgeryTokenAttribute(true)).WithName("AuthorizationAssignRole").WithTags("Authorization");
         }
     }
     """;
