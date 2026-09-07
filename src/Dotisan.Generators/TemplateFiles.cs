@@ -235,6 +235,7 @@ internal static class TemplateFiles
         <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.7" />
         <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.7" />
         <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.9" />
+        <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.12" />
         <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.7" />
         <PackageVersion Include="WolverineFx" Version="6.30.3" />
         <PackageVersion Include="WolverineFx.EntityFrameworkCore" Version="6.30.3" />
@@ -686,7 +687,7 @@ internal static class TemplateFiles
     using {{identifier}}.Api.Features.Health;
     using Microsoft.AspNetCore.SignalR;
     {{(notificationsEnabled || storageEnabled || cachingEnabled || importsExportsEnabled || webhooksEnabled ? $"using {identifier}.Api.Integrations;" : string.Empty)}}
-    using Wolverine;
+    {{(jobsEnabled ? "using Wolverine;" : string.Empty)}}
     using OpenTelemetry;
     using OpenTelemetry.Metrics;
     using OpenTelemetry.Trace;
@@ -814,7 +815,7 @@ internal static class TemplateFiles
     using {{identifier}}.Api.Features.Health;
     using Microsoft.AspNetCore.DataProtection;
     {{(multiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty)}}
-    using Wolverine;
+    {{(jobsEnabled ? "using Wolverine;" : string.Empty)}}
     using Microsoft.AspNetCore.Authentication.Cookies;
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Identity;
