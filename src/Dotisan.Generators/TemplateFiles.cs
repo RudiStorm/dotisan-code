@@ -205,6 +205,7 @@ internal static class TemplateFiles
         <PackageReference Include="{{DatabasePackage(database)}}" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Extensions.Http" />
         {{(jobsEnabled ? $"<PackageReference Include=\"WolverineFx\" />\n        <PackageReference Include=\"WolverineFx.EntityFrameworkCore\" />\n        <PackageReference Include=\"WolverineFx.RuntimeCompilation\" />\n        <PackageReference Include=\"WolverineFx.{WolverineProviderPackage(database)}\" />" : string.Empty)}}
         <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
         <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
@@ -227,6 +228,7 @@ internal static class TemplateFiles
         <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.7" />
         <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.7" />
         <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.7" />
+        <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.7" />
         <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
         <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.7" />
         <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.7" />
