@@ -275,9 +275,9 @@ internal sealed class AddIntegrationCommand : WorkspaceCommand
         ["sendgrid"] = "# SendGrid\n\nAdd a provider adapter implementing `IEmailProvider`. Configure `SendGrid:ApiKey` and `SendGrid:From` through deployment secrets.\n",
         ["mailgun"] = "# Mailgun\n\nAdd a provider adapter implementing `IEmailProvider`. Configure `Mailgun:ApiKey`, `Mailgun:Domain`, and `Mailgun:From` through deployment secrets.\n",
         ["signoz"] = "# SigNoz\n\nSet `OTEL_EXPORTER_OTLP_ENDPOINT` to the SigNoz collector endpoint and enable export with `OpenTelemetry:Enabled=true`.\n",
-        ["notifications"] = "# Notifications\n\nGenerate with `dotisan new <Name> --notifications yes`. Add application-specific notification persistence and use the generated SignalR boundary for live updates.\n",
-        ["storage"] = "# File storage\n\nGenerate with `dotisan new <Name> --storage yes`. Implement `IFileStorage` with the local development adapter or an S3-compatible adapter configured through deployment secrets.\n",
-        ["caching"] = "# Caching\n\nGenerate with `dotisan new <Name> --caching yes`. Use the in-memory development boundary and configure a distributed provider for multi-instance deployments.\n",
+        ["notifications"] = "# Notifications\n\nGenerate with `dotisan new <Name> --notifications yes`. Readiness: development-adapter. Add retention, pagination, and delivery monitoring before production use.\n",
+        ["storage"] = "# File storage\n\nGenerate with `dotisan new <Name> --storage yes`. Readiness: development-adapter. Implement a reviewed durable provider for multi-node production.\n",
+        ["caching"] = "# Caching\n\nGenerate with `dotisan new <Name> --caching yes`. Readiness: development-adapter. Configure a distributed provider for multi-instance production.\n",
         ["imports-exports"] = "# Imports and exports\n\nGenerate with `dotisan new <Name> --imports-exports yes`. Readiness: development-adapter. Generated source includes bounded CSV/JSON uploads, EF-backed status, and a queued handler; add durable payload storage, domain processing, retention, and monitoring before production use.\n",
         ["webhooks"] = "# Webhooks\n\nGenerate with `dotisan new <Name> --webhooks yes`. Readiness: development-adapter. Generated source includes HMAC signing, URL validation, timeout, retries, delivery history, fresh replay signatures, and endpoint authorization; move dispatch to durable background execution and add destination policy, secret rotation, and observability before production use.\n"
     };
