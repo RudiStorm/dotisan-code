@@ -15,7 +15,7 @@ The current release is v0.8.6.
 - Generated OpenAPI, TypeScript models, Zod schemas, fetch services, and TanStack Query helpers.
 - Optional ASP.NET Core Identity cookie authentication and role-claim authorization.
 - Wolverine-backed durable local queues, delayed messages, recurring sample scheduling, and retries.
-- Opt-in provider-neutral notifications, local file storage, caching, CSV/JSON imports and exports, and signed webhooks.
+- Opt-in provider-neutral notifications, local file storage, caching, CSV/JSON imports and exports, and signed webhooks. See [integration readiness](docs/integrations-readiness.md) before promoting optional capabilities to production.
 - A solution file, `dotisan.config`, appsettings, local development defaults, and editable source boundaries.
 
 Dotisan owns the initial scaffold. After that, the generated application is yours: edit the files under `src/<Name>.Api` and `src/<Name>.Web`, use standard .NET and frontend tooling, and keep generated contract output refreshed with `dotisan generate`.
