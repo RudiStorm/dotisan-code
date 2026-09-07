@@ -397,6 +397,7 @@ internal static class TemplateFiles
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Routing;
     {{(authenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty)}}
+    {{(authenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty)}}
     using Wolverine;
     using {{identifier}}.Api.Jobs;
     {{(authenticationEnabled ? $"using {identifier}.Api.Security;" : string.Empty)}}
@@ -3342,6 +3343,7 @@ internal static class TemplateFiles
     using System.Collections.Concurrent;
     using System.Text;
     using Microsoft.AspNetCore.Routing;
+    {{(authenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty)}}
     using Wolverine;
     namespace {{identifier}}.Api.Integrations;
 
@@ -3357,13 +3359,13 @@ internal static class TemplateFiles
     public sealed class DataExchangeService(IMessageBus bus) : IDataExchangeService
     {
         private readonly ConcurrentDictionary<Guid, ImportStatus> statuses = new();
-        public async Task<ImportJob> StartImportAsync(Stream content, string format, CancellationToken cancellationToken = default) { if (format is not ("csv" or "json")) throw new ArgumentException("Only csv and json imports are supported.", nameof(format)); using var memory = new MemoryStream(); await content.CopyToAsync(memory, cancellationToken); var id = Guid.NewGuid(); statuses[id] = new ImportStatus(id, "queued", 0, 0, null); await bus.PublishAsync(new ImportRequested(id, format, null, memory.ToArray())); return new ImportJob(id, format, "queued", 0, 0, DateTimeOffset.UtcNow); }
+        public async Task<ImportJob> StartImportAsync(Stream content, string format, CancellationToken cancellationToken = default) { if (format is not ("csv" or "json")) throw new ArgumentException("Only csv and json imports are supported.", nameof(format)); using var memory = new MemoryStream(); await content.CopyToAsync(memory, cancellationToken); if (memory.Length > 10_485_760) throw new InvalidDataException("Import exceeds the 10 MB limit."); var id = Guid.NewGuid(); statuses[id] = new ImportStatus(id, "queued", 0, 0, null); await bus.PublishAsync(new ImportRequested(id, format, null, memory.ToArray())); return new ImportJob(id, format, "queued", 0, 0, DateTimeOffset.UtcNow); }
         public Task<ImportStatus?> GetStatusAsync(Guid id, CancellationToken cancellationToken = default) => Task.FromResult(statuses.TryGetValue(id, out var status) ? status : null);
         public Task<Stream> ExportAsync(string format, CancellationToken cancellationToken = default) => format is "csv" or "json" ? Task.FromResult<Stream>(new MemoryStream(Encoding.UTF8.GetBytes(format == "csv" ? "id,name\n" : "[]"))) : throw new ArgumentException("Only csv and json exports are supported.", nameof(format));
     }
     public static class ImportExportEndpoints
     {
-        public static void Map(IEndpointRouteBuilder endpoints) { var group = endpoints.MapGroup("/api/data"); {{(authenticationEnabled ? "group.RequireAuthorization();" : string.Empty)}} group.MapPost("/imports", async (IFormFile file, IDataExchangeService service, CancellationToken cancellationToken) => Results.Accepted(value: await service.StartImportAsync(file.OpenReadStream(), Path.GetExtension(file.FileName).TrimStart('.').ToLowerInvariant(), cancellationToken))); group.MapGet("/imports/{id:guid}", async (Guid id, IDataExchangeService service, CancellationToken cancellationToken) => { var status = await service.GetStatusAsync(id, cancellationToken); return status is null ? Results.NotFound() : Results.Ok(status); }); group.MapGet("/exports/{format}", async (string format, IDataExchangeService service, CancellationToken cancellationToken) => Results.File(await service.ExportAsync(format, cancellationToken), format == "csv" ? "text/csv" : "application/json", $"export.{format}")); }
+        public static void Map(IEndpointRouteBuilder endpoints) { var group = endpoints.MapGroup("/api/data"); {{(authenticationEnabled ? "group.RequireAuthorization();" : string.Empty)}} group.MapPost("/imports", async (IFormFile file, IDataExchangeService service, CancellationToken cancellationToken) => { if (file.Length == 0 || file.Length > 10_485_760) return Results.BadRequest(new { code = "invalid_import_size" }); return Results.Accepted(value: await service.StartImportAsync(file.OpenReadStream(), Path.GetExtension(file.FileName).TrimStart('.').ToLowerInvariant(), cancellationToken)); }){{(authenticationEnabled ? ".WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty)}}; group.MapGet("/imports/{id:guid}", async (Guid id, IDataExchangeService service, CancellationToken cancellationToken) => { var status = await service.GetStatusAsync(id, cancellationToken); return status is null ? Results.NotFound() : Results.Ok(status); }); group.MapGet("/exports/{format}", async (string format, IDataExchangeService service, CancellationToken cancellationToken) => Results.File(await service.ExportAsync(format, cancellationToken), format == "csv" ? "text/csv" : "application/json", $"export.{format}")); }
     }
     """;
 
