@@ -47,13 +47,19 @@ public sealed class DotisanApplication
         }
 
         var commandName = args[0];
+        var commandArguments = args[1..];
+        if (commandName.Equals("make", StringComparison.OrdinalIgnoreCase) && commandArguments.Length > 0)
+        {
+            commandName = $"make:{commandArguments[0]}";
+            commandArguments = commandArguments[1..];
+        }
         if (!registry.TryGet(commandName, out var command) || command is null)
         {
             context.Console.WriteError($"Unknown command '{commandName}'. Run 'dotisan help' to see available commands.");
             return DotisanExitCode.UsageError;
         }
 
-        return await command.ExecuteAsync(context, args[1..], cancellationToken);
+        return await command.ExecuteAsync(context, commandArguments, cancellationToken);
     }
 
     public void Register(IDotisanCommand command) => registry.Register(command);
