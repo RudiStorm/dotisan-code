@@ -1,10 +1,20 @@
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)][string]$ProjectRoot,
+    [string]$ProjectRoot,
+    [ValidateSet('minimal', 'identity', 'saas', 'maximal', 'custom')][string]$Profile = 'minimal',
     [ValidateSet('npm', 'pnpm')][string]$PackageManager = 'pnpm'
 )
 
 $ErrorActionPreference = 'Stop'
+$createdRoot = $false
+if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
+    $ProjectRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("dotisan-acceptance-" + [Guid]::NewGuid().ToString('N'))
+    $cliArguments = @('run', '--project', (Join-Path $PSScriptRoot '..\src\Dotisan.Cli'), '--', 'new', 'GeneratedAcceptance', '--profile', $Profile, '--package-manager', $PackageManager, '--yes', '--output', $ProjectRoot)
+    & dotnet @cliArguments
+    if ($LASTEXITCODE -ne 0) { throw "dotisan new failed with exit code $LASTEXITCODE." }
+    $createdRoot = $true
+}
+$ProjectRoot = [System.IO.Path]::GetFullPath($ProjectRoot)
 $solution = Get-ChildItem -LiteralPath $ProjectRoot -Filter '*.sln' | Select-Object -First 1
 $web = Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'src') -Directory -Filter '*.Web' | Select-Object -First 1
 if ($null -eq $solution -or $null -eq $web) { throw "Generated solution or frontend was not found under $ProjectRoot." }
@@ -20,4 +30,8 @@ if ($PackageManager -eq 'pnpm') {
     & npm --prefix $web.FullName ci
     & npm --prefix $web.FullName run build
     & npm --prefix $web.FullName test
+}
+
+if ($createdRoot -and (Test-Path -LiteralPath $ProjectRoot)) {
+    Remove-Item -LiteralPath $ProjectRoot -Recurse -Force
 }
