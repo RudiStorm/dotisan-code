@@ -807,6 +807,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.DoesNotContain("UseWolverine", program);
             Assert.DoesNotContain("JobEndpoints", endpoints);
             Assert.False(File.Exists(Path.Combine(output, "src", "NoJobsApp.Api", "Jobs", "JobRegistration.cs")));
+            Assert.False(File.Exists(Path.Combine(output, "tests", "NoJobsApp.Api.Tests", "JobTests.cs")));
         }
         finally
         {

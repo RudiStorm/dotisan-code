@@ -178,7 +178,7 @@ internal static class TemplateFiles
                 : Array.Empty<TemplateFile>()),
             new($"tests/{options.Name}.Api.Tests/{options.Name}.Api.Tests.csproj", ApiTestsProject(options.Name, options.AuthenticationEnabled)),
             new($"tests/{options.Name}.Api.Tests/HealthEndpointTests.cs", ApiTests(identifier)),
-            new($"tests/{options.Name}.Api.Tests/JobTests.cs", JobTests(identifier)),
+            ..(options.JobsEnabled ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/JobTests.cs", JobTests(identifier)) } : Array.Empty<TemplateFile>()),
             new($"tests/{options.Name}.Api.Tests/Usings.cs", "global using Xunit;\n"),
             ..(options.MultiTenancyEnabled
                 ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/TenantContextTests.cs", TenantContextTests(identifier)) }
