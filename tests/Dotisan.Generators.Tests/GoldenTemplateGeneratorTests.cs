@@ -397,6 +397,30 @@ public sealed class GoldenTemplateGeneratorTests
         }
     }
 
+    [Fact]
+    public async Task Generated_webhooks_use_the_named_timeout_client()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-webhook-client-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var generated = await new GoldenTemplateGenerator().GenerateAsync(ProjectOptions.Quick("WebhookApp", output) with
+            {
+                AuthenticationEnabled = true,
+                Registration = RegistrationPolicy.Public,
+                MultiTenancyEnabled = true,
+                WebhooksEnabled = true,
+                JobsEnabled = true
+            }, CancellationToken.None);
+            Assert.True(generated.Success, generated.ErrorMessage);
+            var webhooks = await File.ReadAllTextAsync(Path.Combine(output, "src", "WebhookApp.Api", "Integrations", "Webhooks.cs"));
+            Assert.Contains("CreateClient(\"webhooks\")", webhooks);
+        }
+        finally
+        {
+            if (Directory.Exists(output)) Directory.Delete(output, recursive: true);
+        }
+    }
+
     [Theory]
     [InlineData(DatabaseProvider.SQLite, "Microsoft.EntityFrameworkCore.Sqlite", "UseSqlite", "Data Source=Data/DataApp.db", "SQLite")]
     [InlineData(DatabaseProvider.SqlServer, "Microsoft.EntityFrameworkCore.SqlServer", "UseSqlServer", "Server=localhost,1433;Database=DataApp;User Id=sa;Password=DotisanDev123!;TrustServerCertificate=True", "SQL Server")]
