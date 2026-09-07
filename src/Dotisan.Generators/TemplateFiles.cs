@@ -87,7 +87,6 @@ internal static class TemplateFiles
             new TemplateFile("compose.yaml", DatabaseCompose(options.Name, options.Database, options.MailProvider)),
             new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.Database, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.MultiTenancyEnabled, options.NotificationsEnabled, options.StorageEnabled, options.CachingEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled)),
-            new($"src/{options.Name}.Api/Infrastructure/DotisanContractExport.cs", ContractExport(options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled, options.NotificationsEnabled, options.WebhooksEnabled)),
             new($"src/{options.Name}.Api/Auditing/AuditEntry.cs", AuditEntry(identifier)),
             new($"src/{options.Name}.Api/Auditing/IAuditWriter.cs", AuditWriterContract(identifier)),
@@ -201,7 +200,6 @@ internal static class TemplateFiles
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <RootNamespace>{{name.Replace('-', '_')}}</RootNamespace>
-        <DefineConstants>DOTISAN_CONTRACT_FALLBACK</DefineConstants>
         <OpenApiGenerateDocuments>true</OpenApiGenerateDocuments>
         <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
       </PropertyGroup>
@@ -701,9 +699,6 @@ internal static class TemplateFiles
     using Microsoft.AspNetCore.HttpOverrides;
     using System.Net;
 
-    if (TryExportDotisanContract(args))
-        return;
-
     var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddOptions<DotisanSecurityOptions>()
         .BindConfiguration("Dotisan:Security")
@@ -809,21 +804,6 @@ internal static class TemplateFiles
         return string.Join(';', parts);
     }
 
-    static bool TryExportDotisanContract(string[] arguments)
-    {
-        const string option = "--dotisan-export-contract";
-        var index = Array.IndexOf(arguments, option);
-        if (index < 0)
-            return false;
-        if (index + 1 >= arguments.Length || string.IsNullOrWhiteSpace(arguments[index + 1]))
-            throw new InvalidOperationException($"{option} requires an output path.");
-
-        var outputPath = Path.GetFullPath(arguments[index + 1]);
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-        File.WriteAllText(outputPath, Dotisan.Generated.DotisanContractExport.ContractManifestJson);
-        return true;
-    }
-
     public partial class Program { }
     """;
 
@@ -852,9 +832,6 @@ internal static class TemplateFiles
     using OpenTelemetry.Metrics;
     using OpenTelemetry.Trace;
     using OpenTelemetry.Logs;
-
-    if (TryExportDotisanContract(args))
-        return;
 
     var builder = WebApplication.CreateBuilder(args);
     builder.Services.AddOptions<DotisanSecurityOptions>()
@@ -1036,21 +1013,6 @@ internal static class TemplateFiles
         Directory.CreateDirectory(Path.GetDirectoryName(resolvedPath)!);
         parts[0] = $"Data Source={resolvedPath}";
         return string.Join(';', parts);
-    }
-
-    static bool TryExportDotisanContract(string[] arguments)
-    {
-        const string option = "--dotisan-export-contract";
-        var index = Array.IndexOf(arguments, option);
-        if (index < 0)
-            return false;
-        if (index + 1 >= arguments.Length || string.IsNullOrWhiteSpace(arguments[index + 1]))
-            throw new InvalidOperationException($"{option} requires an output path.");
-
-        var outputPath = Path.GetFullPath(arguments[index + 1]);
-        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-        File.WriteAllText(outputPath, Dotisan.Generated.DotisanContractExport.ContractManifestJson);
-        return true;
     }
 
     public partial class Program { }
@@ -2573,20 +2535,6 @@ internal static class TemplateFiles
                 ,EndpointContractMetadata.Create("DELETE", "/api/account/external/{provider}/link", null, [new EndpointParameterMetadata("provider", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], ["Account"], true)
             ])
         : new ContractManifest(1, [], []);
-
-    private static string ContractExport(bool authenticationEnabled) => (authenticationEnabled ? InitialContractManifest(true) : InitialContractManifest(false)).ToJson() switch
-    {
-        var json => $$"""
-    namespace Dotisan.Generated;
-
-    #if DOTISAN_CONTRACT_FALLBACK
-    public static class DotisanContractExport
-    {
-        public const string ContractManifestJson = "{{json.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)}}";
-    }
-    #endif
-    """
-    };
 
     private static string RoutesIndex(bool authenticationEnabled, bool notificationsEnabled, bool importsExportsEnabled, bool webhooksEnabled) => authenticationEnabled
         ? $$"""
