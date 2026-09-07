@@ -2980,10 +2980,10 @@ internal static class TemplateFiles
     <script setup lang="ts">
     import { onMounted, ref } from 'vue';
     import UiCard from '../components/ui/Card.vue';
-    import { issueAntiforgery } from '../dotisan/services';
+    import { request } from '../api/client';
     const notifications = ref<Array<{ id: string; title: string; body: string; isRead: boolean }>>([]); const pending = ref<string | null>(null); const message = ref('');
-    onMounted(async () => { const response = await fetch('/api/notifications', { credentials: 'include' }); if (response.ok) notifications.value = (await response.json()).notifications; });
-    async function markRead(id: string) { if (pending.value) return; pending.value = id; message.value = ''; try { const token = await issueAntiforgery(); const response = await fetch(`/api/notifications/${id}/read`, { method: 'POST', credentials: 'include', headers: { 'X-XSRF-TOKEN': token.token } }); if (!response.ok) throw new Error(); const item = notifications.value.find(value => value.id === id); if (item) item.isRead = true; } catch { message.value = 'Could not mark the notification as read.'; } finally { pending.value = null; } }
+    onMounted(async () => { try { const result = await request<{ notifications: typeof notifications.value }>('/api/notifications'); notifications.value = result.notifications; } catch { message.value = 'Could not load notifications.'; } });
+    async function markRead(id: string) { if (pending.value) return; pending.value = id; message.value = ''; try { await request(`/api/notifications/${id}/read`, { method: 'POST' }); const item = notifications.value.find(value => value.id === id); if (item) item.isRead = true; } catch { message.value = 'Could not mark the notification as read.'; } finally { pending.value = null; } }
     </script>
     <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Inbox</p><h2>Notifications</h2></div></div><p v-if="message" role="alert" v-text="message"></p><UiCard v-for="item in notifications" :key="item.id" :class="{ unread: !item.isRead }"><h3>{{ item.title }}</h3><p>{{ item.body }}</p><button v-if="!item.isRead" :disabled="pending !== null" @click="markRead(item.id)">{{ pending === item.id ? 'Saving...' : 'Mark read' }}</button></UiCard><p v-if="notifications.length === 0" class="muted">You are all caught up.</p></section></template>
     """;
@@ -2991,9 +2991,9 @@ internal static class TemplateFiles
     private static string ImportsExportsPage() => """
     <script setup lang="ts">
     import { ref } from 'vue';
-    import { issueAntiforgery } from '../dotisan/services';
+    import { request } from '../api/client';
     const file = ref<File>(); const message = ref(''); const pending = ref(false);
-    async function importFile() { if (!file.value || pending.value) return; pending.value = true; message.value = ''; try { const body = new FormData(); body.append('file', file.value); const token = await issueAntiforgery(); const response = await fetch('/api/data/imports', { method: 'POST', body, credentials: 'include', headers: { 'X-XSRF-TOKEN': token.token } }); message.value = response.ok ? 'Import queued.' : 'Import failed.'; } catch { message.value = 'Import failed.'; } finally { pending.value = false; } }
+    async function importFile() { if (!file.value || pending.value) return; pending.value = true; message.value = ''; try { const body = new FormData(); body.append('file', file.value); await request('/api/data/imports', { method: 'POST', body }); message.value = 'Import queued.'; } catch { message.value = 'Import failed.'; } finally { pending.value = false; } }
     </script>
     <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Data</p><h2>Imports and exports</h2></div></div><form @submit.prevent="importFile"><input type="file" accept=".csv,.json" @change="file = ($event.target as HTMLInputElement).files?.[0]" /><button type="submit" :disabled="pending">{{ pending ? 'Queueing...' : 'Queue import' }}</button></form><a href="/api/data/exports/csv">Download CSV export</a><p v-if="message" role="status">{{ message }}</p></section></template>
     """;
@@ -3001,10 +3001,10 @@ internal static class TemplateFiles
     private static string WebhooksPage() => """
     <script setup lang="ts">
     import { onMounted, ref } from 'vue';
-    import { issueAntiforgery } from '../dotisan/services';
+    import { request } from '../api/client';
     const deliveries = ref<Array<{ id: string; eventType: string; endpoint: string; status: string; attempts: number }>>([]); const pending = ref<string | null>(null);
-    onMounted(async () => { const response = await fetch('/api/webhooks/deliveries'); if (response.ok) deliveries.value = await response.json(); });
-    async function replay(id: string) { if (pending.value) return; pending.value = id; try { const token = await issueAntiforgery(); await fetch(`/api/webhooks/deliveries/${id}/replay`, { method: 'POST', credentials: 'include', headers: { 'X-XSRF-TOKEN': token.token } }); } finally { pending.value = null; } }
+    onMounted(async () => { try { deliveries.value = await request<typeof deliveries.value>('/api/webhooks/deliveries'); } catch { /* empty state remains visible */ } });
+    async function replay(id: string) { if (pending.value) return; pending.value = id; try { await request(`/api/webhooks/deliveries/${id}/replay`, { method: 'POST' }); } finally { pending.value = null; } }
     </script>
     <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Integrations</p><h2>Webhook deliveries</h2></div></div><table><caption class="sr-only">Webhook deliveries</caption><thead><tr><th scope="col">Event</th><th scope="col">Endpoint</th><th scope="col">Status</th><th scope="col">Attempts</th><th scope="col">Actions</th></tr></thead><tbody><tr v-for="delivery in deliveries" :key="delivery.id"><td>{{ delivery.eventType }}</td><td>{{ delivery.endpoint }}</td><td>{{ delivery.status }}</td><td>{{ delivery.attempts }}</td><td><button :disabled="pending !== null" @click="replay(delivery.id)">{{ pending === delivery.id ? 'Replaying...' : 'Replay' }}</button></td></tr></tbody></table><p v-if="deliveries.length === 0" class="muted">No webhook deliveries yet.</p></section></template>
     """;
@@ -3074,10 +3074,10 @@ internal static class TemplateFiles
 
     private static string AuthorizationPage() => """
     <script setup lang="ts">
-    import { onMounted, ref } from 'vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue'; import { issueAntiforgery } from '../../dotisan/services';
+    import { onMounted, ref } from 'vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue'; import { request } from '../../api/client';
     const users = ref<{ id: string; email: string }[]>([]); const roles = ref<string[]>([]); const selectedRole = ref(''); const error = ref('');
-    async function load() { const response = await fetch('/api/authorization/users', { credentials: 'include' }); if (!response.ok) throw new Error(response.status === 403 ? 'You do not have permission to manage authorization.' : 'Could not load authorization data.'); const data = await response.json(); users.value = data.users; roles.value = data.roles; selectedRole.value = roles.value[0] ?? ''; }
-    async function assign(userId: string) { if (!selectedRole.value) return; const token = await issueAntiforgery(); const response = await fetch(`/api/authorization/users/${userId}/roles/${encodeURIComponent(selectedRole.value)}`, { method: 'POST', credentials: 'include', headers: { 'X-XSRF-TOKEN': token.token } }); if (!response.ok) error.value = 'Could not assign that role.'; }
+    async function load() { try { const data = await request<{ users: typeof users.value; roles: string[] }>('/api/authorization/users'); users.value = data.users; roles.value = data.roles; selectedRole.value = roles.value[0] ?? ''; } catch (exception) { throw new Error(exception instanceof Error && exception.message.includes('(403)') ? 'You do not have permission to manage authorization.' : 'Could not load authorization data.'); } }
+    async function assign(userId: string) { if (!selectedRole.value) return; try { await request(`/api/authorization/users/${userId}/roles/${encodeURIComponent(selectedRole.value)}`, { method: 'POST' }); } catch { error.value = 'Could not assign that role.'; } }
     onMounted(() => load().catch(exception => error.value = exception instanceof Error ? exception.message : 'Could not load authorization data.'));
     </script>
     <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Administration</p><h2>Authorization</h2><p class="muted">Assign existing Identity roles to users. Define permission claims in the API.</p></div></div><UiCard><p v-if="error" class="form-error" role="alert" v-text="error"></p><label>Role<UiInput v-model="selectedRole" placeholder="Role name" /></label><p v-if="!users.length" class="muted">Loading users...</p><ul v-else class="profile-list"><li v-for="user in users" :key="user.id"><span v-text="user.email"></span><button class="ui-button ui-button--outline" @click="assign(user.id)">Assign role</button></li></ul></UiCard></section></template>
@@ -3108,11 +3108,11 @@ internal static class TemplateFiles
 
     private static string ExternalLoginsPage() => """
     <script setup lang="ts">
-    import { onMounted, ref } from 'vue'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import { issueAntiforgery } from '../../dotisan/services';
+    import { onMounted, ref } from 'vue'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import { request } from '../../api/client';
     const providers = ref<{ name: string; displayName: string }[]>([]); const message = ref('');
-    onMounted(async () => { const response = await fetch('/api/account/external/providers'); if (response.ok) providers.value = (await response.json()).providers; });
+    onMounted(async () => { try { providers.value = (await request<{ providers: typeof providers.value }>('/api/account/external/providers')).providers; } catch { message.value = 'Could not load external providers.'; } });
     function connect(name: string) { window.location.assign(`/api/account/external/${encodeURIComponent(name)}/challenge?returnUrl=${encodeURIComponent('/security/external-logins')}`); }
-    async function disconnect(name: string) { const token = await issueAntiforgery(); await fetch(`/api/account/external/${encodeURIComponent(name)}/link`, { method: 'DELETE', credentials: 'include', headers: { 'X-XSRF-TOKEN': token.token } }); message.value = `${name} disconnected.`; }
+    async function disconnect(name: string) { try { await request(`/api/account/external/${encodeURIComponent(name)}/link`, { method: 'DELETE' }); message.value = `${name} disconnected.`; } catch { message.value = `Could not disconnect ${name}.`; } }
     </script>
     <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Account security</p><h2>External sign-in providers</h2><p class="muted">Connect providers through an application-specific adapter. Dotisan keeps this boundary provider-neutral.</p></div></div><UiCard><p v-if="message" class="muted" v-text="message"></p><p v-if="!providers.length" class="muted">No external providers are configured yet.</p><ul v-else class="profile-list"><li v-for="provider in providers" :key="provider.name"><strong v-text="provider.displayName"></strong><span class="muted" v-text="provider.name"></span><UiButton @click="connect(provider.name)">Connect</UiButton><UiButton variant="outline" @click="disconnect(provider.name)">Disconnect</UiButton></li></ul></UiCard></section></template>
     """;
