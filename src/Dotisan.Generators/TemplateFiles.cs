@@ -3229,6 +3229,7 @@ internal static class TemplateFiles
     FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS final
     WORKDIR /app
     COPY --from=api-build /app/publish .
+    RUN mkdir -p /app/Data && chown $APP_UID /app/Data
     USER $APP_UID
     EXPOSE 8080
     HEALTHCHECK --interval=30s --timeout=5s CMD wget --spider --no-verbose http://localhost:8080/api/health || exit 1

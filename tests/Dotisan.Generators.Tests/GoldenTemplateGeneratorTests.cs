@@ -864,6 +864,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("corepack prepare pnpm@9.15.0", dockerfile);
             Assert.Contains("pnpm install --frozen-lockfile", dockerfile);
             Assert.Contains("COPY Directory.Packages.props ./", dockerfile);
+            Assert.Contains("mkdir -p /app/Data && chown $APP_UID /app/Data", dockerfile);
         }
         finally
         {
