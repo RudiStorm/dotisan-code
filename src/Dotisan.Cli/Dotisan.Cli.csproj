@@ -7,6 +7,12 @@
     <ToolCommandName>dotisan</ToolCommandName>
     <PackAsTool>true</PackAsTool>
     <Version>0.8.6</Version>
+    <Authors>Dotisan contributors</Authors>
+    <RepositoryUrl>https://github.com/RudiStorm/dotisan-code</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/RudiStorm/dotisan-code</PackageProjectUrl>
+    <PackageReleaseNotes>See https://github.com/RudiStorm/dotisan-code/blob/master/CHANGELOG.md</PackageReleaseNotes>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>dotnet;aspnetcore;scaffolding;cli;vue;typescript;openapi</PackageTags>
