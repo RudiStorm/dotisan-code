@@ -777,6 +777,7 @@ internal static class TemplateFiles
     app.UseExceptionHandler();
     if (!app.Environment.IsDevelopment())
     {
+        app.UseHsts();
         app.UseHttpsRedirection();
     }
     app.UseDefaultFiles();
@@ -1001,6 +1002,7 @@ internal static class TemplateFiles
     app.UseExceptionHandler();
     if (!app.Environment.IsDevelopment())
     {
+        app.UseHsts();
         app.UseHttpsRedirection();
     }
     app.UseDefaultFiles();
