@@ -21,6 +21,7 @@ internal sealed class HelpCommand(DotisanCommandRegistry registry) : IDotisanCom
         context.Console.WriteLine(string.Empty);
         context.Console.WriteLine("Commands:");
         context.Console.WriteLine("  dotisan new <ProjectName>    Create a new Dotisan application");
+        context.Console.WriteLine("      Profiles: --profile minimal|identity|saas|maximal|custom");
         foreach (var command in registry.Commands.Where(command => command.Name is not "help" and not "new"))
         {
             context.Console.WriteLine($"  {command.Name,-25} {command.Description}");
