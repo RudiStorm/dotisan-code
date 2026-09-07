@@ -1132,6 +1132,9 @@ internal static class TemplateFiles
 
     private static string DevelopmentAppSettings(MailProvider provider) => $$"""
     {
+      "Dotisan": {
+        "Jobs": { "Enabled": false }
+      },
       "Mail": {
         "Provider": "{{provider.ToString().ToLowerInvariant()}}",
         "Mailpit": { "BaseUrl": "http://localhost:8025/api/v1", "From": "no-reply@localhost" },
