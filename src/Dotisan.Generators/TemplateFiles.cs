@@ -686,6 +686,7 @@ internal static class TemplateFiles
     {{(multiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty)}}
     using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Data;
+    {{(authenticationEnabled ? $"using {identifier}.Api.Security;" : string.Empty)}}
     using {{identifier}}.Api.Infrastructure;
     using {{identifier}}.Api.Jobs;
     using {{identifier}}.Api.Features.Health;
@@ -3397,7 +3398,7 @@ internal static class TemplateFiles
     }
     public static class WebhookEndpoints
     {
-        public static void Map(IEndpointRouteBuilder endpoints) { var group = endpoints.MapGroup("/api/webhooks"); {{(authenticationEnabled ? "group.RequireAuthorization();" : string.Empty)}} group.MapGet("/deliveries", async (AppDbContext db, CancellationToken cancellationToken) => Results.Ok(await db.WebhookDeliveries.AsNoTracking().OrderByDescending(x => x.CreatedAtUtc).Take(100).ToListAsync(cancellationToken))); group.MapPost("/deliveries/{id:guid}/replay", async (Guid id, IWebhookDispatcher dispatcher, CancellationToken cancellationToken) => await dispatcher.ReplayAsync(id, cancellationToken) ? Results.Accepted($"/api/webhooks/deliveries/{id}", new { deliveryId = id, status = "delivered" }) : Results.NotFound()); }
+        public static void Map(IEndpointRouteBuilder endpoints) { var group = endpoints.MapGroup("/api/webhooks"); {{(authenticationEnabled ? "group.RequireAuthorization();" : string.Empty)}} group.MapGet("/deliveries", async (AppDbContext db, CancellationToken cancellationToken) => Results.Ok(await db.WebhookDeliveries.AsNoTracking().OrderByDescending(x => x.CreatedAtUtc).Take(100).ToListAsync(cancellationToken))); group.MapPost("/deliveries/{id:guid}/replay", async (Guid id, IWebhookDispatcher dispatcher, CancellationToken cancellationToken) => await dispatcher.ReplayAsync(id, cancellationToken) ? Results.Accepted($"/api/webhooks/deliveries/{id}", new { deliveryId = id, status = "delivered" }) : Results.NotFound()){{(authenticationEnabled ? ".RequireAuthorization(Permissions.AuthorizationManage)" : string.Empty)}}; }
     }
     """;
 
