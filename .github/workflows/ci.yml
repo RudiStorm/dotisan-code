@@ -161,9 +161,9 @@ jobs:
         shell: pwsh
         run: |
           if ('${{ matrix.feature }}' -eq 'integrations') {
-            dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- new GeneratedApp${{ matrix.feature }}${{ matrix.package_manager }} --yes --auth yes --registration public --tenant yes --notifications yes --storage yes --caching yes --imports-exports yes --webhooks yes --package-manager ${{ matrix.package_manager }} --no-restore --output ${{ github.workspace }}/generated/${{ matrix.feature }}-${{ matrix.package_manager }}
+            dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- new GeneratedApp${{ matrix.feature }}${{ matrix.package_manager }} --yes --auth yes --registration public --tenant yes --notifications yes --storage yes --caching yes --imports-exports yes --webhooks yes --package-manager ${{ matrix.package_manager }} --output ${{ github.workspace }}/generated/${{ matrix.feature }}-${{ matrix.package_manager }}
           } else {
-            dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- new GeneratedApp${{ matrix.feature }}${{ matrix.package_manager }} --yes --package-manager ${{ matrix.package_manager }} --no-restore --output ${{ github.workspace }}/generated/${{ matrix.feature }}-${{ matrix.package_manager }}
+            dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- new GeneratedApp${{ matrix.feature }}${{ matrix.package_manager }} --yes --package-manager ${{ matrix.package_manager }} --output ${{ github.workspace }}/generated/${{ matrix.feature }}-${{ matrix.package_manager }}
           }
       - run: dotnet restore generated/${{ matrix.feature }}-${{ matrix.package_manager }}/GeneratedApp${{ matrix.feature }}${{ matrix.package_manager }}.sln
       - run: dotnet build generated/${{ matrix.feature }}-${{ matrix.package_manager }}/GeneratedApp${{ matrix.feature }}${{ matrix.package_manager }}.sln --configuration Release --no-restore --warnaserror
