@@ -18,20 +18,26 @@ public sealed class GoldenPathTests
             DotisanExitCode.Success,
             await creation.RunAsync(["new", "GoldenApp", "--yes", "--auth", "yes", "--registration", "public", "--no-restore", "--output", root]));
 
-        var app = DotisanApplication.CreateDefault(new MemoryConsole(), new DefaultDotisanServices(root));
+        var console = new MemoryConsole();
+        var services = new DefaultDotisanServices(root);
+        Assert.True((await services.RunAsync("dotnet", ["restore", Path.Combine(root, "GoldenApp.sln")], root, console, CancellationToken.None)).Success, console.ErrorOutput);
+        Assert.True((await services.RunAsync("dotnet", ["build", Path.Combine(root, "GoldenApp.sln"), "--no-restore"], root, console, CancellationToken.None)).Success, console.ErrorOutput);
+        var app = DotisanApplication.CreateDefault(console, services);
         Assert.Equal(DotisanExitCode.Success, await app.RunAsync(["make:resource", "Customer"]));
         Assert.Equal(DotisanExitCode.Success, await app.RunAsync(["generate"]));
         Assert.Equal(DotisanExitCode.Success, await app.RunAsync(["generate", "--check"]));
 
-        var services = await File.ReadAllTextAsync(
+        var generatedServices = await File.ReadAllTextAsync(
             Path.Combine(root, "src", "GoldenApp.Web", "src", "dotisan", "services.ts"));
-        Assert.Contains("listCustomers", services, StringComparison.Ordinal);
-        Assert.Contains("customerId", services, StringComparison.Ordinal);
+        Assert.Contains("listCustomers", generatedServices, StringComparison.Ordinal);
+        Assert.Contains("customerId", generatedServices, StringComparison.Ordinal);
     }
 
     private sealed class MemoryConsole : IConsole
     {
+        public string ErrorOutput { get; private set; } = string.Empty;
+
         public void WriteLine(string message) { }
-        public void WriteError(string message) { }
+        public void WriteError(string message) => ErrorOutput += message + Environment.NewLine;
     }
 }

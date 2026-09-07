@@ -64,7 +64,7 @@ public sealed class TypeScriptTypeMapperTests
 
         var services = TypeScriptContractGenerator.GenerateAll(manifest).Single(file => file.Path == "services.ts").Content;
 
-        Assert.Contains("\"/api/sessions/\" + id + \"\"", services);
+        Assert.Contains("`/api/sessions/${encodeURIComponent(String(id))}`", services);
     }
 
     [Fact]
