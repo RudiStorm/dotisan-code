@@ -396,6 +396,7 @@ internal static class TemplateFiles
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Routing;
+    {{(authenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty)}}
     using Wolverine;
     using {{identifier}}.Api.Jobs;
     {{(authenticationEnabled ? $"using {identifier}.Api.Security;" : string.Empty)}}
@@ -3313,7 +3314,7 @@ internal static class TemplateFiles
     }
     public static class StorageEndpoints
     {
-        public static void Map(IEndpointRouteBuilder endpoints) { var group = endpoints.MapGroup("/api/files"); {{(authenticationEnabled ? "group.RequireAuthorization();" : string.Empty)}} group.MapPost("", async (IFormFile file, IFileStorage storage, CancellationToken cancellationToken) => { if (file.Length == 0 || string.IsNullOrWhiteSpace(file.ContentType)) return Results.BadRequest(new { code = "invalid_file" }); var key = $"uploads/{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}"; await using var stream = file.OpenReadStream(); return Results.Ok(await storage.PutAsync(key, stream, file.ContentType, cancellationToken)); }); group.MapGet("/{**key}", async (string key, IFileStorage storage, CancellationToken cancellationToken) => { var stream = await storage.OpenReadAsync(key, cancellationToken); return stream is null ? Results.NotFound() : Results.File(stream, "application/octet-stream"); }); group.MapDelete("/{**key}", async (string key, IFileStorage storage, CancellationToken cancellationToken) => { await storage.DeleteAsync(key, cancellationToken); return Results.NoContent(); }); }
+        public static void Map(IEndpointRouteBuilder endpoints) { var group = endpoints.MapGroup("/api/files"); {{(authenticationEnabled ? "group.RequireAuthorization();" : string.Empty)}} group.MapPost("", async (IFormFile file, IFileStorage storage, CancellationToken cancellationToken) => { if (file.Length == 0 || string.IsNullOrWhiteSpace(file.ContentType)) return Results.BadRequest(new { code = "invalid_file" }); var key = $"uploads/{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}"; await using var stream = file.OpenReadStream(); return Results.Ok(await storage.PutAsync(key, stream, file.ContentType, cancellationToken)); }){{(authenticationEnabled ? ".WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty)}}; group.MapGet("/{**key}", async (string key, IFileStorage storage, CancellationToken cancellationToken) => { var stream = await storage.OpenReadAsync(key, cancellationToken); return stream is null ? Results.NotFound() : Results.File(stream, "application/octet-stream"); }); group.MapDelete("/{**key}", async (string key, IFileStorage storage, CancellationToken cancellationToken) => { await storage.DeleteAsync(key, cancellationToken); return Results.NoContent(); }){{(authenticationEnabled ? ".WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty)}}; }
     }
     """;
 
