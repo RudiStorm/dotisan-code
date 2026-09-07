@@ -43,7 +43,7 @@ public static class OpenApiContractReader
                 endpoints.Add(new EndpointManifestEntry(operationId, tags.FirstOrDefault() ?? "Api", operationId, method, path.Name,
                     request.Item1, response.Item1, requiresAuthorization, null, null, tags, false, false));
                 metadata.Add(new EndpointContractMetadata(request.Item2 is null ? null : new EndpointRequestBodyMetadata(request.Item2), pathParameters, queryParameters,
-                    response.Item2, tags, new EndpointValidationMetadata(false, [])));
+                    response.Item2, tags, ReadValidation(operation.Value)));
             }
         }
 
@@ -111,6 +111,27 @@ public static class OpenApiContractReader
             "object" when schema.TryGetProperty("additionalProperties", out var values) => (new ContractTypeDescriptor(ContractTypeKind.Dictionary, ElementType: ReadSchema(values, schemas).Descriptor), nullable),
             _ => (new ContractTypeDescriptor(ContractTypeKind.Unknown), nullable)
         };
+    }
+
+    private static EndpointValidationMetadata ReadValidation(JsonElement operation)
+    {
+        if (!operation.TryGetProperty("requestBody", out var body)
+            || !body.TryGetProperty("content", out var content)
+            || !content.TryGetProperty("application/json", out var media)
+            || !media.TryGetProperty("schema", out var schema)
+            || !schema.TryGetProperty("properties", out var properties))
+            return new EndpointValidationMetadata(false, []);
+
+        var rules = new List<EndpointValidationRuleMetadata>();
+        foreach (var property in properties.EnumerateObject())
+        {
+            foreach (var (name, kind) in new[] { ("minLength", "minLength"), ("maxLength", "maxLength"), ("pattern", "pattern"), ("minimum", "minimum"), ("maximum", "maximum") })
+            {
+                if (property.Value.TryGetProperty(name, out var value))
+                    rules.Add(new EndpointValidationRuleMetadata(property.Name, kind, value.ToString()));
+            }
+        }
+        return new EndpointValidationMetadata(rules.Count > 0, rules);
     }
 
     private static bool IsMethod(string name) => name is "get" or "post" or "put" or "patch" or "delete" or "options" or "head" or "trace";
