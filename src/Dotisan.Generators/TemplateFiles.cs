@@ -205,7 +205,6 @@ internal static class TemplateFiles
         <PackageReference Include="{{DatabasePackage(database)}}" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" PrivateAssets="all" />
-        <PackageReference Include="Microsoft.Extensions.Http" />
         {{(jobsEnabled ? $"<PackageReference Include=\"WolverineFx\" />\n        <PackageReference Include=\"WolverineFx.EntityFrameworkCore\" />\n        <PackageReference Include=\"WolverineFx.RuntimeCompilation\" />\n        <PackageReference Include=\"WolverineFx.{WolverineProviderPackage(database)}\" />" : string.Empty)}}
         <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
         <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
@@ -228,7 +227,6 @@ internal static class TemplateFiles
         <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.7" />
         <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.7" />
         <PackageVersion Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.7" />
-        <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.7" />
         <PackageVersion Include="Microsoft.OpenApi" Version="2.7.5" />
         <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.7" />
         <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.7" />
@@ -755,7 +753,7 @@ internal static class TemplateFiles
     {{(storageEnabled ? "builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();" : string.Empty)}}
     {{(cachingEnabled ? "builder.Services.AddMemoryCache();\n    builder.Services.AddSingleton<IDistributedApplicationCache, MemoryApplicationCache>();\n    builder.Services.AddSingleton<IApplicationCache>(services => services.GetRequiredService<IDistributedApplicationCache>());" : string.Empty)}}
     {{(importsExportsEnabled ? "builder.Services.AddScoped<IDataExchangeService, DataExchangeService>();" : string.Empty)}}
-    {{(webhooksEnabled ? "builder.Services.AddHttpClient(client => client.Timeout = TimeSpan.FromSeconds(30));\n    builder.Services.AddScoped<IWebhookDispatcher, HmacWebhookDispatcher>();" : string.Empty)}}
+    {{(webhooksEnabled ? "builder.Services.AddHttpClient(\"webhooks\", client => client.Timeout = TimeSpan.FromSeconds(30));\n    builder.Services.AddScoped<IWebhookDispatcher, HmacWebhookDispatcher>();" : string.Empty)}}
     {{(multiTenancyEnabled ? "builder.Services.AddHttpContextAccessor();\n    builder.Services.AddScoped<ITenantContext, TenantContext>();" : string.Empty)}}
     {{(jobsEnabled ? "builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));" : string.Empty)}}
 
@@ -894,7 +892,7 @@ internal static class TemplateFiles
     {{(storageEnabled ? "builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();" : string.Empty)}}
     {{(cachingEnabled ? "builder.Services.AddMemoryCache();\n    builder.Services.AddSingleton<IDistributedApplicationCache, MemoryApplicationCache>();\n    builder.Services.AddSingleton<IApplicationCache>(services => services.GetRequiredService<IDistributedApplicationCache>());" : string.Empty)}}
     {{(importsExportsEnabled ? "builder.Services.AddScoped<IDataExchangeService, DataExchangeService>();" : string.Empty)}}
-    {{(webhooksEnabled ? "builder.Services.AddHttpClient(client => client.Timeout = TimeSpan.FromSeconds(30));\n    builder.Services.AddScoped<IWebhookDispatcher, HmacWebhookDispatcher>();" : string.Empty)}}
+    {{(webhooksEnabled ? "builder.Services.AddHttpClient(\"webhooks\", client => client.Timeout = TimeSpan.FromSeconds(30));\n    builder.Services.AddScoped<IWebhookDispatcher, HmacWebhookDispatcher>();" : string.Empty)}}
     {{(multiTenancyEnabled ? "builder.Services.AddHttpContextAccessor();\n    builder.Services.AddScoped<ITenantContext, TenantContext>();" : string.Empty)}}
     {{(jobsEnabled ? "builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));" : string.Empty)}}
     builder.Services.AddIdentityCore<ApplicationUser>(options =>
