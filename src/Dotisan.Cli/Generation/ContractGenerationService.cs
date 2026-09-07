@@ -47,21 +47,7 @@ public static class ContractGenerationService
                     goto ContractLoaded;
                 }
 
-                Directory.CreateDirectory(Path.GetDirectoryName(exportPath)!);
-                var export = await services.RunAsync(
-                    "dotnet",
-                    ["run", "--project", services.ApiProjectPath, "--no-build", "--", "--dotisan-export-contract", exportPath],
-                    root,
-                    console ?? new NullConsole(),
-                    cancellationToken);
-                if (!export.Success)
-                    return ContractGenerationResult.Failed(export.ErrorMessage ?? "The generated API could not export its contract manifest.");
-
-                json = await File.ReadAllTextAsync(exportPath, cancellationToken);
-                manifest = ContractManifest.FromJson(json);
-                if (check && (!File.Exists(manifestPath) || !string.Equals(await File.ReadAllTextAsync(manifestPath, cancellationToken), manifest.ToJson(), StringComparison.Ordinal)))
-                    return ContractGenerationResult.Failed($"The compiled contract manifest is stale: {manifestPath}. Run 'dotisan generate'.");
-                goto ContractLoaded;
+                return ContractGenerationResult.Failed($"The API build did not produce an OpenAPI document. Build '{services.ApiProjectPath}' with OpenAPI document generation enabled, then run 'dotisan generate'.");
             }
             else
             {
