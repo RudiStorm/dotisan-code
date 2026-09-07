@@ -549,6 +549,9 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("Delete", listPage);
             Assert.Contains("Loading", listPage);
             Assert.Contains("No customers yet", listPage);
+            Assert.Contains("import { request } from '../../api/client';", listPage);
+            Assert.DoesNotContain("fetch('/api/customers'", listPage);
+            Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "api", "client.ts")));
             Assert.All(result.CreatedFiles, file => Assert.DoesNotContain("generated", file, StringComparison.OrdinalIgnoreCase));
         }
         finally

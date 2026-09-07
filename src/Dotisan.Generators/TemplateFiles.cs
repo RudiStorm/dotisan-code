@@ -147,6 +147,7 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/src/App.vue", AppVue()),
             new($"src/{options.Name}.Web/src/style.css", StyleCss()),
             new($"src/{options.Name}.Web/src/dotisan/.gitkeep", string.Empty),
+            new($"src/{options.Name}.Web/src/api/client.ts", ApiClient()),
             new($"src/{options.Name}.Web/src/components/ui/Button.vue", UiButton()),
             new($"src/{options.Name}.Web/src/components/ui/Input.vue", UiInput()),
             new($"src/{options.Name}.Web/src/components/ui/Card.vue", UiCard()),
@@ -2578,6 +2579,23 @@ internal static class TemplateFiles
     ];
     // DOTISAN:ROUTES
     export default createRouter({ history: createWebHistory(), routes });
+    """;
+
+    private static string ApiClient() => """
+    export async function issueAntiforgery(): Promise<string> {
+      const response = await fetch('/api/account/antiforgery', { credentials: 'include' });
+      if (!response.ok) throw new Error('Could not obtain an antiforgery token.');
+      return (await response.json() as { token: string }).token;
+    }
+
+    export async function request<T>(url: string, init: RequestInit = {}): Promise<T> {
+      const method = (init.method ?? 'GET').toUpperCase();
+      const headers = new Headers(init.headers);
+      if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') headers.set('X-XSRF-TOKEN', await issueAntiforgery());
+      const response = await fetch(url, { ...init, headers, credentials: 'include' });
+      if (!response.ok) throw new Error(`Request failed (${response.status}).`);
+      return response.status === 204 ? undefined as T : await response.json() as T;
+    }
     """;
 
     private static string JobTests(string identifier) => $$"""
