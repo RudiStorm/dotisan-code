@@ -15,6 +15,7 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>dotisan.svg</PackageIcon>
     <PackageTags>dotnet;aspnetcore;scaffolding;cli;vue;typescript;openapi</PackageTags>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <Description>Dotisan application scaffolding CLI.</Description>
@@ -27,5 +28,6 @@
     <ProjectReference Include="..\Dotisan.OpenApi\Dotisan.OpenApi.csproj" />
     <None Include="..\..\README.md" Pack="true" PackagePath="README.md" />
     <None Include="..\..\LICENSE" Pack="true" PackagePath="LICENSE" />
+    <None Include="..\..\assets\dotisan.svg" Pack="true" PackagePath="dotisan.svg" />
   </ItemGroup>
 </Project>
