@@ -646,6 +646,7 @@ internal static class TemplateFiles
     using {{identifier}}.Api.Integrations;
     using {{identifier}}.Api.Infrastructure;
     using {{identifier}}.Api.Features.Health;
+    using Microsoft.AspNetCore.SignalR;
     using Microsoft.AspNetCore.DataProtection;
     using Microsoft.AspNetCore.Identity;
     using Microsoft.AspNetCore.Builder;
@@ -689,6 +690,7 @@ internal static class TemplateFiles
     using {{identifier}}.Api.Infrastructure;
     using {{identifier}}.Api.Jobs;
     using {{identifier}}.Api.Features.Health;
+    using Microsoft.AspNetCore.SignalR;
     {{(notificationsEnabled || storageEnabled || cachingEnabled || importsExportsEnabled || webhooksEnabled ? $"using {identifier}.Api.Integrations;" : string.Empty)}}
     using Wolverine;
     using OpenTelemetry;
@@ -755,7 +757,7 @@ internal static class TemplateFiles
         DotisanProductionConfiguration.Validate(builder.Configuration, builder.Environment.EnvironmentName, emailConfirmationEnabled: false, dataProtectionEnabled: false);
     }
     builder.Services.AddScoped<IAuditWriter, AuditWriter>();
-    {{(notificationsEnabled ? "builder.Services.AddSignalR();\n    builder.Services.AddScoped<INotificationStore, EfNotificationStore>();" : string.Empty)}}
+    {{(notificationsEnabled ? "builder.Services.AddSignalR();\n    builder.Services.AddSingleton<IUserIdProvider, NotificationUserIdProvider>();\n    builder.Services.AddScoped<INotificationStore, EfNotificationStore>();" : string.Empty)}}
     {{(storageEnabled ? "builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();" : string.Empty)}}
     {{(cachingEnabled ? "builder.Services.AddMemoryCache();\n    builder.Services.AddSingleton<IDistributedApplicationCache, MemoryApplicationCache>();\n    builder.Services.AddSingleton<IApplicationCache>(services => services.GetRequiredService<IDistributedApplicationCache>());" : string.Empty)}}
     {{(importsExportsEnabled ? "builder.Services.AddScoped<IDataExchangeService, DataExchangeService>();" : string.Empty)}}
@@ -911,7 +913,7 @@ internal static class TemplateFiles
         builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(resolvedKeyDirectory));
     }
     builder.Services.AddScoped<IAuditWriter, AuditWriter>();
-    {{(notificationsEnabled ? "builder.Services.AddSignalR();\n    builder.Services.AddScoped<INotificationStore, EfNotificationStore>();" : string.Empty)}}
+    {{(notificationsEnabled ? "builder.Services.AddSignalR();\n    builder.Services.AddSingleton<IUserIdProvider, NotificationUserIdProvider>();\n    builder.Services.AddScoped<INotificationStore, EfNotificationStore>();" : string.Empty)}}
     {{(storageEnabled ? "builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();" : string.Empty)}}
     {{(cachingEnabled ? "builder.Services.AddMemoryCache();\n    builder.Services.AddSingleton<IDistributedApplicationCache, MemoryApplicationCache>();\n    builder.Services.AddSingleton<IApplicationCache>(services => services.GetRequiredService<IDistributedApplicationCache>());" : string.Empty)}}
     {{(importsExportsEnabled ? "builder.Services.AddScoped<IDataExchangeService, DataExchangeService>();" : string.Empty)}}
@@ -3283,6 +3285,10 @@ internal static class TemplateFiles
         public async Task<bool> MarkReadAsync(Guid id, string recipientId, string? tenantId, CancellationToken cancellationToken) { var item = await db.Notifications.FirstOrDefaultAsync(x => x.Id == id && x.RecipientId == recipientId && x.TenantId == tenantId, cancellationToken); if (item is null) return false; item.IsRead = true; await db.SaveChangesAsync(cancellationToken); return true; }
     }
     public sealed class NotificationHub : Hub { }
+    public sealed class NotificationUserIdProvider : IUserIdProvider
+    {
+        public string? GetUserId(HubConnectionContext connection) => connection.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    }
     public static class NotificationEndpoints
     {
         public static void Map(IEndpointRouteBuilder endpoints)
