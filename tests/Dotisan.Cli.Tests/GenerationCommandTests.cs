@@ -6,6 +6,32 @@ namespace Dotisan.Cli.Tests;
 public sealed class GenerationCommandTests
 {
     [Fact]
+    public async Task Atomic_publisher_does_not_replace_existing_files_when_staging_fails()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "dotisan-publisher-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(root);
+            var existing = Path.Combine(root, "src", "models.ts");
+            Directory.CreateDirectory(Path.GetDirectoryName(existing)!);
+            await File.WriteAllTextAsync(existing, "original\n");
+
+            var publisher = new AtomicArtifactPublisher();
+            await Assert.ThrowsAsync<ArgumentException>(() => publisher.PublishAsync(root,
+                [new GeneratedArtifact("src/models.ts", "replacement\n"), new GeneratedArtifact("../escape.txt", "bad")],
+                CancellationToken.None));
+
+            Assert.Equal("original\n", await File.ReadAllTextAsync(existing));
+            Assert.False(File.Exists(Path.Combine(Path.GetDirectoryName(root)!, "escape.txt")));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Generate_writes_models_from_the_project_contract_manifest()
     {
         var root = Path.Combine(Path.GetTempPath(), "dotisan-generate-" + Guid.NewGuid().ToString("N"));

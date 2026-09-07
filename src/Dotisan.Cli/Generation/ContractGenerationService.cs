@@ -79,7 +79,8 @@ public static class ContractGenerationService
         }
 
         var generatedDirectory = Path.Combine(frontendDirectory, "src", "dotisan");
-        foreach (var file in TypeScriptContractGenerator.GenerateAll(manifest))
+        var generatedFiles = TypeScriptContractGenerator.GenerateAll(manifest).ToArray();
+        foreach (var file in generatedFiles)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var path = Path.Combine(generatedDirectory, file.Path.Replace('/', Path.DirectorySeparatorChar));
@@ -94,15 +95,20 @@ public static class ContractGenerationService
 
         if (!check)
         {
-            await GeneratedContractWriter.WriteAsync(frontendDirectory, manifest, cancellationToken);
+            var artifacts = generatedFiles
+                .Select(file => new GeneratedArtifact(
+                    Path.GetRelativePath(root, Path.Combine(generatedDirectory, file.Path.Replace('/', Path.DirectorySeparatorChar))),
+                    file.Content))
+                .ToList();
+            if (services is not null)
+                artifacts.Add(new GeneratedArtifact("dotisan.contract.json", manifest.ToJson()));
             if (!noOpenApi)
             {
                 var title = Path.GetFileName(root);
-                await File.WriteAllTextAsync(
-                    Path.Combine(root, "openapi.json"),
-                    OpenApiDocumentGenerator.Generate(manifest, title, "v1").Json,
-                    cancellationToken);
+                artifacts.Add(new GeneratedArtifact("openapi.json", OpenApiDocumentGenerator.Generate(manifest, title, "v1").Json));
             }
+
+            await new AtomicArtifactPublisher().PublishAsync(root, artifacts, cancellationToken);
         }
         else if (!noOpenApi)
         {
