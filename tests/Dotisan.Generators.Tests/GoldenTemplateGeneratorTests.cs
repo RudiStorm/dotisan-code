@@ -863,6 +863,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("pnpm@9.15.0", packageJson);
             Assert.Contains("corepack prepare pnpm@9.15.0", dockerfile);
             Assert.Contains("pnpm install --frozen-lockfile", dockerfile);
+            Assert.Contains("COPY Directory.Packages.props ./", dockerfile);
         }
         finally
         {

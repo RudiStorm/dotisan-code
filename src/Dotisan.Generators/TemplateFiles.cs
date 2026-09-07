@@ -3219,6 +3219,7 @@ internal static class TemplateFiles
 
     FROM mcr.microsoft.com/dotnet/sdk:10.0 AS api-build
     WORKDIR /src
+    COPY Directory.Packages.props ./
     COPY src/{{name}}.Api/{{name}}.Api.csproj src/{{name}}.Api/
     RUN dotnet restore src/{{name}}.Api/{{name}}.Api.csproj
     COPY . .
