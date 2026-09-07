@@ -37,8 +37,11 @@ public static class OpenApiContractReader
                 var response = ReadResponse(operation.Value, schemas);
                 var tags = operation.Value.TryGetProperty("tags", out var tagArray) ? tagArray.EnumerateArray().Select(tag => tag.GetString()!).ToArray() : [];
                 var method = operation.Name.ToUpperInvariant();
+                var requiresAuthorization = operation.Value.TryGetProperty("security", out var security)
+                    ? security.ValueKind != JsonValueKind.Array || security.GetArrayLength() > 0
+                    : root.TryGetProperty("security", out var globalSecurity) && globalSecurity.ValueKind == JsonValueKind.Array && globalSecurity.GetArrayLength() > 0;
                 endpoints.Add(new EndpointManifestEntry(operationId, tags.FirstOrDefault() ?? "Api", operationId, method, path.Name,
-                    request.Item1, response.Item1, false, null, null, tags, false, false));
+                    request.Item1, response.Item1, requiresAuthorization, null, null, tags, false, false));
                 metadata.Add(new EndpointContractMetadata(request.Item2 is null ? null : new EndpointRequestBodyMetadata(request.Item2), pathParameters, queryParameters,
                     response.Item2, tags, new EndpointValidationMetadata(false, [])));
             }

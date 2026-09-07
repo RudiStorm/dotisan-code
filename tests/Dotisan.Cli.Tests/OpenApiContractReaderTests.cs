@@ -24,4 +24,16 @@ public sealed class OpenApiContractReaderTests
         Assert.Equal("User", restored.Endpoints.Single().Response);
         Assert.Equal("displayName", restored.Models.Single().Properties.Single().Name);
     }
+
+    [Fact]
+    public void Preserves_operation_security_requirement()
+    {
+        const string json = """
+        {"openapi":"3.0.1","info":{"title":"Test","version":"v1"},"security":[{"cookieAuth":[]}],"paths":{"/api/private":{"get":{"operationId":"private.get","responses":{"200":{"description":"ok"}}}}}}
+        """;
+
+        var restored = OpenApiContractReader.Read(json);
+
+        Assert.True(restored.Endpoints.Single().Authorization);
+    }
 }
