@@ -93,7 +93,15 @@ public static class ContractGenerationService
         }
 
         var generatedDirectory = Path.Combine(frontendDirectory, "src", "dotisan");
-        var generatedFiles = TypeScriptContractGenerator.GenerateAll(manifest).ToArray();
+        GeneratedTypeScriptFile[] generatedFiles;
+        try
+        {
+            generatedFiles = TypeScriptContractGenerator.GenerateAll(manifest).ToArray();
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or ArgumentException or NotSupportedException)
+        {
+            return ContractGenerationResult.Failed($"Contract generation failed: {exception.Message}");
+        }
         foreach (var file in generatedFiles)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -122,7 +130,14 @@ public static class ContractGenerationService
                 artifacts.Add(new GeneratedArtifact("openapi.json", OpenApiDocumentGenerator.Generate(manifest, title, "v1").Json));
             }
 
-            await new AtomicArtifactPublisher().PublishAsync(root, artifacts, cancellationToken);
+            try
+            {
+                await new AtomicArtifactPublisher().PublishAsync(root, artifacts, cancellationToken);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or ArgumentException or IOException)
+            {
+                return ContractGenerationResult.Failed($"Contract generation failed: {exception.Message}");
+            }
         }
         else if (!noOpenApi)
         {
