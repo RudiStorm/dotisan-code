@@ -175,8 +175,8 @@ jobs:
           cd generated/${{ matrix.feature }}-${{ matrix.package_manager }}
           dotnet run --project ../../src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- make:resource Customer
           dotnet build GeneratedApp${{ matrix.feature }}${{ matrix.package_manager }}.sln --configuration Release --no-restore --warnaserror
-          dotnet run --project ../../src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- generate --no-openapi
-          dotnet run --project ../../src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- generate --check --no-openapi
+          dotnet run --project ../../src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- generate --no-openapi --no-build
+          dotnet run --project ../../src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- generate --check --no-openapi --no-build
       - name: Verify generated frontend
         shell: bash
         run: scripts/test-generated-project.sh "${{ github.workspace }}/generated/${{ matrix.feature }}-${{ matrix.package_manager }}" "${{ matrix.package_manager }}"
