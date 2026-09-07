@@ -394,7 +394,7 @@ internal static class TemplateFiles
     {{(authenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty)}}
     using Wolverine;
     using {{identifier}}.Api.Jobs;
-    {{(authenticationEnabled ? $"using {identifier}.Api.Security;" : string.Empty)}}
+    {{(authenticationEnabled ? $"using {identifier}.Api.Authorization;" : string.Empty)}}
 
     namespace {{identifier}}.Api.Features.Jobs;
 
