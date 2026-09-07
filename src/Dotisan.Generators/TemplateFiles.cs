@@ -82,7 +82,7 @@ internal static class TemplateFiles
                 workers: false
             """),
             new("dotisan.contract.json", InitialContractManifest(options.AuthenticationEnabled).ToJson()),
-            new("Dockerfile", Dockerfile(options.Name)),
+            new("Dockerfile", Dockerfile(options.Name, options.PackageManager)),
             new TemplateFile("compose.yaml", DatabaseCompose(options.Name, options.Database, options.MailProvider)),
             new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.Database, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.MultiTenancyEnabled, options.NotificationsEnabled, options.StorageEnabled, options.CachingEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled)),
@@ -3218,11 +3218,10 @@ internal static class TemplateFiles
     @media (max-width: 720px) { .portal-layout { display: block; } .app-sidebar { width: auto; gap: 1rem; padding: 1rem; } .app-sidebar nav { display: flex; overflow-x: auto; } .app-sidebar .sidebar-footer { display: none; } .dashboard-grid { grid-template-columns: 1fr; } .page-heading { display: grid; } }
     """;
 
-    private static string Dockerfile(string name) => $$"""
+    private static string Dockerfile(string name, PackageManager packageManager) => $$"""
     FROM node:22-alpine AS web-build
     WORKDIR /src
-    COPY src/{{name}}.Web/package*.json ./
-    RUN npm install
+    {{(packageManager == PackageManager.Pnpm ? $"RUN corepack enable && corepack prepare pnpm@9.15.5 --activate\n    COPY src/{name}.Web/package.json src/{name}.Web/pnpm-lock.yaml ./\n    RUN pnpm install --frozen-lockfile" : $"COPY src/{name}.Web/package*.json ./\n    RUN npm ci")}}
     COPY src/{{name}}.Web/ ./
     RUN npm run build
 
