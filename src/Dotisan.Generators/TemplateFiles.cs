@@ -1106,13 +1106,13 @@ internal static class TemplateFiles
               "DataProtectionKeyDirectory": "DataProtection-Keys",
               "KnownProxies": []
             },
-            "Jobs": {
+              "Jobs": {
               "Enabled": true,
               "MaxAttempts": 3,
               "RetryDelaySeconds": 5
             }
           },
-              "FrontendUrl": "https://localhost:{{webPort}}",
+          "FrontendUrl": "http://localhost:{{webPort}}",
           "Logging": {
             "LogLevel": {
               "Default": "Information",
