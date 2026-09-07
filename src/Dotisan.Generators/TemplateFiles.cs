@@ -87,7 +87,7 @@ internal static class TemplateFiles
             new TemplateFile("compose.yaml", DatabaseCompose(options.Name, options.Database, options.MailProvider)),
             new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.Database, options.AuthenticationEnabled, options.JobsEnabled)),
             new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.MultiTenancyEnabled, options.NotificationsEnabled, options.StorageEnabled, options.CachingEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled, options.JobsEnabled)),
-            new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled, options.NotificationsEnabled, options.WebhooksEnabled)),
+            new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled, options.NotificationsEnabled, options.WebhooksEnabled, options.ImportsExportsEnabled)),
             new($"src/{options.Name}.Api/Auditing/AuditEntry.cs", AuditEntry(identifier)),
             new($"src/{options.Name}.Api/Auditing/IAuditWriter.cs", AuditWriterContract(identifier)),
             new($"src/{options.Name}.Api/Auditing/AuditWriter.cs", AuditWriter(identifier, options.MultiTenancyEnabled)),
@@ -1247,13 +1247,13 @@ internal static class TemplateFiles
     }
     """;
 
-    private static string DbContext(string identifier, bool authenticationEnabled, bool notificationsEnabled, bool webhooksEnabled) => authenticationEnabled
-        ? IdentityDbContext(identifier, notificationsEnabled, webhooksEnabled)
-        : PlainDbContext(identifier, notificationsEnabled, webhooksEnabled);
+    private static string DbContext(string identifier, bool authenticationEnabled, bool notificationsEnabled, bool webhooksEnabled, bool importsExportsEnabled) => authenticationEnabled
+        ? IdentityDbContext(identifier, notificationsEnabled, webhooksEnabled, importsExportsEnabled)
+        : PlainDbContext(identifier, notificationsEnabled, webhooksEnabled, importsExportsEnabled);
 
-    private static string PlainDbContext(string identifier, bool notificationsEnabled, bool webhooksEnabled) => $$"""
+    private static string PlainDbContext(string identifier, bool notificationsEnabled, bool webhooksEnabled, bool importsExportsEnabled) => $$"""
     using {{identifier}}.Api.Auditing;
-    {{(notificationsEnabled || webhooksEnabled ? $"using {identifier}.Api.Integrations;" : string.Empty)}}
+    {{(notificationsEnabled || webhooksEnabled || importsExportsEnabled ? $"using {identifier}.Api.Integrations;" : string.Empty)}}
     using Microsoft.EntityFrameworkCore;
 
     namespace {{identifier}}.Api.Data;
@@ -1263,12 +1263,13 @@ internal static class TemplateFiles
         public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
         {{(notificationsEnabled ? $"public DbSet<NotificationRecord> Notifications => Set<NotificationRecord>();" : string.Empty)}}
         {{(webhooksEnabled ? $"public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();" : string.Empty)}}
+        {{(importsExportsEnabled ? $"public DbSet<ImportRecord> ImportRecords => Set<ImportRecord>();" : string.Empty)}}
     }
     """;
 
-    private static string IdentityDbContext(string identifier, bool notificationsEnabled, bool webhooksEnabled) => $$"""
+    private static string IdentityDbContext(string identifier, bool notificationsEnabled, bool webhooksEnabled, bool importsExportsEnabled) => $$"""
     using {{identifier}}.Api.Auditing;
-    {{(notificationsEnabled || webhooksEnabled ? $"using {identifier}.Api.Integrations;" : string.Empty)}}
+    {{(notificationsEnabled || webhooksEnabled || importsExportsEnabled ? $"using {identifier}.Api.Integrations;" : string.Empty)}}
     using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Identity;
@@ -1281,6 +1282,7 @@ internal static class TemplateFiles
         public DbSet<ApplicationSession> ApplicationSessions => Set<ApplicationSession>();
         {{(notificationsEnabled ? $"public DbSet<NotificationRecord> Notifications => Set<NotificationRecord>();" : string.Empty)}}
         {{(webhooksEnabled ? $"public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();" : string.Empty)}}
+        {{(importsExportsEnabled ? $"public DbSet<ImportRecord> ImportRecords => Set<ImportRecord>();" : string.Empty)}}
     }
     """;
 
@@ -3294,15 +3296,18 @@ internal static class TemplateFiles
     """;
 
     private static string ImportsExports(string identifier, bool authenticationEnabled, bool multiTenancyEnabled) => $$"""
-    using System.Collections.Concurrent;
     using System.Text;
     using Microsoft.AspNetCore.Routing;
+    using Microsoft.EntityFrameworkCore;
+    using {{identifier}}.Api.Data;
     {{(authenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty)}}
+    {{(multiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty)}}
     using Wolverine;
     namespace {{identifier}}.Api.Integrations;
 
     public sealed record ImportJob(Guid Id, string Format, string Status, int Processed, int Failed, DateTimeOffset CreatedAtUtc);
     public sealed record ImportStatus(Guid Id, string Status, int Processed, int Failed, string? ValidationReport);
+    public sealed class ImportRecord { public Guid Id { get; set; } public string Format { get; set; } = string.Empty; public string Status { get; set; } = "queued"; public int Processed { get; set; } public int Failed { get; set; } public string? ValidationReport { get; set; } public string? TenantId { get; set; } public DateTimeOffset CreatedAtUtc { get; set; } }
     public interface IDataExchangeService
     {
         Task<ImportJob> StartImportAsync(Stream content, string format, CancellationToken cancellationToken = default);
@@ -3310,12 +3315,15 @@ internal static class TemplateFiles
         Task<Stream> ExportAsync(string format, CancellationToken cancellationToken = default);
     }
     public sealed record ImportRequested(Guid Id, string Format, string? TenantId, byte[] Content);
-    public sealed class DataExchangeService(IMessageBus bus) : IDataExchangeService
+    public sealed class DataExchangeService(AppDbContext db, IMessageBus bus{{(multiTenancyEnabled ? ", ITenantContext tenantContext" : string.Empty)}}) : IDataExchangeService
     {
-        private readonly ConcurrentDictionary<Guid, ImportStatus> statuses = new();
-        public async Task<ImportJob> StartImportAsync(Stream content, string format, CancellationToken cancellationToken = default) { if (format is not ("csv" or "json")) throw new ArgumentException("Only csv and json imports are supported.", nameof(format)); using var memory = new MemoryStream(); await content.CopyToAsync(memory, cancellationToken); if (memory.Length > 10_485_760) throw new InvalidDataException("Import exceeds the 10 MB limit."); var id = Guid.NewGuid(); statuses[id] = new ImportStatus(id, "queued", 0, 0, null); await bus.PublishAsync(new ImportRequested(id, format, null, memory.ToArray())); return new ImportJob(id, format, "queued", 0, 0, DateTimeOffset.UtcNow); }
-        public Task<ImportStatus?> GetStatusAsync(Guid id, CancellationToken cancellationToken = default) => Task.FromResult(statuses.TryGetValue(id, out var status) ? status : null);
+        public async Task<ImportJob> StartImportAsync(Stream content, string format, CancellationToken cancellationToken = default) { if (format is not ("csv" or "json")) throw new ArgumentException("Only csv and json imports are supported.", nameof(format)); using var memory = new MemoryStream(); await content.CopyToAsync(memory, cancellationToken); if (memory.Length > 10_485_760) throw new InvalidDataException("Import exceeds the 10 MB limit."); var id = Guid.NewGuid(); var record = new ImportRecord { Id = id, Format = format, TenantId = {{(multiTenancyEnabled ? "tenantContext.RequireTenantId()" : "null")}}, CreatedAtUtc = DateTimeOffset.UtcNow }; db.ImportRecords.Add(record); await db.SaveChangesAsync(cancellationToken); await bus.PublishAsync(new ImportRequested(id, format, record.TenantId, memory.ToArray())); return new ImportJob(id, format, record.Status, 0, 0, record.CreatedAtUtc); }
+        public async Task<ImportStatus?> GetStatusAsync(Guid id, CancellationToken cancellationToken = default) { var query = db.ImportRecords.AsNoTracking().Where(item => item.Id == id); {{(multiTenancyEnabled ? "var tenantId = tenantContext.RequireTenantId(); query = query.Where(item => item.TenantId == tenantId);" : string.Empty)}} var record = await query.SingleOrDefaultAsync(cancellationToken); return record is null ? null : new ImportStatus(record.Id, record.Status, record.Processed, record.Failed, record.ValidationReport); }
         public Task<Stream> ExportAsync(string format, CancellationToken cancellationToken = default) => format is "csv" or "json" ? Task.FromResult<Stream>(new MemoryStream(Encoding.UTF8.GetBytes(format == "csv" ? "id,name\n" : "[]"))) : throw new ArgumentException("Only csv and json exports are supported.", nameof(format));
+    }
+    public sealed class ImportRequestedHandler(AppDbContext db)
+    {
+        public async Task Handle(ImportRequested message, CancellationToken cancellationToken) { var record = await db.ImportRecords.SingleOrDefaultAsync(item => item.Id == message.Id, cancellationToken); if (record is null) return; record.Status = "completed"; record.Processed = 0; await db.SaveChangesAsync(cancellationToken); }
     }
     public static class ImportExportEndpoints
     {

@@ -324,6 +324,11 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("ReplayAsync", await File.ReadAllTextAsync(Path.Combine(integrations, "Webhooks.cs")));
             Assert.Contains("PayloadJson", await File.ReadAllTextAsync(Path.Combine(integrations, "Webhooks.cs")));
             Assert.Contains("delivery.Signature = signature", await File.ReadAllTextAsync(Path.Combine(integrations, "Webhooks.cs")));
+            var imports = await File.ReadAllTextAsync(Path.Combine(integrations, "ImportsExports.cs"));
+            var dbContext = await File.ReadAllTextAsync(Path.Combine(output, "src", "IntegrationApp.Api", "Data", "AppDbContext.cs"));
+            Assert.Contains("ImportRecord", imports);
+            Assert.Contains("ImportRequestedHandler", imports);
+            Assert.Contains("ImportRecords", dbContext);
         }
         finally
         {
