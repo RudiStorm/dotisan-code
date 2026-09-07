@@ -1,0 +1,24 @@
+name: Bug report
+description: Report a reproducible problem with Dotisan
+title: "[Bug]: "
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Dotisan version
+      description: Include the CLI or package version.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Exact commands and the smallest project that reproduces the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true

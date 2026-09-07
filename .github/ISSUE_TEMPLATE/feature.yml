@@ -1,0 +1,18 @@
+name: Feature request
+description: Propose an improvement to Dotisan
+title: "[Feature]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe the developer workflow or outcome that needs improvement.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Explain the behavior, generated output, and compatibility considerations.
+    validations:
+      required: true
