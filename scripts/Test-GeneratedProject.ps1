@@ -9,34 +9,40 @@ $ErrorActionPreference = 'Stop'
 $previousEnvironment = $env:ASPNETCORE_ENVIRONMENT
 $env:ASPNETCORE_ENVIRONMENT = 'Development'
 $createdRoot = $false
-if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
-    $ProjectRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("dotisan-acceptance-" + [Guid]::NewGuid().ToString('N'))
-    $cliArguments = @('run', '--project', (Join-Path $PSScriptRoot '..\src\Dotisan.Cli'), '--', 'new', 'GeneratedAcceptance', '--profile', $Profile, '--package-manager', $PackageManager, '--yes', '--output', $ProjectRoot)
-    & dotnet @cliArguments
-    if ($LASTEXITCODE -ne 0) { throw "dotisan new failed with exit code $LASTEXITCODE." }
-    $createdRoot = $true
-}
-$ProjectRoot = [System.IO.Path]::GetFullPath($ProjectRoot)
-$solution = Get-ChildItem -LiteralPath $ProjectRoot -Filter '*.sln' | Select-Object -First 1
-$web = Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'src') -Directory -Filter '*.Web' | Select-Object -First 1
-if ($null -eq $solution -or $null -eq $web) { throw "Generated solution or frontend was not found under $ProjectRoot." }
-
-dotnet restore $solution.FullName
-dotnet build $solution.FullName -c Release --no-restore --warnaserror
-dotnet test $solution.FullName -c Release --no-build --no-restore --verbosity minimal
-if ($PackageManager -eq 'pnpm') {
-    & pnpm --dir $web.FullName install --frozen-lockfile
-    & pnpm --dir $web.FullName audit --audit-level high
-    & pnpm --dir $web.FullName run build
-    & pnpm --dir $web.FullName test
-} else {
-    & npm --prefix $web.FullName ci
-    & npm --prefix $web.FullName audit --audit-level=high
-    & npm --prefix $web.FullName run build
-    & npm --prefix $web.FullName test
+function Invoke-Checked([scriptblock]$Command, [string]$Description) {
+    & $Command
+    if ($LASTEXITCODE -ne 0) { throw "$Description failed with exit code $LASTEXITCODE." }
 }
 
-if ($createdRoot -and (Test-Path -LiteralPath $ProjectRoot)) {
-    Remove-Item -LiteralPath $ProjectRoot -Recurse -Force
+try {
+    if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
+        $ProjectRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("dotisan-acceptance-" + [Guid]::NewGuid().ToString('N'))
+        $cliArguments = @('run', '--project', (Join-Path $PSScriptRoot '..\src\Dotisan.Cli'), '--', 'new', 'GeneratedAcceptance', '--profile', $Profile, '--package-manager', $PackageManager, '--yes', '--output', $ProjectRoot)
+        Invoke-Checked { dotnet @cliArguments } 'dotisan new'
+        $createdRoot = $true
+    }
+    $ProjectRoot = [System.IO.Path]::GetFullPath($ProjectRoot)
+    $solution = Get-ChildItem -LiteralPath $ProjectRoot -Filter '*.sln' | Select-Object -First 1
+    $web = Get-ChildItem -LiteralPath (Join-Path $ProjectRoot 'src') -Directory -Filter '*.Web' | Select-Object -First 1
+    if ($null -eq $solution -or $null -eq $web) { throw "Generated solution or frontend was not found under $ProjectRoot." }
+
+    Invoke-Checked { dotnet restore $solution.FullName } 'dotnet restore'
+    Invoke-Checked { dotnet build $solution.FullName -c Release --no-restore --warnaserror } 'dotnet build'
+    Invoke-Checked { dotnet test $solution.FullName -c Release --no-build --no-restore --verbosity minimal } 'dotnet test'
+    if ($PackageManager -eq 'pnpm') {
+        Invoke-Checked { pnpm --dir $web.FullName install --frozen-lockfile } 'pnpm install'
+        Invoke-Checked { pnpm --dir $web.FullName audit --audit-level high } 'pnpm audit'
+        Invoke-Checked { pnpm --dir $web.FullName run build } 'pnpm build'
+        Invoke-Checked { pnpm --dir $web.FullName test } 'pnpm test'
+    } else {
+        Invoke-Checked { npm --prefix $web.FullName ci } 'npm ci'
+        Invoke-Checked { npm --prefix $web.FullName audit --audit-level=high } 'npm audit'
+        Invoke-Checked { npm --prefix $web.FullName run build } 'npm build'
+        Invoke-Checked { npm --prefix $web.FullName test } 'npm test'
+    }
+} finally {
+    if ($createdRoot -and (Test-Path -LiteralPath $ProjectRoot)) {
+        Remove-Item -LiteralPath $ProjectRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if ($null -eq $previousEnvironment) { Remove-Item Env:ASPNETCORE_ENVIRONMENT -ErrorAction SilentlyContinue } else { $env:ASPNETCORE_ENVIRONMENT = $previousEnvironment }
 }
-if ($null -eq $previousEnvironment) { Remove-Item Env:ASPNETCORE_ENVIRONMENT -ErrorAction SilentlyContinue } else { $env:ASPNETCORE_ENVIRONMENT = $previousEnvironment }
