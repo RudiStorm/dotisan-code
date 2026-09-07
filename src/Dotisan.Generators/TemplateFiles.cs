@@ -179,7 +179,7 @@ internal static class TemplateFiles
                 : Array.Empty<TemplateFile>()),
             new($"tests/{options.Name}.Api.Tests/{options.Name}.Api.Tests.csproj", ApiTestsProject(options.Name, options.AuthenticationEnabled)),
             new($"tests/{options.Name}.Api.Tests/HealthEndpointTests.cs", ApiTests(identifier)),
-            ..(options.JobsEnabled ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/JobTests.cs", JobTests(identifier)) } : Array.Empty<TemplateFile>()),
+            ..(options.JobsEnabled ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/JobTests.cs", JobTests(identifier, options.AuthenticationEnabled)) } : Array.Empty<TemplateFile>()),
             new($"tests/{options.Name}.Api.Tests/Usings.cs", "global using Xunit;\n"),
             ..(options.MultiTenancyEnabled
                 ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/TenantContextTests.cs", TenantContextTests(identifier)) }
@@ -2599,7 +2599,7 @@ internal static class TemplateFiles
     }
     """;
 
-    private static string JobTests(string identifier) => $$"""
+    private static string JobTests(string identifier, bool authenticationEnabled) => $$"""
     using Microsoft.AspNetCore.Mvc.Testing;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.Data.Sqlite;
@@ -2643,7 +2643,7 @@ internal static class TemplateFiles
 
             using var response = await client.PostAsync("/api/jobs/sample", content: null);
 
-            Assert.Equal(System.Net.HttpStatusCode.Accepted, response.StatusCode);
+            Assert.Equal(System.Net.HttpStatusCode.{{(authenticationEnabled ? "Unauthorized" : "Accepted")}}, response.StatusCode);
         }
 
         [Fact]
