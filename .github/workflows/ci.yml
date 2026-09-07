@@ -158,6 +158,15 @@ jobs:
       - run: dotnet restore generated/${{ matrix.feature }}/GeneratedApp${{ matrix.feature }}.sln
       - run: dotnet build generated/${{ matrix.feature }}/GeneratedApp${{ matrix.feature }}.sln --configuration Release --no-restore --warnaserror
       - run: dotnet test generated/${{ matrix.feature }}/GeneratedApp${{ matrix.feature }}.sln --configuration Release --no-build --no-restore --verbosity minimal
+      - name: Exercise resource and contract generation workflow
+        if: matrix.feature == 'integrations'
+        shell: bash
+        run: |
+          cd generated/${{ matrix.feature }}
+          dotnet run --project ../../src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- make:resource Customer
+          dotnet build GeneratedApp${{ matrix.feature }}.sln --configuration Release --no-restore --warnaserror
+          dotnet run --project ../../src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- generate --no-openapi
+          dotnet run --project ../../src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- generate --check --no-openapi
       - name: Verify generated frontend
         shell: bash
         run: scripts/test-generated-project.sh "${{ github.workspace }}/generated/${{ matrix.feature }}" pnpm
