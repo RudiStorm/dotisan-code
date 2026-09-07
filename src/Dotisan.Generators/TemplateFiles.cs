@@ -594,7 +594,7 @@ internal static class TemplateFiles
 
     ## Database and migrations
 
-    `dotisan new` creates and applies the initial Identity migration automatically when restore is enabled. With `--no-restore`, author and apply it manually with standard EF Core tooling:
+    `dotisan new` does not create or apply migrations. Author and apply the initial Identity migration manually with standard EF Core tooling:
 
     ~~~powershell
     dotnet ef migrations add InitialIdentity --project src\{{name}}.Api

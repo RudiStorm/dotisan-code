@@ -199,7 +199,7 @@ Generated resource operations and authenticated security operations record actor
 
 ## Authentication projects
 
-For an authenticated project, `dotisan new` creates and applies the initial Identity schema automatically unless `--no-restore` is supplied. To apply it manually:
+For an authenticated project, `dotisan new` does not create or apply migrations. Author and apply the initial Identity schema manually:
 
 ~~~powershell
 dotnet ef migrations add InitialIdentity --project src\AuthApp.Api

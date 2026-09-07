@@ -266,7 +266,7 @@ Outside Development, generated APIs fail fast unless `Dotisan__Security__Fronten
 
 When Mailpit is selected, use `dotisan mail` to print the local inbox URL or `dotisan mail --open` to open it in a browser. Mailpit is Development-only; generated APIs reject `Mail:Provider=mailpit` in other environments. Use SMTP for staging and production and keep credentials in deployment secrets. `Integrations/IntegrationExamples.cs` contains optional SendGrid, Mailgun, and configuration-driven OAuth2 examples; register only the adapter you have configured through deployment secrets. External login registration, linking, callback, and unlinking are exposed through the provider-neutral `IExternalLoginProvider` contract.
 
-Before starting the app, create and apply the Identity schema:
+Before starting the app, author and apply the Identity schema:
 
 ```powershell
 dotnet ef migrations add InitialIdentity --project src\AuthApp.Api

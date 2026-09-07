@@ -34,7 +34,7 @@ The default configuration is:
 
 Set `Dotisan__Jobs__Enabled=false` through normal ASP.NET Core configuration to disable generated job persistence, retry policy, and recurring registration while leaving Wolverine available for the host. `MaxAttempts` is applied to the generated Wolverine handler chain, while `RetryDelaySeconds` controls the Wolverine scheduled retry delay. Failed messages remain available through Wolverine's native error-handling and replay tooling.
 
-For SQLite, the application uses `WolverineFx.Sqlite`. SQL Server, PostgreSQL, and MySQL projects receive the corresponding Wolverine persistence package and registration method. With the default restore-enabled workflow, `dotisan new` creates and applies the initial application migration automatically; use `--no-restore` when you want to author and apply migrations manually. Production deployments must use only reviewed, committed migrations and `dotisan migrate`.
+For SQLite, the application uses `WolverineFx.Sqlite`. SQL Server, PostgreSQL, and MySQL projects receive the corresponding Wolverine persistence package and registration method. `dotisan new` does not create or apply migrations; author and apply them explicitly with EF Core tooling, then use `dotisan migrate` for reviewed, committed migrations in deployments.
 
 Run `dotisan doctor --production` before deployment to confirm that migrations, health endpoints, the production Dockerfile, and provider configuration are present.
 
