@@ -189,7 +189,7 @@ public sealed class ResourceScaffolder
                 var entities = await db.{{featureName}}.AsNoTracking(){{(multiTenancyEnabled ? ".Where(item => item.TenantId == tenantContext.TenantId)" : string.Empty)}}.ToListAsync(cancellationToken);
                 {{(authenticationEnabled ? "await audit.RecordAsync(httpContext, \"" + featureName + "\", null, \"list\", new Dictionary<string, object?>(), cancellationToken);" : string.Empty)}}
                 return entities;
-            });
+            }).WithName("List{{resourceName}}").WithTags("{{resourceName}}");
             {{(authenticationEnabled ? "collection.RequireAuthorization(Permissions." + featureName + "View);" : string.Empty)}}
 
             var create = endpoints.MapPost("/api/{{featureName.ToLowerInvariant()}}", async (Create{{resourceName}}Request request, AppDbContext db, {{(multiTenancyEnabled ? "ITenantContext tenantContext, " : string.Empty)}}{{(authenticationEnabled ? "HttpContext httpContext, IAuditWriter audit, " : string.Empty)}}CancellationToken cancellationToken) =>
@@ -204,7 +204,7 @@ public sealed class ResourceScaffolder
                 await db.SaveChangesAsync(cancellationToken);
                 {{(authenticationEnabled ? "await audit.RecordAsync(httpContext, \"" + resourceName + "\", entity.Id.ToString(), \"create\", new Dictionary<string, object?> { [\"Name\"] = entity.Name }, cancellationToken);" : string.Empty)}}
                 return Results.Created($"/api/{{featureName.ToLowerInvariant()}}/{entity.Id}", entity);
-            });
+            }).WithName("Create{{resourceName}}").WithTags("{{resourceName}}");
             {{(authenticationEnabled ? "create.RequireAuthorization(Permissions." + featureName + "Create);" : string.Empty)}}
 
             {{(authenticationEnabled ? $$"""
@@ -218,7 +218,7 @@ public sealed class ResourceScaffolder
 
                 await audit.RecordAsync(httpContext, "{{resourceName}}", entity.Id.ToString(), "read", new Dictionary<string, object?>(), cancellationToken);
                 return Results.Ok(entity);
-            });
+            }).WithName("Get{{resourceName}}").WithTags("{{resourceName}}");
             read.RequireAuthorization(Permissions.{{featureName}}View);
 
             var update = endpoints.MapPut("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, Update{{resourceName}}Request request, AppDbContext db, {{(multiTenancyEnabled ? "ITenantContext tenantContext, " : string.Empty)}}HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) =>
@@ -239,7 +239,7 @@ public sealed class ResourceScaffolder
                 await db.SaveChangesAsync(cancellationToken);
                 await audit.RecordAsync(httpContext, "{{resourceName}}", entity.Id.ToString(), "update", new Dictionary<string, object?> { ["Name"] = new { old = oldName, @new = entity.Name } }, cancellationToken);
                 return Results.Ok(entity);
-            });
+            }).WithName("Update{{resourceName}}").WithTags("{{resourceName}}");
             update.RequireAuthorization(Permissions.{{featureName}}Update);
 
             var delete = endpoints.MapDelete("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, AppDbContext db, {{(multiTenancyEnabled ? "ITenantContext tenantContext, " : string.Empty)}}HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) =>
@@ -254,7 +254,7 @@ public sealed class ResourceScaffolder
                 await db.SaveChangesAsync(cancellationToken);
                 await audit.RecordAsync(httpContext, "{{resourceName}}", entity.Id.ToString(), "delete", new Dictionary<string, object?>(), cancellationToken);
                 return Results.NoContent();
-            });
+            }).WithName("Delete{{resourceName}}").WithTags("{{resourceName}}");
             delete.RequireAuthorization(Permissions.{{featureName}}Delete);
             """ : string.Empty)}}
         }

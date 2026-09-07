@@ -20,9 +20,9 @@ public static class OpenApiContractReader
         {
             foreach (var operation in path.Value.EnumerateObject().Where(item => IsMethod(item.Name)))
             {
+                var method = operation.Name.ToUpperInvariant();
                 var operationId = operation.Value.TryGetProperty("operationId", out var id) ? id.GetString() : null;
-                if (string.IsNullOrWhiteSpace(operationId))
-                    throw new JsonException($"OpenAPI operation at '{path.Name}' is missing operationId.");
+                operationId = string.IsNullOrWhiteSpace(operationId) ? CreateOperationId(method, path.Name) : operationId;
                 if (endpoints.Any(endpoint => endpoint.Id.Equals(operationId, StringComparison.Ordinal)))
                     throw new JsonException($"Duplicate OpenAPI operationId '{operationId}'.");
 
@@ -36,7 +36,6 @@ public static class OpenApiContractReader
                     : ("void", (ContractTypeDescriptor?)null, false);
                 var response = ReadResponse(operation.Value, schemas);
                 var tags = operation.Value.TryGetProperty("tags", out var tagArray) ? tagArray.EnumerateArray().Select(tag => tag.GetString()!).ToArray() : [];
-                var method = operation.Name.ToUpperInvariant();
                 var requiresAuthorization = operation.Value.TryGetProperty("security", out var security)
                     ? security.ValueKind != JsonValueKind.Array || security.GetArrayLength() > 0
                     : root.TryGetProperty("security", out var globalSecurity) && globalSecurity.ValueKind == JsonValueKind.Array && globalSecurity.GetArrayLength() > 0;
@@ -48,6 +47,15 @@ public static class OpenApiContractReader
         }
 
         return new ContractManifest(1, endpoints, schemas.Values.ToArray(), metadata);
+    }
+
+    private static string CreateOperationId(string method, string path)
+    {
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries)
+            .Select(segment => segment.Trim('{', '}').Replace('-', ' ').Replace('_', ' '))
+            .SelectMany(segment => segment.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            .Select(segment => char.ToUpperInvariant(segment[0]) + segment[1..]);
+        return method + string.Concat(segments);
     }
 
     private static Dictionary<string, ContractModel> ReadSchemas(JsonElement root)
