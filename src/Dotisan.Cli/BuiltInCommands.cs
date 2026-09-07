@@ -718,6 +718,13 @@ internal sealed class NewCommand : IDotisanCommand
                 case "--profile":
                     if (!TryReadValue(arguments, ref index, out profile) || profile is not ("minimal" or "identity" or "saas" or "maximal" or "custom"))
                         return UsageError(context, "--profile must be minimal, identity, saas, maximal, or custom.");
+                    if (profile is not "custom")
+                    {
+                        authenticationEnabled = profile is "identity" or "saas" or "maximal";
+                        registration = authenticationEnabled ? RegistrationPolicy.Public : RegistrationPolicy.Disabled;
+                        multiTenancyEnabled = profile is "saas" or "maximal";
+                        notificationsEnabled = storageEnabled = cachingEnabled = importsExportsEnabled = webhooksEnabled = profile == "maximal";
+                    }
                     break;
                 case "--mail-provider":
                     if (!TryReadValue(arguments, ref index, out var mailValue) || !TryParseMailProvider(mailValue, out mailProvider))
@@ -850,13 +857,6 @@ internal sealed class NewCommand : IDotisanCommand
             }
         }
 
-        if (profile is not null and not "custom")
-        {
-            authenticationEnabled = profile is "identity" or "saas" or "maximal";
-            registration = authenticationEnabled ? RegistrationPolicy.Public : RegistrationPolicy.Disabled;
-            multiTenancyEnabled = profile is "saas" or "maximal";
-            notificationsEnabled = storageEnabled = cachingEnabled = importsExportsEnabled = webhooksEnabled = profile == "maximal";
-        }
         context.Console.WriteLine($"Next: cd {Path.GetRelativePath(Directory.GetCurrentDirectory(), result.OutputDirectory)}");
         context.Console.WriteLine("Before development, create and apply the initial database migration:");
         context.Console.WriteLine($"  dotnet ef migrations add {migrationName} --project {apiProjectPath}");
