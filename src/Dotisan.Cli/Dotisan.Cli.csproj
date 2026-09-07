@@ -9,6 +9,8 @@
     <Version>0.8.6</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>dotnet;aspnetcore;scaffolding;cli;vue;typescript;openapi</PackageTags>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <Description>Dotisan application scaffolding CLI.</Description>
   </PropertyGroup>
 
@@ -18,5 +20,6 @@
     <ProjectReference Include="..\Dotisan.TypeScript\Dotisan.TypeScript.csproj" />
     <ProjectReference Include="..\Dotisan.OpenApi\Dotisan.OpenApi.csproj" />
     <None Include="..\..\README.md" Pack="true" PackagePath="README.md" />
+    <None Include="..\..\LICENSE" Pack="true" PackagePath="LICENSE" />
   </ItemGroup>
 </Project>

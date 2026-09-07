@@ -53,7 +53,7 @@ internal static class TemplateFiles
         return
         [
             new(".gitignore", "bin/\nobj/\nwwwroot/\nnode_modules/\ndist/\n*.db\n"),
-            new("global.json", "{\n  \"sdk\": {\n    \"version\": \"10.0.100\",\n    \"rollForward\": \"latestMajor\"\n  }\n}\n"),
+            new("global.json", "{\n  \"sdk\": {\n    \"version\": \"10.0.400\",\n    \"rollForward\": \"latestFeature\",\n    \"allowPrerelease\": false\n  }\n}\n"),
             new(".node-version", "22\n"),
             new("Directory.Packages.props", PackageVersions()),
             new("README.md", ProjectReadme(options.Name, options.Database, options.AuthenticationEnabled, options.MultiTenancyEnabled)),
