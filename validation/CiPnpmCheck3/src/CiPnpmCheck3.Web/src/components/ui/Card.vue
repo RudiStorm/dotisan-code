@@ -1,0 +1,1 @@
+<template><section class="ui-card"><div v-if="$slots.header" class="ui-card__header"><slot name="header" /></div><div class="ui-card__content"><slot /></div><div v-if="$slots.footer" class="ui-card__footer"><slot name="footer" /></div></section></template>

@@ -1,0 +1,52 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
+using V086Final.Api.Tenancy;
+
+namespace V086Final.Api.Tests;
+
+public sealed class TenantContextTests
+{
+    [Fact]
+    public void Authenticated_claim_takes_precedence_over_development_header()
+    {
+        var context = new DefaultHttpContext();
+        context.User = new ClaimsPrincipal(new ClaimsIdentity([new Claim("tenant_id", "tenant-a")]));
+        context.Request.Headers["X-Tenant-ID"] = "tenant-b";
+        var tenant = new TenantContext(new HttpContextAccessor { HttpContext = context }, Environment("Development"));
+
+        Assert.Equal("tenant-a", tenant.TenantId);
+    }
+
+    [Fact]
+    public void Development_header_is_a_supported_fallback()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Headers["X-Tenant-ID"] = " tenant-b ";
+        var tenant = new TenantContext(new HttpContextAccessor { HttpContext = context }, Environment("Development"));
+
+        Assert.Equal("tenant-b", tenant.RequireTenantId());
+    }
+
+    [Fact]
+    public void Production_rejects_header_only_tenant_identity()
+    {
+        var context = new DefaultHttpContext();
+        context.Request.Headers["X-Tenant-ID"] = "tenant-b";
+        var tenant = new TenantContext(new HttpContextAccessor { HttpContext = context }, Environment("Production"));
+
+        Assert.Throws<InvalidOperationException>(() => tenant.TenantId);
+    }
+
+    private static TestEnvironment Environment(string name) => new() { EnvironmentName = name };
+
+    private sealed class TestEnvironment : IHostEnvironment
+    {
+        public string EnvironmentName { get; set; } = Environments.Development;
+        public string ApplicationName { get; set; } = "TenantTests";
+        public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+        public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
+    }
+}

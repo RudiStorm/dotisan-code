@@ -1,0 +1,10 @@
+import { mount } from '@vue/test-utils';
+import { describe, expect, it } from 'vitest';
+import UiBadge from './Badge.vue';
+
+describe('UiBadge', () => {
+  it('renders its slot content', () => {
+    const wrapper = mount(UiBadge, { slots: { default: 'Ready' } });
+    expect(wrapper.text()).toBe('Ready');
+  });
+});

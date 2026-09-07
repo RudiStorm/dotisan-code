@@ -1,0 +1,8 @@
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import { issueAntiforgery } from '../../dotisan/services';
+const providers = ref<{ name: string; displayName: string }[]>([]); const message = ref('');
+onMounted(async () => { const response = await fetch('/api/account/external/providers'); if (response.ok) providers.value = (await response.json()).providers; });
+function connect(name: string) { window.location.assign(`/api/account/external/${encodeURIComponent(name)}/challenge?returnUrl=${encodeURIComponent('/security/external-logins')}`); }
+async function disconnect(name: string) { const token = await issueAntiforgery(); await fetch(`/api/account/external/${encodeURIComponent(name)}/link`, { method: 'DELETE', credentials: 'include', headers: { 'X-XSRF-TOKEN': token.token } }); message.value = `${name} disconnected.`; }
+</script>
+<template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Account security</p><h2>External sign-in providers</h2><p class="muted">Connect providers through an application-specific adapter. Dotisan keeps this boundary provider-neutral.</p></div></div><UiCard><p v-if="message" class="muted" v-text="message"></p><p v-if="!providers.length" class="muted">No external providers are configured yet.</p><ul v-else class="profile-list"><li v-for="provider in providers" :key="provider.name"><strong v-text="provider.displayName"></strong><span class="muted" v-text="provider.name"></span><UiButton @click="connect(provider.name)">Connect</UiButton><UiButton variant="outline" @click="disconnect(provider.name)">Disconnect</UiButton></li></ul></UiCard></section></template>

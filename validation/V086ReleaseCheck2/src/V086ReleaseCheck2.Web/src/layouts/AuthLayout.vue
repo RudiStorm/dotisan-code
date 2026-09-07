@@ -1,0 +1,1 @@
+<template><main class="auth-layout"><div class="auth-brand"><span class="brand-mark">D</span><span>Dotisan</span></div><RouterView /></main></template>

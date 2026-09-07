@@ -1,0 +1,305 @@
+using System.Security.Claims;
+using V080HealthCheck.Api.Auditing;
+using V080HealthCheck.Api.Data;
+using V080HealthCheck.Api.Identity;
+using V080HealthCheck.Api.Integrations;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
+
+namespace V080HealthCheck.Api.Features.Account;
+
+public static class AccountEndpoints
+{
+    public static IEndpointRouteBuilder MapAccountEndpoints(this IEndpointRouteBuilder endpoints, bool registrationEnabled)
+    {
+        var group = endpoints.MapGroup("/api/account").RequireRateLimiting("account");
+        group.MapGet("/antiforgery", IssueAntiforgery).AllowAnonymous();
+        group.MapPost("/register", (RegisterRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, HttpContext httpContext, IAuditWriter audit, IConfiguration configuration, CancellationToken cancellationToken) => Register(request, users, emailProvider, audit, httpContext, configuration, registrationEnabled, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+        group.MapPost("/login", (LoginRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, AppDbContext db, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) => Login(request, users, signInManager, db, audit, httpContext, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+        group.MapPost("/password-reset/request", (PasswordResetRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, CancellationToken cancellationToken) => RequestPasswordReset(request, users, emailProvider, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+        group.MapPost("/password-reset/confirm", (PasswordResetConfirmRequest request, UserManager<ApplicationUser> users, CancellationToken cancellationToken) => ConfirmPasswordReset(request, users, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+        group.MapPost("/email-confirmation/confirm", (EmailConfirmationRequest request, UserManager<ApplicationUser> users, CancellationToken cancellationToken) => ConfirmEmail(request, users, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+        group.MapPost("/email-confirmation/resend", (EmailConfirmationResendRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, IConfiguration configuration, CancellationToken cancellationToken) => ResendConfirmation(request, users, emailProvider, configuration, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+        group.MapGet("/mfa/setup", (ClaimsPrincipal principal, UserManager<ApplicationUser> users) => SetupMfa(principal, users)).RequireAuthorization();
+        group.MapPost("/mfa/verify", (MfaCodeRequest request, ClaimsPrincipal principal, UserManager<ApplicationUser> users) => VerifyMfa(request, principal, users)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+        group.MapPost("/mfa/disable", (ClaimsPrincipal principal, UserManager<ApplicationUser> users) => DisableMfa(principal, users)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+        group.MapPost("/mfa/recovery-codes/regenerate", (ClaimsPrincipal principal, UserManager<ApplicationUser> users) => RegenerateRecoveryCodes(principal, users)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+        group.MapPost("/mfa/challenge", (MfaCodeRequest request, SignInManager<ApplicationUser> signInManager, AppDbContext db, HttpContext httpContext, CancellationToken cancellationToken) => ChallengeMfa(request, signInManager, db, httpContext, cancellationToken)).AllowAnonymous().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+        group.MapGet("/sessions", (ClaimsPrincipal principal, AppDbContext db) => ListSessions(principal, db)).RequireAuthorization();
+        group.MapDelete("/sessions/{id:guid}", (Guid id, ClaimsPrincipal principal, AppDbContext db) => RevokeSession(id, principal, db)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+        group.MapPost("/sessions/revoke-all", (ClaimsPrincipal principal, UserManager<ApplicationUser> users, AppDbContext db) => RevokeAllSessions(principal, users, db)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+        group.MapGet("/external/providers", (IEnumerable<IExternalLoginProvider> providers) => Results.Ok(new { providers = providers.Select(provider => new ExternalLoginProviderDescriptor(provider.Name, provider.DisplayName)) })).AllowAnonymous();
+        group.MapGet("/external/{provider}/challenge", (string provider, string? returnUrl, IEnumerable<IExternalLoginProvider> providers, CancellationToken cancellationToken) => ExternalLoginChallenge(provider, returnUrl, providers, cancellationToken)).AllowAnonymous();
+        group.MapGet("/external/{provider}/callback", (string provider, string code, string state, ClaimsPrincipal principal, IEnumerable<IExternalLoginProvider> providers, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, AppDbContext db, HttpContext httpContext, IExternalLoginStateStore stateStore, CancellationToken cancellationToken) => ExternalLoginCallback(provider, code, state, principal, providers, users, signInManager, db, httpContext, stateStore, cancellationToken)).AllowAnonymous();
+        group.MapPost("/external/{provider}/link", (string provider, string? returnUrl, ClaimsPrincipal principal, IEnumerable<IExternalLoginProvider> providers, CancellationToken cancellationToken) => ExternalLoginChallenge(provider, returnUrl, providers, cancellationToken)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+        group.MapDelete("/external/{provider}/link", (string provider, ClaimsPrincipal principal, IEnumerable<IExternalLoginProvider> providers, UserManager<ApplicationUser> users) => UnlinkExternalLogin(provider, principal, providers, users)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+        group.MapPost("/logout", (SignInManager<ApplicationUser> signInManager, HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) => Logout(signInManager, audit, httpContext, cancellationToken)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true));
+        group.MapGet("/me", (ClaimsPrincipal user) => Me(user)).RequireAuthorization();
+        return endpoints;
+    }
+
+    private static IResult IssueAntiforgery(HttpContext httpContext, IAntiforgery antiforgery)
+    {
+        var tokens = antiforgery.GetAndStoreTokens(httpContext);
+        return Results.Ok(new { token = tokens.RequestToken });
+    }
+
+    private static async Task<IResult> Register(RegisterRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, IAuditWriter audit, HttpContext httpContext, IConfiguration configuration, bool registrationEnabled, CancellationToken cancellationToken)
+    {
+        if (!registrationEnabled)
+        {
+            await audit.RecordAsync(httpContext, "Security", null, "security.registration.denied", new Dictionary<string, object?>(), cancellationToken);
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Registration is unavailable.", extensions: new Dictionary<string, object?> { ["code"] = "registration_unavailable" });
+        }
+
+        var user = new ApplicationUser { UserName = request.Email, Email = request.Email };
+        var result = await users.CreateAsync(user, request.Password);
+        if (!result.Succeeded)
+        {
+            var errors = result.Errors
+                .GroupBy(error => error.Code.Contains("Password", StringComparison.OrdinalIgnoreCase) ? "Password" : "Email", StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.Select(error => error.Description).ToArray(), StringComparer.Ordinal);
+            return Results.ValidationProblem(errors);
+        }
+
+        var confirmationToken = await users.GenerateEmailConfirmationTokenAsync(user);
+        await emailProvider.SendAsync(user.Email!, "Confirm your email", BuildConfirmationEmail(configuration["FrontendUrl"] ?? "http://localhost:5173", user.Email!, confirmationToken), cancellationToken);
+        await audit.RecordAsync(httpContext, "Security", user.Id, "security.registered", new Dictionary<string, object?>(), cancellationToken);
+        return Results.Ok(new CurrentUserResponse(user.Id, user.Email!));
+    }
+
+    private static async Task<IResult> Login(LoginRequest request, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, AppDbContext db, IAuditWriter audit, HttpContext httpContext, CancellationToken cancellationToken)
+    {
+        var user = await users.FindByEmailAsync(request.Email);
+        if (user is null)
+        {
+            await audit.RecordAsync(httpContext, "Security", null, "security.login.failed", new Dictionary<string, object?>(), cancellationToken);
+            return Results.Unauthorized();
+        }
+
+        if (!await users.IsEmailConfirmedAsync(user))
+        {
+            await audit.RecordAsync(httpContext, "Security", user.Id, "security.login.unconfirmed_email", new Dictionary<string, object?>(), cancellationToken);
+            return Results.Unauthorized();
+        }
+
+        signInManager.AuthenticationScheme = IdentityConstants.ApplicationScheme;
+        var result = await signInManager.PasswordSignInAsync(user, request.Password, request.RememberMe, lockoutOnFailure: true);
+        if (result.RequiresTwoFactor)
+            return Results.Ok(new LoginResponse("mfa_required"));
+        if (!result.Succeeded)
+        {
+            await audit.RecordAsync(httpContext, "Security", user.Id, "security.login.failed", new Dictionary<string, object?>(), cancellationToken);
+            return Results.Unauthorized();
+        }
+
+        await audit.RecordAsync(httpContext, "Security", user.Id, "security.login.succeeded", new Dictionary<string, object?>(), cancellationToken);
+        var sessionId = await CreateSession(user.Id, db, httpContext, cancellationToken);
+        await signInManager.SignInWithClaimsAsync(user, request.RememberMe, [new Claim("dotisan_session_id", sessionId.ToString())]);
+        return Results.Ok(new LoginResponse("authenticated"));
+    }
+
+    private static async Task<Guid> CreateSession(string userId, AppDbContext db, HttpContext httpContext, CancellationToken cancellationToken)
+    {
+        var agent = httpContext.Request.Headers.UserAgent.ToString();
+        var now = DateTimeOffset.UtcNow;
+        var id = Guid.NewGuid();
+        db.ApplicationSessions.Add(new ApplicationSession { Id = id, UserId = userId, CreatedAt = now, LastSeenAt = now, ExpiresAt = now.AddDays(30), DeviceName = string.IsNullOrWhiteSpace(agent) ? "Unknown device" : agent[..Math.Min(agent.Length, 100)], UserAgent = agent, IpAddress = httpContext.Connection.RemoteIpAddress?.ToString() });
+        await db.SaveChangesAsync(cancellationToken);
+        return id;
+    }
+
+    private static async Task<IResult> ListSessions(ClaimsPrincipal principal, AppDbContext db)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (userId is null) return Results.Unauthorized();
+        var sessions = (await db.ApplicationSessions.AsNoTracking().Where(session => session.UserId == userId && session.RevokedAt == null).ToListAsync()).Where(session => session.ExpiresAt > DateTimeOffset.UtcNow).OrderByDescending(session => session.LastSeenAt).Select(session => new { session.Id, session.DeviceName, session.CreatedAt, session.LastSeenAt, session.ExpiresAt, session.UserAgent, session.IpAddress }).ToList();
+        return Results.Ok(new { sessions });
+    }
+
+    private static async Task<IResult> RevokeSession(Guid id, ClaimsPrincipal principal, AppDbContext db)
+    {
+        var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        var session = userId is null ? null : await db.ApplicationSessions.SingleOrDefaultAsync(item => item.Id == id && item.UserId == userId && item.RevokedAt == null);
+        if (session is null) return Results.NotFound();
+        session.RevokedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync();
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> RevokeAllSessions(ClaimsPrincipal principal, UserManager<ApplicationUser> users, AppDbContext db)
+    {
+        var user = await users.GetUserAsync(principal);
+        if (user is null) return Results.Unauthorized();
+        var sessions = await db.ApplicationSessions.Where(session => session.UserId == user.Id && session.RevokedAt == null).ToListAsync();
+        foreach (var session in sessions) session.RevokedAt = DateTimeOffset.UtcNow;
+        await users.UpdateSecurityStampAsync(user);
+        await db.SaveChangesAsync();
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> ExternalLoginChallenge(string provider, string? returnUrl, IEnumerable<IExternalLoginProvider> providers, CancellationToken cancellationToken)
+    {
+        var adapter = providers.FirstOrDefault(item => string.Equals(item.Name, provider, StringComparison.OrdinalIgnoreCase));
+        if (adapter is null) return Results.NotFound(new { code = "external_provider_not_configured" });
+        var safeReturnUrl = !string.IsNullOrWhiteSpace(returnUrl) && Uri.TryCreate(returnUrl, UriKind.Relative, out _) && returnUrl.StartsWith('/') && !returnUrl.StartsWith("//", StringComparison.Ordinal) ? returnUrl : "/";
+        return Results.Redirect(await adapter.CreateChallengeUrlAsync(safeReturnUrl, cancellationToken));
+    }
+
+    private static async Task<IResult> ExternalLoginCallback(string provider, string code, string state, ClaimsPrincipal principal, IEnumerable<IExternalLoginProvider> providers, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, AppDbContext db, HttpContext httpContext, IExternalLoginStateStore stateStore, CancellationToken cancellationToken)
+    {
+        var adapter = providers.FirstOrDefault(item => string.Equals(item.Name, provider, StringComparison.OrdinalIgnoreCase));
+        if (adapter is null) return Results.NotFound(new { code = "external_provider_not_configured" });
+        if (!stateStore.TryConsume(state, out var returnUrl)) return Results.BadRequest(new { code = "invalid_external_state" });
+        var identity = await adapter.ResolveIdentityAsync(code, state, cancellationToken);
+        if (identity is null) return Results.BadRequest(new { code = "invalid_external_identity" });
+        var login = new UserLoginInfo(adapter.Name, identity.ProviderKey, adapter.DisplayName);
+        var user = principal.Identity?.IsAuthenticated == true ? await users.GetUserAsync(principal) : null;
+        if (user is not null) { await users.AddLoginAsync(user, login); return Results.Redirect(returnUrl); }
+        user = await users.FindByLoginAsync(adapter.Name, identity.ProviderKey);
+        if (user is null) { user = await users.FindByEmailAsync(identity.Email); if (user is null) { user = new ApplicationUser { UserName = identity.Email, Email = identity.Email, EmailConfirmed = true }; var created = await users.CreateAsync(user); if (!created.Succeeded) return Results.BadRequest(new { code = "external_registration_failed" }); } await users.AddLoginAsync(user, login); }
+        var sessionId = await CreateSession(user.Id, db, httpContext, cancellationToken);
+        await signInManager.SignInWithClaimsAsync(user, false, [new Claim("dotisan_session_id", sessionId.ToString())]);
+        return Results.Redirect(returnUrl);
+    }
+
+    private static async Task<IResult> UnlinkExternalLogin(string provider, ClaimsPrincipal principal, IEnumerable<IExternalLoginProvider> providers, UserManager<ApplicationUser> users)
+    {
+        var adapter = providers.FirstOrDefault(item => string.Equals(item.Name, provider, StringComparison.OrdinalIgnoreCase));
+        var user = await users.GetUserAsync(principal);
+        if (adapter is null) return Results.NotFound(new { code = "external_provider_not_configured" });
+        if (user is null) return Results.Unauthorized();
+        var linked = (await users.GetLoginsAsync(user)).FirstOrDefault(item => string.Equals(item.LoginProvider, adapter.Name, StringComparison.OrdinalIgnoreCase));
+        if (linked is null) return Results.BadRequest(new { code = "external_login_not_linked" });
+        var result = await users.RemoveLoginAsync(user, linked.LoginProvider, linked.ProviderKey);
+        return result.Succeeded ? Results.NoContent() : Results.BadRequest(new { code = "external_login_not_linked" });
+    }
+
+    private static async Task<IResult> Logout(SignInManager<ApplicationUser> signInManager, IAuditWriter audit, HttpContext httpContext, CancellationToken cancellationToken)
+    {
+        signInManager.AuthenticationScheme = IdentityConstants.ApplicationScheme;
+        await audit.RecordAsync(httpContext, "Security", null, "security.logout", new Dictionary<string, object?>(), cancellationToken);
+        await signInManager.SignOutAsync();
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> RequestPasswordReset(PasswordResetRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, CancellationToken cancellationToken)
+    {
+        var user = await users.FindByEmailAsync(request.Email);
+        if (user is not null)
+        {
+            var token = await users.GeneratePasswordResetTokenAsync(user);
+            await emailProvider.SendAsync(user.Email!, "Reset your password", $"Use this password reset token: {token}", cancellationToken);
+        }
+        return Results.Accepted();
+    }
+
+    private static async Task<IResult> ConfirmEmail(EmailConfirmationRequest request, UserManager<ApplicationUser> users, CancellationToken cancellationToken)
+    {
+        var user = await users.FindByEmailAsync(request.Email);
+        if (user is null) return Results.BadRequest(new { code = "invalid_confirmation" });
+        var result = await users.ConfirmEmailAsync(user, request.Token);
+        return result.Succeeded ? Results.NoContent() : Results.BadRequest(new { code = "invalid_confirmation" });
+    }
+
+    private static async Task<IResult> ResendConfirmation(EmailConfirmationResendRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, IConfiguration configuration, CancellationToken cancellationToken)
+    {
+        var user = await users.FindByEmailAsync(request.Email);
+        if (user is not null && !await users.IsEmailConfirmedAsync(user))
+        {
+            var token = await users.GenerateEmailConfirmationTokenAsync(user);
+            await emailProvider.SendAsync(user.Email!, "Confirm your email", BuildConfirmationEmail(configuration["FrontendUrl"] ?? "http://localhost:5173", user.Email!, token), cancellationToken);
+        }
+        return Results.Accepted();
+    }
+
+    private static string BuildConfirmationEmail(string frontendUrl, string email, string token)
+    {
+        var link = $"{frontendUrl.TrimEnd('/')}/auth/confirm-email?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(token)}";
+        return $"Welcome!\n\nPlease confirm your email address by opening this link:\n{link}\n\nIf you did not create this account, you can safely ignore this email.";
+    }
+
+    private static async Task<IResult> ConfirmPasswordReset(PasswordResetConfirmRequest request, UserManager<ApplicationUser> users, CancellationToken cancellationToken)
+    {
+        var user = await users.FindByEmailAsync(request.Email);
+        if (user is null) return Results.BadRequest(new { code = "invalid_reset" });
+        var result = await users.ResetPasswordAsync(user, request.Token, request.NewPassword);
+        return result.Succeeded ? Results.NoContent() : Results.BadRequest(new { code = "invalid_reset" });
+    }
+
+    private static async Task<IResult> SetupMfa(ClaimsPrincipal principal, UserManager<ApplicationUser> users)
+    {
+        var user = await users.GetUserAsync(principal);
+        if (user is null) return Results.Unauthorized();
+        var key = await users.GetAuthenticatorKeyAsync(user);
+        if (string.IsNullOrWhiteSpace(key)) { await users.ResetAuthenticatorKeyAsync(user); key = await users.GetAuthenticatorKeyAsync(user); }
+        return Results.Ok(new { sharedKey = key, authenticatorUri = $"otpauth://totp/Dotisan:{Uri.EscapeDataString(user.Email!)}?secret={key}&issuer=Dotisan" });
+    }
+
+    private static async Task<IResult> VerifyMfa(MfaCodeRequest request, ClaimsPrincipal principal, UserManager<ApplicationUser> users)
+    {
+        var user = await users.GetUserAsync(principal);
+        if (user is null) return Results.Unauthorized();
+        if (!await users.VerifyTwoFactorTokenAsync(user, TokenOptions.DefaultAuthenticatorProvider, request.Code)) return Results.BadRequest(new { code = "invalid_mfa_code" });
+        await users.SetTwoFactorEnabledAsync(user, true);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> DisableMfa(ClaimsPrincipal principal, UserManager<ApplicationUser> users)
+    {
+        var user = await users.GetUserAsync(principal);
+        if (user is null) return Results.Unauthorized();
+        await users.SetTwoFactorEnabledAsync(user, false);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> RegenerateRecoveryCodes(ClaimsPrincipal principal, UserManager<ApplicationUser> users)
+    {
+        var user = await users.GetUserAsync(principal);
+        if (user is null) return Results.Unauthorized();
+        if (!await users.GetTwoFactorEnabledAsync(user)) return Results.BadRequest(new { code = "mfa_not_enabled" });
+        return Results.Ok(new { recoveryCodes = await users.GenerateNewTwoFactorRecoveryCodesAsync(user, 10) });
+    }
+
+    private static async Task<IResult> ChallengeMfa(MfaCodeRequest request, SignInManager<ApplicationUser> signInManager, AppDbContext db, HttpContext httpContext, CancellationToken cancellationToken)
+    {
+        var result = await signInManager.TwoFactorAuthenticatorSignInAsync(request.Code, false, false);
+        if (!result.Succeeded)
+            result = await signInManager.TwoFactorRecoveryCodeSignInAsync(request.Code);
+        if (result.Succeeded)
+        {
+            var user = await signInManager.GetTwoFactorAuthenticationUserAsync();
+            if (user is not null)
+            {
+                var sessionId = await CreateSession(user.Id, db, httpContext, cancellationToken);
+                await signInManager.SignInWithClaimsAsync(user, false, [new Claim("dotisan_session_id", sessionId.ToString())]);
+            }
+        }
+        return result.Succeeded ? Results.NoContent() : Results.Unauthorized();
+    }
+
+    private static IResult Me(ClaimsPrincipal user)
+    {
+        var id = user.FindFirstValue(ClaimTypes.NameIdentifier);
+        var email = user.FindFirstValue(ClaimTypes.Email);
+        return id is null || email is null
+            ? Results.Unauthorized()
+            : Results.Ok(new CurrentUserResponse(id, email));
+    }
+
+    public sealed record RegisterRequest(string Email, string Password);
+    public sealed record LoginRequest(string Email, string Password, bool RememberMe);
+    public sealed record LoginResponse(string Code);
+    public sealed record PasswordResetRequest(string Email);
+    public sealed record PasswordResetConfirmRequest(string Email, string Token, string NewPassword);
+    public sealed record EmailConfirmationRequest(string Email, string Token);
+    public sealed record EmailConfirmationResendRequest(string Email);
+    public sealed record MfaCodeRequest(string Code);
+    public sealed record CurrentUserResponse(string Id, string Email);
+}

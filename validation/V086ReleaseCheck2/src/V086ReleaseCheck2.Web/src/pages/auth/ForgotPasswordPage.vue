@@ -1,0 +1,8 @@
+<script setup lang="ts">
+import { ref } from 'vue'; import UiButton from '../../components/ui/Button.vue'; import UiCard from '../../components/ui/Card.vue'; import UiInput from '../../components/ui/Input.vue'; import { issueAntiforgery, requestPasswordReset } from '../../dotisan/services';
+const email = ref(''); const sent = ref(false); const error = ref(''); const pending = ref(false);
+async function submit() { pending.value = true; error.value = ''; try { const token = await issueAntiforgery(); await requestPasswordReset({ email: email.value }, { headers: { 'X-XSRF-TOKEN': token.token } }); sent.value = true; } catch (exception) { error.value = exception instanceof Error ? exception.message : 'Unable to request a reset.'; } finally { pending.value = false; } }
+</script>
+<template>
+<UiCard><div class="auth-card-heading"><p class="eyebrow">Account recovery</p><h1>Forgot password?</h1><p v-if="sent" class="muted">If the account exists, a reset email has been sent.</p><form v-else class="form-stack" @submit.prevent="submit"><p v-if="error" class="form-error" role="alert" v-text="error"></p><label>Email<UiInput v-model="email" type="email" autocomplete="email" required /></label><UiButton type="submit" :disabled="pending"><span v-text="pending ? 'Sending...' : 'Send reset email'"></span></UiButton></form></div><p class="form-links"><RouterLink to="/auth/login">Return to sign in</RouterLink></p></UiCard>
+</template>

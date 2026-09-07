@@ -1,0 +1,5 @@
+<script setup lang="ts">
+defineProps<{ modelValue?: string; type?: string; placeholder?: string; autocomplete?: string; required?: boolean; disabled?: boolean }>();
+const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
+</script>
+<template><input :value="modelValue" :type="type ?? 'text'" :placeholder="placeholder" :autocomplete="autocomplete" :required="required" :disabled="disabled" class="ui-input" @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)" /></template>
