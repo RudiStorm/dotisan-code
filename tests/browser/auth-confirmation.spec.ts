@@ -28,7 +28,7 @@ test('failed login shows the API error without navigating', async ({ page }) => 
   await page.getByLabel('Password').fill('wrong-password');
   await page.getByRole('button', { name: 'Sign in' }).click();
 
-  await expect(page.getByRole('alert')).toContainText('Request failed');
+  await expect(page.getByRole('alert')).toContainText('Invalid email or password.');
   await expect(page).toHaveURL(/\/auth\/login$/);
 });
 
