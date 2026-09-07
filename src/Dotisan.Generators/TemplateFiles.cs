@@ -1152,7 +1152,7 @@ internal static class TemplateFiles
             DatabaseProvider.SqlServer => $$"""
             services:
               database:
-                image: mcr.microsoft.com/mssql/server:2022-latest
+                image: mcr.microsoft.com/mssql/server:2022-CU16-ubuntu-22.04
                 environment:
                   ACCEPT_EULA: "Y"
                   MSSQL_SA_PASSWORD: "DotisanDev123!"
@@ -1214,7 +1214,7 @@ internal static class TemplateFiles
             ? compose + $$"""
 
               mailpit:
-                image: axllent/mailpit:latest
+                image: axllent/mailpit:v1.21.8
                 ports:
                   - "1025:1025"
                   - "8025:8025"
@@ -1229,7 +1229,7 @@ internal static class TemplateFiles
         return withMailpit + $$"""
 
               dashboard:
-                image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
+                image: mcr.microsoft.com/dotnet/aspire-dashboard:9.4
                 ports:
                   - "18888:18888"
                   - "4317:18889"

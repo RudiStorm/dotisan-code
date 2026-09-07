@@ -432,7 +432,7 @@ public sealed class GoldenTemplateGeneratorTests
                 Assert.Contains("database:", compose);
                 Assert.Contains(provider switch
                 {
-                    DatabaseProvider.SqlServer => "mcr.microsoft.com/mssql/server:2022-latest",
+                    DatabaseProvider.SqlServer => "mcr.microsoft.com/mssql/server:2022-CU16-ubuntu-22.04",
                     DatabaseProvider.PostgreSQL => "postgres:16-alpine",
                     DatabaseProvider.MySQL => "mysql:8.4",
                     _ => throw new InvalidOperationException()
