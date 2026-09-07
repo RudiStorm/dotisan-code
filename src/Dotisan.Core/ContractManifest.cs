@@ -9,7 +9,6 @@ public sealed record ContractManifest
 {
     private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
 
-    [JsonConstructor]
     public ContractManifest(
         int SchemaVersion,
         IReadOnlyList<EndpointManifestEntry> Endpoints,
@@ -18,6 +17,7 @@ public sealed record ContractManifest
     {
     }
 
+    [JsonConstructor]
     public ContractManifest(
         int SchemaVersion,
         IReadOnlyList<EndpointManifestEntry> Endpoints,

@@ -123,6 +123,28 @@ public sealed class ContractManifestTests
     }
 
     [Fact]
+    public void Json_round_trip_preserves_endpoint_metadata_and_hash()
+    {
+        var original = new ContractManifest(
+            1,
+            [Entry("customers.read")],
+            [],
+            [EndpointContractMetadata.Create(
+                "GET",
+                "/api/customers/{id:guid}",
+                requestBody: null,
+                [new EndpointParameterMetadata("id", new ContractTypeDescriptor(ContractTypeKind.Guid), false, false)],
+                ["Customers"],
+                validation: true)]);
+
+        var restored = ContractManifest.FromJson(original.ToJson());
+
+        Assert.NotNull(restored.EndpointMetadata);
+        Assert.Equal(original.ToJson(), restored.ToJson());
+        Assert.Equal(original.Sha256, restored.Sha256);
+    }
+
+    [Fact]
     public void Hash_is_stable_for_equivalent_input_order()
     {
         var first = CreateManifest(modelsInReverseOrder: false);
