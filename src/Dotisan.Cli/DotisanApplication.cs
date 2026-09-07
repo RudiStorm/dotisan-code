@@ -2,12 +2,15 @@ using Dotisan.Core;
 using Dotisan.Generators;
 using Dotisan.Cli.Generation;
 using Dotisan.Cli.Diagnostics;
+using System.Reflection;
 
 namespace Dotisan.Cli;
 
 public sealed class DotisanApplication
 {
-    public const string Version = "0.8.6";
+    public static string Version => typeof(DotisanApplication).Assembly
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+        ?? "0.0.0";
 
     private readonly DotisanCommandRegistry registry;
     private readonly CommandContext context;
