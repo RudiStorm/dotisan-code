@@ -59,6 +59,20 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task New_rejects_async_integrations_when_jobs_are_disabled()
+    {
+        var console = new MemoryConsole();
+        var generator = new TrackingProjectGenerator();
+        var app = DotisanApplication.CreateDefault(console, projectGenerator: generator);
+
+        var exitCode = await app.RunAsync(["new", "AsyncApp", "--yes", "--imports-exports", "yes", "--jobs", "none", "--no-restore"]);
+
+        Assert.Equal(DotisanExitCode.UsageError, exitCode);
+        Assert.Contains("require --jobs wolverine", console.ErrorOutput);
+        Assert.False(generator.WasCalled);
+    }
+
+    [Fact]
     public async Task Doctor_production_reports_a_ready_generated_workspace()
     {
         var console = new MemoryConsole();
