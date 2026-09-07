@@ -202,6 +202,7 @@ internal static class TemplateFiles
         <RootNamespace>{{name.Replace('-', '_')}}</RootNamespace>
         <DefineConstants>DOTISAN_CONTRACT_FALLBACK</DefineConstants>
         <OpenApiGenerateDocuments>true</OpenApiGenerateDocuments>
+        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
       </PropertyGroup>
       <ItemGroup>
         <PackageReference Include="{{DatabasePackage(database)}}" />
