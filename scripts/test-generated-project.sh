@@ -10,6 +10,12 @@ web="$(find "$project_root/src" -maxdepth 1 -type d -name '*.Web' -print -quit)"
 dotnet restore "$solution"
 dotnet build "$solution" -c Release --no-restore --warnaserror
 dotnet test "$solution" -c Release --no-build --no-restore --verbosity minimal
-"$package_manager" install --prefix "$web"
-"$package_manager" run build --prefix "$web"
-"$package_manager" test --prefix "$web"
+if [[ "$package_manager" == "pnpm" ]]; then
+  pnpm --dir "$web" install --frozen-lockfile
+  pnpm --dir "$web" run build
+  pnpm --dir "$web" test
+else
+  npm --prefix "$web" ci
+  npm --prefix "$web" run build
+  npm --prefix "$web" test
+fi
