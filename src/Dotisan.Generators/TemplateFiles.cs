@@ -686,7 +686,6 @@ internal static class TemplateFiles
     {{(multiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty)}}
     using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Data;
-    {{(authenticationEnabled ? $"using {identifier}.Api.Security;" : string.Empty)}}
     using {{identifier}}.Api.Infrastructure;
     using {{identifier}}.Api.Jobs;
     using {{identifier}}.Api.Features.Health;
@@ -3382,6 +3381,7 @@ internal static class TemplateFiles
     using Microsoft.AspNetCore.Routing;
     using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Data;
+    {{(authenticationEnabled ? $"using {identifier}.Api.Security;" : string.Empty)}}
     namespace {{identifier}}.Api.Integrations;
 
     public sealed class WebhookDelivery { public Guid Id { get; set; } public string EventType { get; set; } = string.Empty; public string Endpoint { get; set; } = string.Empty; public string Signature { get; set; } = string.Empty; public string PayloadJson { get; set; } = "{}"; public string Status { get; set; } = "queued"; public int Attempts { get; set; } public int RetryCount { get; set; } public DateTimeOffset CreatedAtUtc { get; set; } }
