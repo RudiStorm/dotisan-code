@@ -791,6 +791,31 @@ public sealed class GoldenTemplateGeneratorTests
     }
 
     [Fact]
+    public async Task Jobs_none_profile_omits_wolverine_dependencies_and_sources()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-no-jobs-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var result = await new GoldenTemplateGenerator().GenerateAsync(
+                ProjectOptions.Quick("NoJobsApp", output) with { JobsEnabled = false }, CancellationToken.None);
+
+            Assert.True(result.Success, result.ErrorMessage);
+            var project = await File.ReadAllTextAsync(Path.Combine(output, "src", "NoJobsApp.Api", "NoJobsApp.Api.csproj"));
+            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "NoJobsApp.Api", "Program.cs"));
+            var endpoints = await File.ReadAllTextAsync(Path.Combine(output, "src", "NoJobsApp.Api", "Infrastructure", "DotisanEndpointExtensions.cs"));
+            Assert.DoesNotContain("Wolverine", project);
+            Assert.DoesNotContain("UseWolverine", program);
+            Assert.DoesNotContain("JobEndpoints", endpoints);
+            Assert.False(File.Exists(Path.Combine(output, "src", "NoJobsApp.Api", "Jobs", "JobRegistration.cs")));
+        }
+        finally
+        {
+            if (Directory.Exists(output))
+                Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Generation_is_reproducible_for_the_same_feature_matrix()
     {
         var first = Path.Combine(Path.GetTempPath(), "dotisan-repro-first-" + Guid.NewGuid().ToString("N"));

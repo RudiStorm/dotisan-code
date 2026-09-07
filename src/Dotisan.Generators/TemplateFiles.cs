@@ -85,8 +85,8 @@ internal static class TemplateFiles
             new("dotisan.contract.json", InitialContractManifest(options.AuthenticationEnabled).ToJson()),
             new("Dockerfile", Dockerfile(options.Name, options.PackageManager)),
             new TemplateFile("compose.yaml", DatabaseCompose(options.Name, options.Database, options.MailProvider)),
-            new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.Database, options.AuthenticationEnabled)),
-            new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.MultiTenancyEnabled, options.NotificationsEnabled, options.StorageEnabled, options.CachingEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled)),
+            new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.Database, options.AuthenticationEnabled, options.JobsEnabled)),
+            new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.MultiTenancyEnabled, options.NotificationsEnabled, options.StorageEnabled, options.CachingEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled, options.JobsEnabled)),
             new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled, options.NotificationsEnabled, options.WebhooksEnabled)),
             new($"src/{options.Name}.Api/Auditing/AuditEntry.cs", AuditEntry(identifier)),
             new($"src/{options.Name}.Api/Auditing/IAuditWriter.cs", AuditWriterContract(identifier)),
@@ -94,10 +94,7 @@ internal static class TemplateFiles
             ..(options.MultiTenancyEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Tenancy/TenantContext.cs", TenantContext(identifier)) }
                 : Array.Empty<TemplateFile>()),
-            new($"src/{options.Name}.Api/Jobs/JobRegistration.cs", JobRegistration(identifier, options.Database)),
-            new($"src/{options.Name}.Api/Jobs/SampleJob.cs", SampleJob(identifier)),
-            new($"src/{options.Name}.Api/Jobs/SampleJobHandler.cs", SampleJobHandler(identifier)),
-            new($"src/{options.Name}.Api/Features/Jobs/JobEndpoints.cs", JobEndpoints(identifier, options.AuthenticationEnabled)),
+            ..(options.JobsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Jobs/JobRegistration.cs", JobRegistration(identifier, options.Database)), new TemplateFile($"src/{options.Name}.Api/Jobs/SampleJob.cs", SampleJob(identifier)), new TemplateFile($"src/{options.Name}.Api/Jobs/SampleJobHandler.cs", SampleJobHandler(identifier)), new TemplateFile($"src/{options.Name}.Api/Features/Jobs/JobEndpoints.cs", JobEndpoints(identifier, options.AuthenticationEnabled)) } : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Api/Features/Health/HealthEndpoints.cs", HealthEndpoints(identifier)),
             new($"src/{options.Name}.Api/Infrastructure/DotisanSecurityOptions.cs", DotisanSecurityOptions(identifier)),
             new($"src/{options.Name}.Api/Infrastructure/DotisanProductionConfiguration.cs", DotisanProductionConfiguration(identifier, options.AuthenticationEnabled)),
@@ -130,7 +127,7 @@ internal static class TemplateFiles
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Authorization/AuthorizationEndpoints.cs", AuthorizationEndpoints(identifier)) }
                 : Array.Empty<TemplateFile>()),
-            new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.NotificationsEnabled, options.StorageEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled)),
+            new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.NotificationsEnabled, options.StorageEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled, options.JobsEnabled)),
             new($"src/{options.Name}.Api/appsettings.json", AppSettings(options.Name, options.Database, DevelopmentWebPort(options.Name), options.JobsEnabled)),
             new($"src/{options.Name}.Api/appsettings.Development.json", DevelopmentAppSettings(options.MailProvider)),
             new($"src/{options.Name}.Web/package.json", packageJson),
@@ -193,7 +190,7 @@ internal static class TemplateFiles
         ];
     }
 
-    private static string ApiProject(string name, DatabaseProvider database, bool authenticationEnabled) => $$"""
+    private static string ApiProject(string name, DatabaseProvider database, bool authenticationEnabled, bool jobsEnabled) => $$"""
     <Project Sdk="Microsoft.NET.Sdk.Web">
       <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
@@ -207,10 +204,7 @@ internal static class TemplateFiles
         <PackageReference Include="{{DatabasePackage(database)}}" />
         <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
         <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" PrivateAssets="all" />
-        <PackageReference Include="WolverineFx" />
-        <PackageReference Include="WolverineFx.EntityFrameworkCore" />
-        <PackageReference Include="WolverineFx.RuntimeCompilation" />
-        <PackageReference Include="WolverineFx.{{WolverineProviderPackage(database)}}" />
+        {{(jobsEnabled ? $"<PackageReference Include=\"WolverineFx\" />\n        <PackageReference Include=\"WolverineFx.EntityFrameworkCore\" />\n        <PackageReference Include=\"WolverineFx.RuntimeCompilation\" />\n        <PackageReference Include=\"WolverineFx.{WolverineProviderPackage(database)}\" />" : string.Empty)}}
         <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
         <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
         <PackageReference Include="OpenTelemetry.Instrumentation.EntityFrameworkCore" />
@@ -677,17 +671,17 @@ internal static class TemplateFiles
     }
     """;
 
-    private static string ApiProgram(string identifier, DatabaseProvider database, bool authenticationEnabled, bool registrationEnabled, bool multiTenancyEnabled, bool notificationsEnabled, bool storageEnabled, bool cachingEnabled, bool importsExportsEnabled, bool webhooksEnabled) => authenticationEnabled
-        ? AuthenticatedApiProgram(identifier, database, registrationEnabled, multiTenancyEnabled, notificationsEnabled, storageEnabled, cachingEnabled, importsExportsEnabled, webhooksEnabled)
-        : PlainApiProgram(identifier, database, multiTenancyEnabled, notificationsEnabled, storageEnabled, cachingEnabled, importsExportsEnabled, webhooksEnabled);
+    private static string ApiProgram(string identifier, DatabaseProvider database, bool authenticationEnabled, bool registrationEnabled, bool multiTenancyEnabled, bool notificationsEnabled, bool storageEnabled, bool cachingEnabled, bool importsExportsEnabled, bool webhooksEnabled, bool jobsEnabled) => authenticationEnabled
+        ? AuthenticatedApiProgram(identifier, database, registrationEnabled, multiTenancyEnabled, notificationsEnabled, storageEnabled, cachingEnabled, importsExportsEnabled, webhooksEnabled, jobsEnabled)
+        : PlainApiProgram(identifier, database, multiTenancyEnabled, notificationsEnabled, storageEnabled, cachingEnabled, importsExportsEnabled, webhooksEnabled, jobsEnabled);
 
-    private static string PlainApiProgram(string identifier, DatabaseProvider database, bool multiTenancyEnabled, bool notificationsEnabled, bool storageEnabled, bool cachingEnabled, bool importsExportsEnabled, bool webhooksEnabled) => $$"""
+    private static string PlainApiProgram(string identifier, DatabaseProvider database, bool multiTenancyEnabled, bool notificationsEnabled, bool storageEnabled, bool cachingEnabled, bool importsExportsEnabled, bool webhooksEnabled, bool jobsEnabled) => $$"""
     using {{identifier}}.Api.Auditing;
     {{(multiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty)}}
     using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Data;
     using {{identifier}}.Api.Infrastructure;
-    using {{identifier}}.Api.Jobs;
+    {{(jobsEnabled ? $"using {identifier}.Api.Jobs;" : string.Empty)}}
     using {{identifier}}.Api.Features.Health;
     using Microsoft.AspNetCore.SignalR;
     {{(notificationsEnabled || storageEnabled || cachingEnabled || importsExportsEnabled || webhooksEnabled ? $"using {identifier}.Api.Integrations;" : string.Empty)}}
@@ -759,7 +753,7 @@ internal static class TemplateFiles
     {{(importsExportsEnabled ? "builder.Services.AddScoped<IDataExchangeService, DataExchangeService>();" : string.Empty)}}
     {{(webhooksEnabled ? "builder.Services.AddHttpClient(client => client.Timeout = TimeSpan.FromSeconds(30));\n    builder.Services.AddScoped<IWebhookDispatcher, HmacWebhookDispatcher>();" : string.Empty)}}
     {{(multiTenancyEnabled ? "builder.Services.AddHttpContextAccessor();\n    builder.Services.AddScoped<ITenantContext, TenantContext>();" : string.Empty)}}
-    builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));
+    {{(jobsEnabled ? "builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));" : string.Empty)}}
 
     var app = builder.Build();
     app.UseForwardedHeaders();
@@ -807,7 +801,7 @@ internal static class TemplateFiles
     public partial class Program { }
     """;
 
-    private static string AuthenticatedApiProgram(string identifier, DatabaseProvider database, bool registrationEnabled, bool multiTenancyEnabled, bool notificationsEnabled, bool storageEnabled, bool cachingEnabled, bool importsExportsEnabled, bool webhooksEnabled) => $$"""
+    private static string AuthenticatedApiProgram(string identifier, DatabaseProvider database, bool registrationEnabled, bool multiTenancyEnabled, bool notificationsEnabled, bool storageEnabled, bool cachingEnabled, bool importsExportsEnabled, bool webhooksEnabled, bool jobsEnabled) => $$"""
     using System.Security.Claims;
     using {{identifier}}.Api.Authorization;
     using {{identifier}}.Api.Auditing;
@@ -815,7 +809,7 @@ internal static class TemplateFiles
     using {{identifier}}.Api.Identity;
     using {{identifier}}.Api.Integrations;
     using {{identifier}}.Api.Infrastructure;
-    using {{identifier}}.Api.Jobs;
+    {{(jobsEnabled ? $"using {identifier}.Api.Jobs;" : string.Empty)}}
     using {{identifier}}.Api.Features.Health;
     using Microsoft.AspNetCore.DataProtection;
     {{(multiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty)}}
@@ -897,7 +891,7 @@ internal static class TemplateFiles
     {{(importsExportsEnabled ? "builder.Services.AddScoped<IDataExchangeService, DataExchangeService>();" : string.Empty)}}
     {{(webhooksEnabled ? "builder.Services.AddHttpClient(client => client.Timeout = TimeSpan.FromSeconds(30));\n    builder.Services.AddScoped<IWebhookDispatcher, HmacWebhookDispatcher>();" : string.Empty)}}
     {{(multiTenancyEnabled ? "builder.Services.AddHttpContextAccessor();\n    builder.Services.AddScoped<ITenantContext, TenantContext>();" : string.Empty)}}
-    builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));
+    {{(jobsEnabled ? "builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));" : string.Empty)}}
     builder.Services.AddIdentityCore<ApplicationUser>(options =>
     {
         options.User.RequireUniqueEmail = true;
@@ -1842,12 +1836,12 @@ internal static class TemplateFiles
     }
     """;
 
-    private static string EndpointExtensions(string identifier, bool authenticationEnabled, bool registrationEnabled, bool notificationsEnabled, bool storageEnabled, bool importsExportsEnabled, bool webhooksEnabled) => $$"""
+    private static string EndpointExtensions(string identifier, bool authenticationEnabled, bool registrationEnabled, bool notificationsEnabled, bool storageEnabled, bool importsExportsEnabled, bool webhooksEnabled, bool jobsEnabled) => $$"""
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Routing;
     using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Features.Health;
-    using {{identifier}}.Api.Features.Jobs;
+    {{(jobsEnabled ? $"using {identifier}.Api.Features.Jobs;" : string.Empty)}}
     {{(notificationsEnabled || storageEnabled || importsExportsEnabled || webhooksEnabled ? $"using {identifier}.Api.Integrations;" : string.Empty)}}
     {{(authenticationEnabled ? $"using {identifier}.Api.Features.Account;\n    using {identifier}.Api.Features.Authorization;" : string.Empty)}}
 
@@ -1860,7 +1854,7 @@ internal static class TemplateFiles
         {
             // DOTISAN:ENDPOINTS
             HealthEndpoints.MapHealthEndpoints(endpoints);
-            JobEndpoints.MapJobEndpoints(endpoints);
+            {{(jobsEnabled ? "JobEndpoints.MapJobEndpoints(endpoints);" : string.Empty)}}
             {{(notificationsEnabled ? "NotificationEndpoints.Map(endpoints); endpoints.MapHub<NotificationHub>(\"/hubs/notifications\");" : string.Empty)}}
             {{(storageEnabled ? "StorageEndpoints.Map(endpoints);" : string.Empty)}}
             {{(importsExportsEnabled ? "ImportExportEndpoints.Map(endpoints);" : string.Empty)}}
