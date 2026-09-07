@@ -10,6 +10,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 namespace Dotisan.SourceGenerators;
 
 [Generator]
+[System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
 public sealed class EndpointRegistrationGenerator : IIncrementalGenerator
 {
     private const string MarkerName = "Dotisan.Core.IDotisanEndpoint";
