@@ -323,6 +323,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(File.Exists(Path.Combine(output, "src", "IntegrationApp.Web", "src", "pages", "WebhooksPage.vue")));
             Assert.Contains("ReplayAsync", await File.ReadAllTextAsync(Path.Combine(integrations, "Webhooks.cs")));
             Assert.Contains("PayloadJson", await File.ReadAllTextAsync(Path.Combine(integrations, "Webhooks.cs")));
+            Assert.Contains("delivery.Signature = signature", await File.ReadAllTextAsync(Path.Combine(integrations, "Webhooks.cs")));
         }
         finally
         {
