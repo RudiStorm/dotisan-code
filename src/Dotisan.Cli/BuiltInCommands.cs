@@ -642,7 +642,7 @@ internal sealed class NewCommand : IDotisanCommand
     {
         if (arguments.Count == 0 || string.IsNullOrWhiteSpace(arguments[0]))
         {
-            context.Console.WriteError("A project name is required. Usage: dotisan new <ProjectName> [--output <directory>] [--yes]");
+            context.Console.WriteError("A project name is required. Usage: dotisan new <ProjectName> [--profile minimal|identity|saas|maximal|custom] [--output <directory>] [--yes]");
             return DotisanExitCode.UsageError;
         }
 
@@ -661,6 +661,7 @@ internal sealed class NewCommand : IDotisanCommand
         var importsExportsEnabled = false;
         var webhooksEnabled = false;
         var restore = true;
+        string? profile = null;
 
         for (var index = 1; index < arguments.Count; index++)
         {
@@ -712,6 +713,10 @@ internal sealed class NewCommand : IDotisanCommand
                         return UsageError(context, "--package-manager must be pnpm or npm.");
                     }
 
+                    break;
+                case "--profile":
+                    if (!TryReadValue(arguments, ref index, out profile) || profile is not ("minimal" or "identity" or "saas" or "maximal" or "custom"))
+                        return UsageError(context, "--profile must be minimal, identity, saas, maximal, or custom.");
                     break;
                 case "--mail-provider":
                     if (!TryReadValue(arguments, ref index, out var mailValue) || !TryParseMailProvider(mailValue, out mailProvider))
@@ -842,6 +847,14 @@ internal sealed class NewCommand : IDotisanCommand
                 }
 
             }
+        }
+
+        if (profile is not null and not "custom")
+        {
+            authenticationEnabled = profile is "identity" or "saas" or "maximal";
+            registration = authenticationEnabled ? RegistrationPolicy.Public : RegistrationPolicy.Disabled;
+            multiTenancyEnabled = profile is "saas" or "maximal";
+            notificationsEnabled = storageEnabled = cachingEnabled = importsExportsEnabled = webhooksEnabled = profile == "maximal";
         }
         context.Console.WriteLine($"Next: cd {Path.GetRelativePath(Directory.GetCurrentDirectory(), result.OutputDirectory)}");
         context.Console.WriteLine("Before development, create and apply the initial database migration:");
