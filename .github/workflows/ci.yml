@@ -150,7 +150,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        feature: [plain, integrations]
+        profile: [minimal, identity, saas, maximal]
         package_manager: [npm, pnpm]
     steps:
       - uses: actions/checkout@v5
@@ -160,23 +160,19 @@ jobs:
       - name: Generate project
         shell: pwsh
         run: |
-          if ('${{ matrix.feature }}' -eq 'integrations') {
-            dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- new GeneratedApp${{ matrix.feature }}${{ matrix.package_manager }} --yes --auth yes --registration public --tenant yes --notifications yes --storage yes --caching yes --imports-exports yes --webhooks yes --package-manager ${{ matrix.package_manager }} --output ${{ github.workspace }}/generated/${{ matrix.feature }}-${{ matrix.package_manager }}
-          } else {
-            dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- new GeneratedApp${{ matrix.feature }}${{ matrix.package_manager }} --yes --package-manager ${{ matrix.package_manager }} --output ${{ github.workspace }}/generated/${{ matrix.feature }}-${{ matrix.package_manager }}
-          }
-      - run: dotnet restore generated/${{ matrix.feature }}-${{ matrix.package_manager }}/GeneratedApp${{ matrix.feature }}${{ matrix.package_manager }}.sln
-      - run: dotnet build generated/${{ matrix.feature }}-${{ matrix.package_manager }}/GeneratedApp${{ matrix.feature }}${{ matrix.package_manager }}.sln --configuration Release --no-restore --warnaserror
-      - run: dotnet test generated/${{ matrix.feature }}-${{ matrix.package_manager }}/GeneratedApp${{ matrix.feature }}${{ matrix.package_manager }}.sln --configuration Release --no-build --no-restore --verbosity minimal
+          dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- new GeneratedApp${{ matrix.profile }}${{ matrix.package_manager }} --profile ${{ matrix.profile }} --yes --package-manager ${{ matrix.package_manager }} --output ${{ github.workspace }}/generated/${{ matrix.profile }}-${{ matrix.package_manager }}
+      - run: dotnet restore generated/${{ matrix.profile }}-${{ matrix.package_manager }}/GeneratedApp${{ matrix.profile }}${{ matrix.package_manager }}.sln
+      - run: dotnet build generated/${{ matrix.profile }}-${{ matrix.package_manager }}/GeneratedApp${{ matrix.profile }}${{ matrix.package_manager }}.sln --configuration Release --no-restore --warnaserror
+      - run: dotnet test generated/${{ matrix.profile }}-${{ matrix.package_manager }}/GeneratedApp${{ matrix.profile }}${{ matrix.package_manager }}.sln --configuration Release --no-build --no-restore --verbosity minimal
       - name: Exercise resource and contract generation workflow
-        if: matrix.feature == 'integrations'
+        if: matrix.profile == 'maximal'
         shell: bash
         run: |
-          cd generated/${{ matrix.feature }}-${{ matrix.package_manager }}
+          cd generated/${{ matrix.profile }}-${{ matrix.package_manager }}
           dotnet run --project ../../src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- make:resource Customer
-          dotnet build GeneratedApp${{ matrix.feature }}${{ matrix.package_manager }}.sln --configuration Release --no-restore --warnaserror
+          dotnet build GeneratedApp${{ matrix.profile }}${{ matrix.package_manager }}.sln --configuration Release --no-restore --warnaserror
           dotnet run --project ../../src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- generate --no-openapi --no-build
           dotnet run --project ../../src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- generate --check --no-openapi --no-build
       - name: Verify generated frontend
         shell: bash
-        run: scripts/test-generated-project.sh "${{ github.workspace }}/generated/${{ matrix.feature }}-${{ matrix.package_manager }}" "${{ matrix.package_manager }}"
+        run: scripts/test-generated-project.sh "${{ github.workspace }}/generated/${{ matrix.profile }}-${{ matrix.package_manager }}" "${{ matrix.package_manager }}"
