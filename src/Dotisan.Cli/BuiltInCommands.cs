@@ -841,34 +841,12 @@ internal sealed class NewCommand : IDotisanCommand
                     }
                 }
 
-                if (!prerequisiteResult.IsMissing(".NET SDK") && !prerequisiteResult.IsMissing("dotnet-ef"))
-                {
-                    var migrationResult = await CreateAndApplyInitialMigrationAsync(
-                        migrationName,
-                        apiProjectPath,
-                        result.OutputDirectory,
-                        options.Database,
-                        context.Services,
-                        context.Console,
-                        cancellationToken);
-                    if (!migrationResult.Success)
-                    {
-                        context.Console.WriteError(migrationResult.ErrorMessage ?? "The project was created, but the initial database migration failed.");
-                        context.Console.WriteError($"You can retry with 'dotnet ef migrations add {migrationName} --project {apiProjectPath}' followed by 'dotisan migrate'.");
-                        return DotisanExitCode.GenerationError;
-                    }
-
-                    context.Console.WriteLine($"{migrationName} migration created and applied.");
-                }
             }
         }
         context.Console.WriteLine($"Next: cd {Path.GetRelativePath(Directory.GetCurrentDirectory(), result.OutputDirectory)}");
-        if (!restore)
-        {
-            context.Console.WriteLine("Before development, create and apply the initial database migration:");
-            context.Console.WriteLine($"  dotnet ef migrations add {migrationName} --project {apiProjectPath}");
-            context.Console.WriteLine("  dotisan migrate");
-        }
+        context.Console.WriteLine("Before development, create and apply the initial database migration:");
+        context.Console.WriteLine($"  dotnet ef migrations add {migrationName} --project {apiProjectPath}");
+        context.Console.WriteLine("  dotisan migrate");
         context.Console.WriteLine("Then run: dotisan dev");
         return DotisanExitCode.Success;
     }

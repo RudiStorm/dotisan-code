@@ -155,7 +155,7 @@ dotisan migrate status
 dotisan migrate --production
 ```
 
-`dotisan migrate` applies existing EF Core migrations. `dotisan new` creates and applies the initial migration automatically; migration authoring remains an explicit developer action after model changes:
+`dotisan migrate` applies existing EF Core migrations. `dotisan new` does not create or apply migrations; migration authoring and review remain explicit developer actions:
 
 ```powershell
 dotnet ef migrations add InitialCreate --project src\MyApp.Api
