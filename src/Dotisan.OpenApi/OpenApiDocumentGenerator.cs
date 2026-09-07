@@ -141,11 +141,18 @@ public static class OpenApiDocumentGenerator
                 modelsByName));
     }
 
-    private static OpenApiSchema BuildResponseSchema(
+    private static OpenApiSchema? BuildResponseSchema(
         EndpointManifestEntry endpoint,
         Dictionary<string, ContractModel> modelsByName,
         Dictionary<string, ContractModel> modelsBySourceType)
     {
+        if (string.Equals(endpoint.Response, "void", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(endpoint.Response, "System.Void", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(endpoint.Response, "global::System.Void", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
         if (modelsBySourceType.TryGetValue(endpoint.Response, out var sourceTypeMatch))
         {
             return OpenApiSchema.Reference(sourceTypeMatch.Name);

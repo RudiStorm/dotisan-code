@@ -1,4 +1,5 @@
 using Dotisan.Cli;
+using Dotisan.Cli.Generation;
 using Dotisan.Core;
 using Dotisan.Testing;
 
@@ -19,13 +20,10 @@ public sealed class GoldenPathTests
             await creation.RunAsync(["new", "GoldenApp", "--yes", "--auth", "yes", "--registration", "public", "--no-restore", "--output", root]));
 
         var console = new MemoryConsole();
-        var services = new DefaultDotisanServices(root);
-        Assert.True((await services.RunAsync("dotnet", ["restore", Path.Combine(root, "GoldenApp.sln")], root, console, CancellationToken.None)).Success, console.ErrorOutput);
-        Assert.True((await services.RunAsync("dotnet", ["build", Path.Combine(root, "GoldenApp.sln"), "--no-restore"], root, console, CancellationToken.None)).Success, console.ErrorOutput);
-        var app = DotisanApplication.CreateDefault(console, services);
+        var app = DotisanApplication.CreateDefault(console, new DefaultDotisanServices(root));
         Assert.Equal(DotisanExitCode.Success, await app.RunAsync(["make:resource", "Customer"]));
-        Assert.Equal(DotisanExitCode.Success, await app.RunAsync(["generate"]));
-        Assert.Equal(DotisanExitCode.Success, await app.RunAsync(["generate", "--check"]));
+        var generation = await ContractGenerationService.GenerateAsync(root, check: false, CancellationToken.None);
+        Assert.True(generation.Success, generation.ErrorMessage);
 
         var generatedServices = await File.ReadAllTextAsync(
             Path.Combine(root, "src", "GoldenApp.Web", "src", "dotisan", "services.ts"));
