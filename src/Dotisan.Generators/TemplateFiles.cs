@@ -60,6 +60,7 @@ internal static class TemplateFiles
             new("dotisan.config", $$"""
             version: 1
             profile: quick
+            jobs: {{(options.JobsEnabled ? "wolverine" : "none")}}
             database: {{options.Database.ToString().ToLowerInvariant()}}
             authentication: {{(options.AuthenticationEnabled ? "enabled" : "disabled")}}
             multi_tenancy: {{(options.MultiTenancyEnabled ? "enabled" : "disabled")}}
