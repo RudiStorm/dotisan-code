@@ -10,6 +10,11 @@ foreach ($file in $requiredFiles) {
 git diff --check
 dotnet test Dotisan.sln -c Release --no-restore --filter 'FullyQualifiedName!~GoldenPathTests' --verbosity minimal
 
+# Validate the user-facing artifact in a fresh temporary workspace before packing.
+$acceptanceScript = Join-Path $PSScriptRoot 'Test-GeneratedProject.ps1'
+& powershell -NoProfile -ExecutionPolicy Bypass -File $acceptanceScript -Profile minimal -PackageManager npm
+if ($LASTEXITCODE -ne 0) { throw "Generated minimal-project acceptance failed with exit code $LASTEXITCODE." }
+
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 dotnet pack src/Dotisan.Cli/Dotisan.Cli.csproj -c Release --no-restore --output $OutputDirectory --include-symbols
 $package = Get-ChildItem -LiteralPath $OutputDirectory -Filter 'Dotisan.*.nupkg' | Where-Object { $_.Name -notlike '*.snupkg' } | Select-Object -First 1
