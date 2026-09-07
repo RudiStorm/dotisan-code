@@ -3014,11 +3014,11 @@ internal static class TemplateFiles
     import { onMounted, ref } from 'vue';
     import UiCard from '../components/ui/Card.vue';
     import { issueAntiforgery } from '../dotisan/services';
-    const notifications = ref<Array<{ id: string; title: string; body: string; isRead: boolean }>>([]);
+    const notifications = ref<Array<{ id: string; title: string; body: string; isRead: boolean }>>([]); const pending = ref<string | null>(null); const message = ref('');
     onMounted(async () => { const response = await fetch('/api/notifications', { credentials: 'include' }); if (response.ok) notifications.value = (await response.json()).notifications; });
-    async function markRead(id: string) { const token = await issueAntiforgery(); await fetch(`/api/notifications/${id}/read`, { method: 'POST', credentials: 'include', headers: { 'X-XSRF-TOKEN': token.token } }); const item = notifications.value.find(value => value.id === id); if (item) item.isRead = true; }
+    async function markRead(id: string) { if (pending.value) return; pending.value = id; message.value = ''; try { const token = await issueAntiforgery(); const response = await fetch(`/api/notifications/${id}/read`, { method: 'POST', credentials: 'include', headers: { 'X-XSRF-TOKEN': token.token } }); if (!response.ok) throw new Error(); const item = notifications.value.find(value => value.id === id); if (item) item.isRead = true; } catch { message.value = 'Could not mark the notification as read.'; } finally { pending.value = null; } }
     </script>
-    <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Inbox</p><h2>Notifications</h2></div></div><UiCard v-for="item in notifications" :key="item.id" :class="{ unread: !item.isRead }"><h3>{{ item.title }}</h3><p>{{ item.body }}</p><button v-if="!item.isRead" @click="markRead(item.id)">Mark read</button></UiCard><p v-if="notifications.length === 0" class="muted">You are all caught up.</p></section></template>
+    <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Inbox</p><h2>Notifications</h2></div></div><p v-if="message" role="alert" v-text="message"></p><UiCard v-for="item in notifications" :key="item.id" :class="{ unread: !item.isRead }"><h3>{{ item.title }}</h3><p>{{ item.body }}</p><button v-if="!item.isRead" :disabled="pending !== null" @click="markRead(item.id)">{{ pending === item.id ? 'Saving...' : 'Mark read' }}</button></UiCard><p v-if="notifications.length === 0" class="muted">You are all caught up.</p></section></template>
     """;
 
     private static string ImportsExportsPage() => """
