@@ -38,12 +38,12 @@ internal static class TemplateFiles
             "@vue/tsconfig": "^0.7.0",
             "typescript": "~5.6.0",
             "vite": "^6.0.0",
-            "vitest": "^2.1.0",
+            "vitest": "^5.0.0",
             "vue-tsc": "^2.1.0",
             "@vue/test-utils": "^2.4.0",
             "@playwright/test": "^1.49.0",
             "tailwindcss": "^3.4.0",
-            "postcss": "8.4.49",
+            "postcss": "^8.5.28",
             "autoprefixer": "^10.4.0",
             "jsdom": "^25.0.0"
           }
