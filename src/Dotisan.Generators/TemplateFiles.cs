@@ -3025,21 +3025,21 @@ internal static class TemplateFiles
     <script setup lang="ts">
     import { ref } from 'vue';
     import { issueAntiforgery } from '../dotisan/services';
-    const file = ref<File>(); const message = ref('');
-    async function importFile() { if (!file.value) return; const body = new FormData(); body.append('file', file.value); const token = await issueAntiforgery(); const response = await fetch('/api/data/imports', { method: 'POST', body, credentials: 'include', headers: { 'X-XSRF-TOKEN': token.token } }); message.value = response.ok ? 'Import queued.' : 'Import failed.'; }
+    const file = ref<File>(); const message = ref(''); const pending = ref(false);
+    async function importFile() { if (!file.value || pending.value) return; pending.value = true; message.value = ''; try { const body = new FormData(); body.append('file', file.value); const token = await issueAntiforgery(); const response = await fetch('/api/data/imports', { method: 'POST', body, credentials: 'include', headers: { 'X-XSRF-TOKEN': token.token } }); message.value = response.ok ? 'Import queued.' : 'Import failed.'; } catch { message.value = 'Import failed.'; } finally { pending.value = false; } }
     </script>
-    <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Data</p><h2>Imports and exports</h2></div></div><form @submit.prevent="importFile"><input type="file" accept=".csv,.json" @change="file = ($event.target as HTMLInputElement).files?.[0]" /><button type="submit">Queue import</button></form><a href="/api/data/exports/csv">Download CSV export</a><p v-if="message" role="status">{{ message }}</p></section></template>
+    <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Data</p><h2>Imports and exports</h2></div></div><form @submit.prevent="importFile"><input type="file" accept=".csv,.json" @change="file = ($event.target as HTMLInputElement).files?.[0]" /><button type="submit" :disabled="pending">{{ pending ? 'Queueing...' : 'Queue import' }}</button></form><a href="/api/data/exports/csv">Download CSV export</a><p v-if="message" role="status">{{ message }}</p></section></template>
     """;
 
     private static string WebhooksPage() => """
     <script setup lang="ts">
     import { onMounted, ref } from 'vue';
     import { issueAntiforgery } from '../dotisan/services';
-    const deliveries = ref<Array<{ id: string; eventType: string; endpoint: string; status: string; attempts: number }>>([]);
+    const deliveries = ref<Array<{ id: string; eventType: string; endpoint: string; status: string; attempts: number }>>([]); const pending = ref<string | null>(null);
     onMounted(async () => { const response = await fetch('/api/webhooks/deliveries'); if (response.ok) deliveries.value = await response.json(); });
-    async function replay(id: string) { const token = await issueAntiforgery(); await fetch(`/api/webhooks/deliveries/${id}/replay`, { method: 'POST', credentials: 'include', headers: { 'X-XSRF-TOKEN': token.token } }); }
+    async function replay(id: string) { if (pending.value) return; pending.value = id; try { const token = await issueAntiforgery(); await fetch(`/api/webhooks/deliveries/${id}/replay`, { method: 'POST', credentials: 'include', headers: { 'X-XSRF-TOKEN': token.token } }); } finally { pending.value = null; } }
     </script>
-    <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Integrations</p><h2>Webhook deliveries</h2></div></div><table><thead><tr><th>Event</th><th>Endpoint</th><th>Status</th><th>Attempts</th><th></th></tr></thead><tbody><tr v-for="delivery in deliveries" :key="delivery.id"><td>{{ delivery.eventType }}</td><td>{{ delivery.endpoint }}</td><td>{{ delivery.status }}</td><td>{{ delivery.attempts }}</td><td><button @click="replay(delivery.id)">Replay</button></td></tr></tbody></table><p v-if="deliveries.length === 0" class="muted">No webhook deliveries yet.</p></section></template>
+    <template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Integrations</p><h2>Webhook deliveries</h2></div></div><table><caption class="sr-only">Webhook deliveries</caption><thead><tr><th scope="col">Event</th><th scope="col">Endpoint</th><th scope="col">Status</th><th scope="col">Attempts</th><th scope="col">Actions</th></tr></thead><tbody><tr v-for="delivery in deliveries" :key="delivery.id"><td>{{ delivery.eventType }}</td><td>{{ delivery.endpoint }}</td><td>{{ delivery.status }}</td><td>{{ delivery.attempts }}</td><td><button :disabled="pending !== null" @click="replay(delivery.id)">{{ pending === delivery.id ? 'Replaying...' : 'Replay' }}</button></td></tr></tbody></table><p v-if="deliveries.length === 0" class="muted">No webhook deliveries yet.</p></section></template>
     """;
 
     private static string LoginPage() => """
