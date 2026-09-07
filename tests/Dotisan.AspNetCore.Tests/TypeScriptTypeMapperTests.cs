@@ -48,7 +48,7 @@ public sealed class TypeScriptTypeMapperTests
         var output = TypeScriptContractGenerator.GenerateAll(manifest).Single(file => file.Path == "queries.ts").Content;
         var services = TypeScriptContractGenerator.GenerateAll(manifest).Single(file => file.Path == "services.ts").Content;
 
-        Assert.Contains("mutationFn: (...args: Parameters<typeof services.createProfile>) => services.createProfile(...args)", output);
+        Assert.Contains("mutationFn: (args: Parameters<typeof services.createProfile>) => services.createProfile(...args)", output);
         Assert.Contains("headers: { \"Content-Type\": \"application/json\" },", services);
         Assert.Contains("...(init.body ? { \"Content-Type\": \"application/json\" } : {}), ...init.headers", services);
     }
