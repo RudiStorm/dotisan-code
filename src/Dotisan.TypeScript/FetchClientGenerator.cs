@@ -48,16 +48,33 @@ public static class FetchClientGenerator
             var functionName = ToCamelCase(endpoint.Name);
             var responseType = NormalizeType(endpoint.Response);
             var requestType = NormalizeType(endpoint.Request);
-            var parameters = metadata is null
-                ? string.Empty
-                : string.Join(", ", metadata.PathParameters.Concat(metadata.QueryParameters)
-                    .Select(parameter => $"{parameter.Name}: {TypeScriptTypeMapper.Map(parameter.Type, parameter.Nullable, parameter.Optional)}"));
+            var pathParameters = metadata?.PathParameters ?? [];
+            var queryParameters = metadata?.QueryParameters ?? [];
+            var parameters = string.Join(", ", pathParameters.Select(parameter =>
+                $"{parameter.Name}: {TypeScriptTypeMapper.Map(parameter.Type, parameter.Nullable, optional: false)}"));
+            if (queryParameters.Count > 0)
+            {
+                var queryType = string.Join("; ", queryParameters.Select(parameter =>
+                    $"{parameter.Name}{(parameter.Optional ? "?" : string.Empty)}: {TypeScriptTypeMapper.Map(parameter.Type, parameter.Nullable, optional: false)}"));
+                parameters = string.IsNullOrEmpty(parameters)
+                    ? $"query: {{ {queryType} }} = {{}}"
+                    : parameters + $", query: {{ {queryType} }} = {{}}";
+            }
             if (UsesBody(endpoint.Method) && requestType != "void")
                 parameters = string.IsNullOrEmpty(parameters) ? $"body: {requestType}" : parameters + $", body: {requestType}";
             parameters = string.IsNullOrEmpty(parameters) ? "options: RequestInit = {}" : parameters + ", options: RequestInit = {}";
             builder.Append("export async function ").Append(functionName).Append('(').Append(parameters).Append("): Promise<").Append(responseType).AppendLine(">");
             builder.AppendLine("{");
-            builder.Append("  return request<").Append(responseType).Append(">(").Append(BuildUrl(endpoint.Route)).AppendLine(", {");
+            if (queryParameters.Count > 0)
+            {
+                builder.AppendLine("  const search = new URLSearchParams();");
+                foreach (var parameter in queryParameters)
+                {
+                    builder.Append("  if (query.").Append(parameter.Name).Append(" !== undefined) search.set(\"")
+                        .Append(parameter.Name).Append("\", String(query.").Append(parameter.Name).AppendLine("));");
+                }
+            }
+            builder.Append("  return request<").Append(responseType).Append(">(").Append(BuildUrl(endpoint.Route, pathParameters, queryParameters)).AppendLine(", {");
             builder.Append("    method: \"").Append(endpoint.Method.ToUpperInvariant()).AppendLine("\",");
             if (UsesBody(endpoint.Method) && requestType != "void")
                 builder.AppendLine("    headers: { \"Content-Type\": \"application/json\" },");
@@ -71,25 +88,32 @@ public static class FetchClientGenerator
         return new GeneratedTypeScriptFile("services.ts", builder.ToString());
     }
 
-    private static string BuildUrl(string route)
+    private static string BuildUrl(string route, IReadOnlyList<EndpointParameterMetadata> pathParameters, IReadOnlyList<EndpointParameterMetadata> queryParameters)
     {
-        var builder = new StringBuilder("\"");
+        var builder = new StringBuilder("`");
         var index = 0;
         while (index < route.Length)
         {
             var start = route.IndexOf('{', index);
             if (start < 0)
             {
-                builder.Append(route[index..].Replace("\"", "\\\"", StringComparison.Ordinal)).Append('"');
+                builder.Append(route[index..].Replace("`", "\\`", StringComparison.Ordinal));
                 break;
             }
 
-            builder.Append(route[index..start]).Append("\" + ").Append(route[(start + 1)..route.IndexOf('}', start)]).Append(" + \"");
-            index = route.IndexOf('}', start) + 1;
+            var end = route.IndexOf('}', start);
+            var token = route[(start + 1)..end].Trim().TrimStart('*').TrimEnd('?');
+            var separator = token.IndexOfAny([':', '=']);
+            var name = separator >= 0 ? token[..separator] : token;
+            if (!pathParameters.Any(parameter => parameter.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException($"Route parameter '{name}' is not described by contract metadata.");
+            builder.Append(route[index..start]).Append("${encodeURIComponent(String(").Append(name).Append("))}");
+            index = end + 1;
         }
 
-        if (route.EndsWith('}'))
-            builder.Append('"');
+        builder.Append('`');
+        if (queryParameters.Count > 0)
+            builder.Append(" + (search.size ? `?${search}` : \"\")");
 
         return builder.ToString();
     }
