@@ -131,7 +131,7 @@ internal static class TemplateFiles
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Authorization/AuthorizationEndpoints.cs", AuthorizationEndpoints(identifier)) }
                 : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.NotificationsEnabled, options.StorageEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled)),
-            new($"src/{options.Name}.Api/appsettings.json", AppSettings(options.Name, options.Database, DevelopmentWebPort(options.Name))),
+            new($"src/{options.Name}.Api/appsettings.json", AppSettings(options.Name, options.Database, DevelopmentWebPort(options.Name), options.JobsEnabled)),
             new($"src/{options.Name}.Api/appsettings.Development.json", DevelopmentAppSettings(options.MailProvider)),
             new($"src/{options.Name}.Web/package.json", packageJson),
             new($"src/{options.Name}.Web/index.html", WebIndex(options.Name)),
@@ -1087,7 +1087,7 @@ internal static class TemplateFiles
         _ => "options.UseSqlite(connectionString)"
     };
 
-    private static string AppSettings(string name, DatabaseProvider database, int webPort)
+    private static string AppSettings(string name, DatabaseProvider database, int webPort, bool jobsEnabled)
     {
         var connectionString = database switch
         {
@@ -1115,7 +1115,7 @@ internal static class TemplateFiles
               "KnownProxies": []
             },
               "Jobs": {
-              "Enabled": true,
+              "Enabled": {{jobsEnabled.ToString().ToLowerInvariant()}},
               "MaxAttempts": 3,
               "RetryDelaySeconds": 5
             }

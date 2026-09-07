@@ -667,6 +667,7 @@ internal sealed class NewCommand : IDotisanCommand
         var cachingEnabled = false;
         var importsExportsEnabled = false;
         var webhooksEnabled = false;
+        var jobsEnabled = true;
         var restore = true;
         string? profile = null;
 
@@ -730,7 +731,13 @@ internal sealed class NewCommand : IDotisanCommand
                         registration = authenticationEnabled ? RegistrationPolicy.Public : RegistrationPolicy.Disabled;
                         multiTenancyEnabled = profile is "saas" or "maximal";
                         notificationsEnabled = storageEnabled = cachingEnabled = importsExportsEnabled = webhooksEnabled = profile == "maximal";
+                        jobsEnabled = profile != "minimal";
                     }
+                    break;
+                case "--jobs":
+                    if (!TryReadValue(arguments, ref index, out var jobsValue) || jobsValue is not ("none" or "wolverine"))
+                        return UsageError(context, "--jobs must be none or wolverine.");
+                    jobsEnabled = jobsValue == "wolverine";
                     break;
                 case "--mail-provider":
                     if (!TryReadValue(arguments, ref index, out var mailValue) || !TryParseMailProvider(mailValue, out mailProvider))
@@ -780,7 +787,8 @@ internal sealed class NewCommand : IDotisanCommand
                     ,StorageEnabled = storageEnabled
                     ,CachingEnabled = cachingEnabled
                     ,ImportsExportsEnabled = importsExportsEnabled
-                    ,WebhooksEnabled = webhooksEnabled
+                        ,WebhooksEnabled = webhooksEnabled
+                    ,JobsEnabled = jobsEnabled
                 }
                 : context.Prompts.AskForProject(name, outputDirectory);
         }
