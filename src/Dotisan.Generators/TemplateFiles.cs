@@ -97,7 +97,7 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Api/Jobs/JobRegistration.cs", JobRegistration(identifier, options.Database)),
             new($"src/{options.Name}.Api/Jobs/SampleJob.cs", SampleJob(identifier)),
             new($"src/{options.Name}.Api/Jobs/SampleJobHandler.cs", SampleJobHandler(identifier)),
-            new($"src/{options.Name}.Api/Features/Jobs/JobEndpoints.cs", JobEndpoints(identifier)),
+            new($"src/{options.Name}.Api/Features/Jobs/JobEndpoints.cs", JobEndpoints(identifier, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Api/Features/Health/HealthEndpoints.cs", HealthEndpoints(identifier)),
             new($"src/{options.Name}.Api/Infrastructure/DotisanSecurityOptions.cs", DotisanSecurityOptions(identifier)),
             new($"src/{options.Name}.Api/Infrastructure/DotisanProductionConfiguration.cs", DotisanProductionConfiguration(identifier, options.AuthenticationEnabled)),
@@ -392,12 +392,13 @@ internal static class TemplateFiles
     }
     """;
 
-    private static string JobEndpoints(string identifier) => $$"""
+    private static string JobEndpoints(string identifier, bool authenticationEnabled) => $$"""
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Routing;
     using Wolverine;
     using {{identifier}}.Api.Jobs;
+    {{(authenticationEnabled ? $"using {identifier}.Api.Security;" : string.Empty)}}
 
     namespace {{identifier}}.Api.Features.Jobs;
 
@@ -409,13 +410,13 @@ internal static class TemplateFiles
             {
                 await bus.SendAsync(new SampleJob(DateTimeOffset.UtcNow));
                 return Results.Accepted();
-            }).WithName("EnqueueSampleJob").WithTags("Jobs");
+            }){{(authenticationEnabled ? ".RequireAuthorization(Permissions.AuthorizationManage)" : string.Empty)}}.WithName("EnqueueSampleJob").WithTags("Jobs");
 
             endpoints.MapPost("/api/jobs/sample/schedule", async (IMessageBus bus, CancellationToken cancellationToken) =>
             {
                 await bus.ScheduleAsync(new SampleJob(DateTimeOffset.UtcNow), TimeSpan.FromMinutes(5));
                 return Results.Accepted();
-            }).WithName("ScheduleSampleJob").WithTags("Jobs");
+            }){{(authenticationEnabled ? ".RequireAuthorization(Permissions.AuthorizationManage)" : string.Empty)}}.WithName("ScheduleSampleJob").WithTags("Jobs");
         }
     }
     """;
