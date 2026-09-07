@@ -800,6 +800,12 @@ internal sealed class NewCommand : IDotisanCommand
         if (options is null)
             return DotisanExitCode.Canceled;
 
+        if ((options.ImportsExportsEnabled || options.WebhooksEnabled) && !options.JobsEnabled)
+        {
+            context.Console.WriteError("Imports/exports and webhooks require --jobs wolverine because their work is dispatched asynchronously.");
+            return DotisanExitCode.UsageError;
+        }
+
         var result = await context.ProjectGenerator.GenerateAsync(options, cancellationToken);
         if (!result.Success)
         {
