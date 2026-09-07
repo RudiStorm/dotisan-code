@@ -6,6 +6,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$previousEnvironment = $env:ASPNETCORE_ENVIRONMENT
+$env:ASPNETCORE_ENVIRONMENT = 'Development'
 $createdRoot = $false
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $ProjectRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("dotisan-acceptance-" + [Guid]::NewGuid().ToString('N'))
@@ -37,3 +39,4 @@ if ($PackageManager -eq 'pnpm') {
 if ($createdRoot -and (Test-Path -LiteralPath $ProjectRoot)) {
     Remove-Item -LiteralPath $ProjectRoot -Recurse -Force
 }
+if ($null -eq $previousEnvironment) { Remove-Item Env:ASPNETCORE_ENVIRONMENT -ErrorAction SilentlyContinue } else { $env:ASPNETCORE_ENVIRONMENT = $previousEnvironment }

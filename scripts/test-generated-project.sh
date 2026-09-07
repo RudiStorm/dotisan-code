@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+export ASPNETCORE_ENVIRONMENT=Development
 
 project_root="${1:?project root is required}"
 package_manager="${2:-pnpm}"
