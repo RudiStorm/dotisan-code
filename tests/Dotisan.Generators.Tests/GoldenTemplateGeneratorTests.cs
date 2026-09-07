@@ -286,6 +286,8 @@ public sealed class GoldenTemplateGeneratorTests
         {
             var generated = await new GoldenTemplateGenerator().GenerateAsync(ProjectOptions.Quick("IntegrationApp", output) with
             {
+                AuthenticationEnabled = true,
+                Registration = RegistrationPolicy.Public,
                 NotificationsEnabled = true,
                 StorageEnabled = true,
                 CachingEnabled = true,
