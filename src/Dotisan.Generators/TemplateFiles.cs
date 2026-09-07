@@ -3308,12 +3308,6 @@ internal static class TemplateFiles
         public Task<Stream?> OpenReadAsync(string key, CancellationToken cancellationToken = default) { var path = Resolve(key); return Task.FromResult<Stream?>(File.Exists(path) ? File.OpenRead(path) : null); }
         public Task DeleteAsync(string key, CancellationToken cancellationToken = default) { var path = Resolve(key); if (File.Exists(path)) File.Delete(path); return Task.CompletedTask; }
     }
-    public sealed class S3CompatibleFileStorage : IFileStorage
-    {
-        public Task<StoredFile> PutAsync(string key, Stream content, string contentType, CancellationToken cancellationToken = default) => throw new NotSupportedException("Implement the S3-compatible adapter using Storage:S3 configuration.");
-        public Task<Stream?> OpenReadAsync(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException("Implement the S3-compatible adapter using Storage:S3 configuration.");
-        public Task DeleteAsync(string key, CancellationToken cancellationToken = default) => throw new NotSupportedException("Implement the S3-compatible adapter using Storage:S3 configuration.");
-    }
     public static class StorageEndpoints
     {
         public static void Map(IEndpointRouteBuilder endpoints) { var group = endpoints.MapGroup("/api/files"); {{(authenticationEnabled ? "group.RequireAuthorization();" : string.Empty)}} group.MapPost("", async (IFormFile file, IFileStorage storage, CancellationToken cancellationToken) => { if (file.Length == 0 || string.IsNullOrWhiteSpace(file.ContentType)) return Results.BadRequest(new { code = "invalid_file" }); var key = $"uploads/{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}"; await using var stream = file.OpenReadStream(); return Results.Ok(await storage.PutAsync(key, stream, file.ContentType, cancellationToken)); }){{(authenticationEnabled ? ".WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty)}}; group.MapGet("/{**key}", async (string key, IFileStorage storage, CancellationToken cancellationToken) => { var stream = await storage.OpenReadAsync(key, cancellationToken); return stream is null ? Results.NotFound() : Results.File(stream, "application/octet-stream"); }); group.MapDelete("/{**key}", async (string key, IFileStorage storage, CancellationToken cancellationToken) => { await storage.DeleteAsync(key, cancellationToken); return Results.NoContent(); }){{(authenticationEnabled ? ".WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty)}}; }

@@ -317,7 +317,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("RetryCount", await File.ReadAllTextAsync(Path.Combine(integrations, "Webhooks.cs")));
             Assert.Contains("ImportStatus", await File.ReadAllTextAsync(Path.Combine(integrations, "ImportsExports.cs")));
             Assert.Contains("GetStatusAsync", await File.ReadAllTextAsync(Path.Combine(integrations, "ImportsExports.cs")));
-            Assert.Contains("S3CompatibleFileStorage", await File.ReadAllTextAsync(Path.Combine(integrations, "Storage.cs")));
+            Assert.DoesNotContain("S3CompatibleFileStorage", await File.ReadAllTextAsync(Path.Combine(integrations, "Storage.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "IntegrationApp.Web", "src", "pages", "NotificationsPage.vue")));
             Assert.True(File.Exists(Path.Combine(output, "src", "IntegrationApp.Web", "src", "pages", "ImportsExportsPage.vue")));
             Assert.True(File.Exists(Path.Combine(output, "src", "IntegrationApp.Web", "src", "pages", "WebhooksPage.vue")));
