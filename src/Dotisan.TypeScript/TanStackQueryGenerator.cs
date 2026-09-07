@@ -24,7 +24,7 @@ public static class TanStackQueryGenerator
                 builder.Append("export function ").Append(hookName).AppendLine("Mutation() {");
                 // Forward the complete generated service signature. This keeps route parameters,
                 // query options, request bodies, and RequestInit options usable from mutations.
-                builder.Append("  return useMutation({ mutationFn: (...args: Parameters<typeof services.")
+                builder.Append("  return useMutation({ mutationFn: (args: Parameters<typeof services.")
                     .Append(functionName).Append(">) => services.").Append(functionName).AppendLine("(...args) });");
                 builder.AppendLine("}").AppendLine();
             }

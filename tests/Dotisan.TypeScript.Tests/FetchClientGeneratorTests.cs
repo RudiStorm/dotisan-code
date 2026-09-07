@@ -45,6 +45,6 @@ public sealed class FetchClientGeneratorTests
 
         var output = TanStackQueryGenerator.Generate(manifest).Content;
 
-        Assert.Contains("mutationFn: (...args: Parameters<typeof services.updateUser>) => services.updateUser(...args)", output, StringComparison.Ordinal);
+        Assert.Contains("mutationFn: (args: Parameters<typeof services.updateUser>) => services.updateUser(...args)", output, StringComparison.Ordinal);
     }
 }
