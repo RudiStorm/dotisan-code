@@ -12,10 +12,12 @@ dotnet build "$solution" -c Release --no-restore --warnaserror
 dotnet test "$solution" -c Release --no-build --no-restore --verbosity minimal
 if [[ "$package_manager" == "pnpm" ]]; then
   pnpm --dir "$web" install --frozen-lockfile
+  pnpm --dir "$web" audit --audit-level high
   pnpm --dir "$web" run build
   pnpm --dir "$web" test
 else
   npm --prefix "$web" ci
+  npm --prefix "$web" audit --audit-level=high
   npm --prefix "$web" run build
   npm --prefix "$web" test
 fi

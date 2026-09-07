@@ -24,10 +24,12 @@ dotnet build $solution.FullName -c Release --no-restore --warnaserror
 dotnet test $solution.FullName -c Release --no-build --no-restore --verbosity minimal
 if ($PackageManager -eq 'pnpm') {
     & pnpm --dir $web.FullName install --frozen-lockfile
+    & pnpm --dir $web.FullName audit --audit-level high
     & pnpm --dir $web.FullName run build
     & pnpm --dir $web.FullName test
 } else {
     & npm --prefix $web.FullName ci
+    & npm --prefix $web.FullName audit --audit-level=high
     & npm --prefix $web.FullName run build
     & npm --prefix $web.FullName test
 }
