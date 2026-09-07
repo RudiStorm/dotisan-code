@@ -826,6 +826,27 @@ public sealed class GoldenTemplateGeneratorTests
     }
 
     [Fact]
+    public async Task Pnpm_docker_install_matches_manifest_tool_version()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-pnpm-docker-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var result = await new GoldenTemplateGenerator().GenerateAsync(
+                ProjectOptions.Quick("PnpmApp", output) with { PackageManager = PackageManager.Pnpm }, CancellationToken.None);
+            Assert.True(result.Success, result.ErrorMessage);
+            var packageJson = await File.ReadAllTextAsync(Path.Combine(output, "src", "PnpmApp.Web", "package.json"));
+            var dockerfile = await File.ReadAllTextAsync(Path.Combine(output, "Dockerfile"));
+            Assert.Contains("pnpm@9.15.0", packageJson);
+            Assert.Contains("corepack prepare pnpm@9.15.0", dockerfile);
+            Assert.Contains("pnpm install --frozen-lockfile", dockerfile);
+        }
+        finally
+        {
+            if (Directory.Exists(output)) Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Generation_is_reproducible_for_the_same_feature_matrix()
     {
         var first = Path.Combine(Path.GetTempPath(), "dotisan-repro-first-" + Guid.NewGuid().ToString("N"));

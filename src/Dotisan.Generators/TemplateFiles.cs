@@ -3191,7 +3191,7 @@ internal static class TemplateFiles
     private static string Dockerfile(string name, PackageManager packageManager) => $$"""
     FROM node:22-alpine AS web-build
     WORKDIR /src
-    {{(packageManager == PackageManager.Pnpm ? $"RUN corepack enable && corepack prepare pnpm@9.15.5 --activate\n    COPY src/{name}.Web/package.json src/{name}.Web/pnpm-lock.yaml ./\n    RUN pnpm install --frozen-lockfile" : $"COPY src/{name}.Web/package*.json ./\n    RUN npm ci")}}
+    {{(packageManager == PackageManager.Pnpm ? $"RUN corepack enable && corepack prepare pnpm@9.15.0 --activate\n    COPY src/{name}.Web/package.json src/{name}.Web/pnpm-lock.yaml ./\n    RUN pnpm install --frozen-lockfile" : $"COPY src/{name}.Web/package*.json ./\n    RUN npm ci")}}
     COPY src/{{name}}.Web/ ./
     RUN npm run build
 
