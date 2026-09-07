@@ -713,7 +713,9 @@ internal static class TemplateFiles
     });
     builder.Services.AddCors(options => options.AddPolicy("frontend", policy =>
     {
-        var frontendUrl = builder.Configuration["Dotisan:Security:FrontendUrl"] ?? builder.Configuration["FrontendUrl"];
+        var frontendUrl = builder.Environment.IsDevelopment()
+            ? builder.Configuration["FrontendUrl"]
+            : builder.Configuration["Dotisan:Security:FrontendUrl"] ?? builder.Configuration["FrontendUrl"];
         if (Uri.TryCreate(frontendUrl, UriKind.Absolute, out var origin))
             policy.WithOrigins(origin.GetLeftPart(UriPartial.Authority)).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
     }));
@@ -862,7 +864,9 @@ internal static class TemplateFiles
     });
     builder.Services.AddCors(options => options.AddPolicy("frontend", policy =>
     {
-        var frontendUrl = builder.Configuration["Dotisan:Security:FrontendUrl"] ?? builder.Configuration["FrontendUrl"];
+        var frontendUrl = builder.Environment.IsDevelopment()
+            ? builder.Configuration["FrontendUrl"]
+            : builder.Configuration["Dotisan:Security:FrontendUrl"] ?? builder.Configuration["FrontendUrl"];
         if (Uri.TryCreate(frontendUrl, UriKind.Absolute, out var origin))
             policy.WithOrigins(origin.GetLeftPart(UriPartial.Authority)).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
     }));
@@ -1098,7 +1102,7 @@ internal static class TemplateFiles
           },
           "Dotisan": {
             "Security": {
-              "FrontendUrl": "http://localhost:{{webPort}}",
+              "FrontendUrl": "https://localhost:{{webPort}}",
               "DataProtectionKeyDirectory": "DataProtection-Keys",
               "KnownProxies": []
             },
@@ -1108,7 +1112,7 @@ internal static class TemplateFiles
               "RetryDelaySeconds": 5
             }
           },
-          "FrontendUrl": "http://localhost:{{webPort}}",
+              "FrontendUrl": "https://localhost:{{webPort}}",
           "Logging": {
             "LogLevel": {
               "Default": "Information",

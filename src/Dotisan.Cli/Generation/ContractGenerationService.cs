@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Dotisan.Core;
 using Dotisan.Generators;
 using Dotisan.OpenApi;
@@ -35,7 +36,7 @@ public static class ContractGenerationService
                 if (services.ApiProjectPath is null)
                     return ContractGenerationResult.Failed("Could not find an API project. Run this command from a generated Dotisan project.");
 
-                var openApiPath = FindBuildOpenApiDocument(services.ApiProjectPath);
+                var openApiPath = await FindBuildOpenApiDocumentAsync(services.ApiProjectPath, cancellationToken);
                 if (openApiPath is not null)
                 {
                     json = await File.ReadAllTextAsync(openApiPath, cancellationToken);
@@ -137,16 +138,31 @@ public static class ContractGenerationService
         return ContractGenerationResult.Succeeded();
     }
 
-    private static string? FindBuildOpenApiDocument(string apiProjectPath)
+    private static async Task<string?> FindBuildOpenApiDocumentAsync(string apiProjectPath, CancellationToken cancellationToken)
     {
         var projectDirectory = Path.GetDirectoryName(apiProjectPath);
         var obj = projectDirectory is null ? null : Path.Combine(projectDirectory, "obj");
         if (obj is null || !Directory.Exists(obj))
             return null;
-        return Directory.EnumerateFiles(obj, "openapi.json", SearchOption.AllDirectories)
+        foreach (var path in Directory.EnumerateFiles(obj, "*.json", SearchOption.AllDirectories)
             .Where(path => !path.Contains("\\ref\\", StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(File.GetLastWriteTimeUtc)
-            .FirstOrDefault();
+            .OrderByDescending(File.GetLastWriteTimeUtc))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await using var stream = File.OpenRead(path);
+                using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+                if (document.RootElement.TryGetProperty("openapi", out _)
+                    && document.RootElement.TryGetProperty("paths", out _))
+                    return path;
+            }
+            catch (JsonException)
+            {
+            }
+        }
+
+        return null;
     }
 
     private static void TryDeleteExport(string path)
