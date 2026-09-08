@@ -52,7 +52,21 @@ internal static class TemplateFiles
                 ["AUTH_PACKAGE"] = options.AuthenticationEnabled ? "    <PackageReference Include=\"Microsoft.AspNetCore.Identity.EntityFrameworkCore\" />" : string.Empty
             }))),
             new($"src/{options.Name}.Api/Program.cs", options.AuthenticationEnabled
-                ? ApiProgram(identifier, options.Database, true, options.Registration == RegistrationPolicy.Public, options.MultiTenancyEnabled, options.NotificationsEnabled, options.StorageEnabled, options.CachingEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled, options.JobsEnabled)
+                ? TemplateRenderer.Render(TemplateCatalog.Select("static/program-auth.template"), new TemplateContext(new Dictionary<string, string>
+                {
+                    ["IDENTIFIER"] = identifier,
+                    ["TENANT_USING"] = options.MultiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty,
+                    ["JOBS_USING"] = options.JobsEnabled ? $"using {identifier}.Api.Jobs;" : string.Empty,
+                    ["WOLVERINE_USING"] = options.JobsEnabled ? "using Wolverine;" : string.Empty,
+                    ["DATABASE_REGISTRATION"] = DatabaseRegistration(options.Database),
+                    ["NOTIFICATIONS_SERVICES"] = options.NotificationsEnabled ? "builder.Services.AddSignalR();\nbuilder.Services.AddSingleton<IUserIdProvider, NotificationUserIdProvider>();\nbuilder.Services.AddScoped<INotificationStore, EfNotificationStore>();" : string.Empty,
+                    ["STORAGE_SERVICES"] = options.StorageEnabled ? "builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();" : string.Empty,
+                    ["CACHING_SERVICES"] = options.CachingEnabled ? "builder.Services.AddMemoryCache();\nbuilder.Services.AddSingleton<IDistributedApplicationCache, MemoryApplicationCache>();\nbuilder.Services.AddSingleton<IApplicationCache>(services => services.GetRequiredService<IDistributedApplicationCache>());" : string.Empty,
+                    ["IMPORTS_SERVICES"] = options.ImportsExportsEnabled ? "builder.Services.AddScoped<IDataExchangeService, DataExchangeService>();" : string.Empty,
+                    ["WEBHOOK_SERVICES"] = options.WebhooksEnabled ? $"builder.Services.AddHttpClient(\"webhooks\", client => client.Timeout = TimeSpan.FromSeconds(30));\nbuilder.Services.AddScoped<IWebhookDispatcher, {(options.JobsEnabled ? "DurableWebhookDispatcher" : "HmacWebhookDispatcher")}>();" : string.Empty,
+                    ["TENANT_SERVICES"] = options.MultiTenancyEnabled ? "builder.Services.AddHttpContextAccessor();\nbuilder.Services.AddScoped<ITenantContext, TenantContext>();" : string.Empty,
+                    ["JOBS_SERVICES"] = options.JobsEnabled ? "builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));" : string.Empty
+                }))
                 : TemplateRenderer.Render(TemplateCatalog.Select("static/program-plain.template"), new TemplateContext(new Dictionary<string, string>
                 {
                     ["IDENTIFIER"] = identifier,
