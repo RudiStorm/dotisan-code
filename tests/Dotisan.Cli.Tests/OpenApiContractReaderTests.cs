@@ -61,4 +61,17 @@ public sealed class OpenApiContractReaderTests
 
         Assert.True(restored.EndpointMetadata!.Single().QueryParameters.Single().Optional);
     }
+
+    [Fact]
+    public void Normalizes_component_references_for_typescript_consumers()
+    {
+        const string json = """
+        {"openapi":"3.0.1","info":{"title":"Test","version":"v1"},"paths":{"/api/customers":{"get":{"operationId":"customers.list","responses":{"200":{"description":"ok","content":{"application/json":{"schema":{"$ref":"#/components/schemas/Customer"}}}}}}}},"components":{"schemas":{"Customer":{"type":"object","properties":{"name":{"type":"string"}}}}}}
+        """;
+
+        var restored = OpenApiContractReader.Read(json);
+
+        Assert.Equal("Customer", restored.Models.Single().Name);
+        Assert.Equal("Customer", restored.Endpoints.Single().Response);
+    }
 }

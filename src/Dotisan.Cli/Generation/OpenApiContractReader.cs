@@ -125,7 +125,7 @@ public static class OpenApiContractReader
 
     private static (ContractTypeDescriptor Descriptor, bool Nullable) ReadSchema(JsonElement schema, Dictionary<string, ContractModel> schemas)
     {
-        if (schema.TryGetProperty("$ref", out var reference)) return (new ContractTypeDescriptor(ContractTypeKind.Object, "global::" + reference.GetString()!.Split('/').Last()), false);
+        if (schema.TryGetProperty("$ref", out var reference)) return (new ContractTypeDescriptor(ContractTypeKind.Object, reference.GetString()!.Split('/').Last()), false);
         var nullable = schema.TryGetProperty("type", out var type) && type.ValueKind == JsonValueKind.Array && type.EnumerateArray().Any(item => item.GetString() == "null");
         var typeName = type.ValueKind == JsonValueKind.Array ? type.EnumerateArray().First(item => item.GetString() != "null").GetString() : type.GetString();
         return typeName switch
