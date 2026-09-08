@@ -156,6 +156,9 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/src/lib/utils.ts", ShadcnUtils()),
             new($"src/{options.Name}.Web/src/components/ui/Badge.test.ts", UiBadgeTest()),
             new($"src/{options.Name}.Web/src/api/client.test.ts", ApiClientTest()),
+            ..(options.NotificationsEnabled || options.ImportsExportsEnabled || options.WebhooksEnabled
+                ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/integration-pages.test.ts", IntegrationPagesTest(options.NotificationsEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled)) }
+                : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Web/tests/e2e/shell.spec.ts", FrontendSmokeTest()),
             new($"src/{options.Name}.Web/src/components/AppSidebar.vue", AppSidebar(options.Name, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Web/src/components/AppHeader.vue", AppHeader(options.Name, options.AuthenticationEnabled)),
@@ -2614,6 +2617,19 @@ internal static class TemplateFiles
         expect(fetchMock).toHaveBeenLastCalledWith('/api/example', expect.objectContaining({ credentials: 'include' }));
         const options = fetchMock.mock.calls[1][1] as RequestInit;
         expect(new Headers(options.headers).get('X-XSRF-TOKEN')).toBe('csrf-token');
+      });
+    });
+    """;
+
+    private static string IntegrationPagesTest(bool notificationsEnabled, bool importsExportsEnabled, bool webhooksEnabled) => $$"""
+    import { describe, expect, it } from 'vitest';
+    {{(notificationsEnabled ? "import NotificationsPage from './NotificationsPage.vue';\n" : string.Empty)}}
+    {{(importsExportsEnabled ? "import ImportsExportsPage from './ImportsExportsPage.vue';\n" : string.Empty)}}
+    {{(webhooksEnabled ? "import WebhooksPage from './WebhooksPage.vue';\n" : string.Empty)}}
+
+    describe('generated integration pages', () => {
+      it('exports each enabled integration page', () => {
+        expect([{{(notificationsEnabled ? "NotificationsPage" : string.Empty)}}{{(notificationsEnabled && (importsExportsEnabled || webhooksEnabled) ? ", " : string.Empty)}}{{(importsExportsEnabled ? "ImportsExportsPage" : string.Empty)}}{{(importsExportsEnabled && webhooksEnabled ? ", " : string.Empty)}}{{(webhooksEnabled ? "WebhooksPage" : string.Empty)}}]).toHaveLength({{(notificationsEnabled ? 1 : 0) + (importsExportsEnabled ? 1 : 0) + (webhooksEnabled ? 1 : 0)}});
       });
     });
     """;
