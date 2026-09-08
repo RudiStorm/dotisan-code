@@ -329,7 +329,10 @@ internal static class TemplateFiles
             ..(options.JobsEnabled ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/JobTests.cs", JobTests(identifier, options.AuthenticationEnabled)) } : Array.Empty<TemplateFile>()),
             new($"tests/{options.Name}.Api.Tests/Usings.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/api-usings.template"), TemplateContext.Empty)),
             ..(options.MultiTenancyEnabled
-                ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/TenantContextTests.cs", TenantContextTests(identifier)) }
+                ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/TenantContextTests.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/tenant-context-tests.template"), new TemplateContext(new Dictionary<string, string>
+                    {
+                        ["IDENTIFIER"] = identifier
+                    }))) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/AuthenticationEndpointTests.cs", AuthenticationTests(identifier, options.Registration)) }
