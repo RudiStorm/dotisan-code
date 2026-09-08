@@ -86,4 +86,38 @@ public sealed class GenerationCommandTests
                 Directory.Delete(root, recursive: true);
         }
     }
+
+    [Fact]
+    public async Task Failed_generation_preserves_existing_derived_artifacts()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "dotisan-generate-failure-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var frontend = Path.Combine(root, "src", "App.Web", "src", "dotisan");
+            Directory.CreateDirectory(frontend);
+            await File.WriteAllTextAsync(Path.Combine(root, "src", "App.Web", "package.json"), "{}\n");
+
+            var existing = new Dictionary<string, string>
+            {
+                [Path.Combine(frontend, "models.ts")] = "valid models\n",
+                [Path.Combine(frontend, "schemas.ts")] = "valid schemas\n",
+                [Path.Combine(frontend, "services.ts")] = "valid services\n",
+                [Path.Combine(frontend, "queries.ts")] = "valid queries\n",
+                [Path.Combine(root, "openapi.json")] = "valid openapi\n",
+                [Path.Combine(root, "dotisan.contract.json")] = "{ invalid json\n"
+            };
+            foreach (var pair in existing)
+                await File.WriteAllTextAsync(pair.Key, pair.Value);
+
+            var result = await ContractGenerationService.GenerateAsync(root, check: false, CancellationToken.None);
+
+            Assert.False(result.Success);
+            Assert.All(existing, pair => Assert.Equal(pair.Value, File.ReadAllText(pair.Key)));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
 }
