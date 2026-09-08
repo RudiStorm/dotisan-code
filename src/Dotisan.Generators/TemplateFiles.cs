@@ -196,7 +196,10 @@ internal static class TemplateFiles
                     }))) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
-                ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Account/AccountEndpoints.cs", AccountEndpoints(identifier, options.Registration == RegistrationPolicy.Public)) }
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Account/AccountEndpoints.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/account-endpoints.template"), new TemplateContext(new Dictionary<string, string>
+                    {
+                        ["IDENTIFIER"] = identifier
+                    }))) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Authorization/AuthorizationEndpoints.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/authorization-endpoints.template"), new TemplateContext(new Dictionary<string, string>
