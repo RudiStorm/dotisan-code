@@ -103,7 +103,7 @@ internal static class TemplateFiles
             ..(options.StorageEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Storage.cs", Storage(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
             ..(options.CachingEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Caching.cs", Caching(identifier)) } : Array.Empty<TemplateFile>()),
             ..(options.ImportsExportsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/ImportsExports.cs", ImportsExports(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
-            ..(options.WebhooksEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Webhooks.cs", Webhooks(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
+            ..(options.WebhooksEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Webhooks.cs", Webhooks(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled, options.JobsEnabled)) } : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationUser.cs", ApplicationUser(identifier)) }
                 : Array.Empty<TemplateFile>()),
@@ -755,7 +755,7 @@ internal static class TemplateFiles
     {{(storageEnabled ? "builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();" : string.Empty)}}
     {{(cachingEnabled ? "builder.Services.AddMemoryCache();\n    builder.Services.AddSingleton<IDistributedApplicationCache, MemoryApplicationCache>();\n    builder.Services.AddSingleton<IApplicationCache>(services => services.GetRequiredService<IDistributedApplicationCache>());" : string.Empty)}}
     {{(importsExportsEnabled ? "builder.Services.AddScoped<IDataExchangeService, DataExchangeService>();" : string.Empty)}}
-    {{(webhooksEnabled ? "builder.Services.AddHttpClient(\"webhooks\", client => client.Timeout = TimeSpan.FromSeconds(30));\n    builder.Services.AddScoped<IWebhookDispatcher, HmacWebhookDispatcher>();" : string.Empty)}}
+    {{(webhooksEnabled ? $"builder.Services.AddHttpClient(\"webhooks\", client => client.Timeout = TimeSpan.FromSeconds(30));\n    builder.Services.AddScoped<IWebhookDispatcher, {(jobsEnabled ? "DurableWebhookDispatcher" : "HmacWebhookDispatcher")}>();" : string.Empty)}}
     {{(multiTenancyEnabled ? "builder.Services.AddHttpContextAccessor();\n    builder.Services.AddScoped<ITenantContext, TenantContext>();" : string.Empty)}}
     {{(jobsEnabled ? "builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));" : string.Empty)}}
 
@@ -875,7 +875,7 @@ internal static class TemplateFiles
     {{(storageEnabled ? "builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();" : string.Empty)}}
     {{(cachingEnabled ? "builder.Services.AddMemoryCache();\n    builder.Services.AddSingleton<IDistributedApplicationCache, MemoryApplicationCache>();\n    builder.Services.AddSingleton<IApplicationCache>(services => services.GetRequiredService<IDistributedApplicationCache>());" : string.Empty)}}
     {{(importsExportsEnabled ? "builder.Services.AddScoped<IDataExchangeService, DataExchangeService>();" : string.Empty)}}
-    {{(webhooksEnabled ? "builder.Services.AddHttpClient(\"webhooks\", client => client.Timeout = TimeSpan.FromSeconds(30));\n    builder.Services.AddScoped<IWebhookDispatcher, HmacWebhookDispatcher>();" : string.Empty)}}
+    {{(webhooksEnabled ? $"builder.Services.AddHttpClient(\"webhooks\", client => client.Timeout = TimeSpan.FromSeconds(30));\n    builder.Services.AddScoped<IWebhookDispatcher, {(jobsEnabled ? "DurableWebhookDispatcher" : "HmacWebhookDispatcher")}>();" : string.Empty)}}
     {{(multiTenancyEnabled ? "builder.Services.AddHttpContextAccessor();\n    builder.Services.AddScoped<ITenantContext, TenantContext>();" : string.Empty)}}
     {{(jobsEnabled ? "builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));" : string.Empty)}}
     builder.Services.AddIdentityCore<ApplicationUser>(options =>
@@ -3372,7 +3372,7 @@ internal static class TemplateFiles
     }
     """;
 
-    private static string Webhooks(string identifier, bool authenticationEnabled, bool multiTenancyEnabled) => $$"""
+    private static string Webhooks(string identifier, bool authenticationEnabled, bool multiTenancyEnabled, bool jobsEnabled) => $$"""
     using System.Text.Json;
     using System.Security.Cryptography;
     using System.Text;
@@ -3380,6 +3380,7 @@ internal static class TemplateFiles
     using Microsoft.EntityFrameworkCore;
     using {{identifier}}.Api.Data;
     {{(authenticationEnabled ? $"using {identifier}.Api.Authorization;" : string.Empty)}}
+    {{(jobsEnabled ? "using Wolverine;" : string.Empty)}}
     namespace {{identifier}}.Api.Integrations;
 
     public sealed class WebhookDelivery { public Guid Id { get; set; } public string EventType { get; set; } = string.Empty; public string Endpoint { get; set; } = string.Empty; public string Signature { get; set; } = string.Empty; public string PayloadJson { get; set; } = "{}"; public string Status { get; set; } = "queued"; public int Attempts { get; set; } public int RetryCount { get; set; } public DateTimeOffset CreatedAtUtc { get; set; } }
@@ -3394,9 +3395,75 @@ internal static class TemplateFiles
         public async Task DispatchAsync(string eventType, object payload, CancellationToken cancellationToken = default) { var body = JsonSerializer.Serialize(payload); var secret = configuration["Webhooks:SigningSecret"] ?? throw new InvalidOperationException("Webhooks:SigningSecret must be configured."); var signature = Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(body))); var maxAttempts = Math.Clamp(configuration.GetValue("Webhooks:MaxAttempts", 3), 1, 10); foreach (var endpoint in configuration.GetSection("Webhooks:Endpoints").Get<string[]>() ?? []) { if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var destination) || destination.Scheme is not ("http" or "https")) throw new InvalidOperationException("Webhooks:Endpoints must contain absolute HTTP(S) URLs."); var delivery = new WebhookDelivery { Id = Guid.NewGuid(), EventType = eventType, Endpoint = destination.ToString(), Signature = signature, PayloadJson = body, CreatedAtUtc = DateTimeOffset.UtcNow }; db.WebhookDeliveries.Add(delivery); for (var attempt = 1; attempt <= maxAttempts; attempt++) { delivery.Attempts = attempt; try { using var request = new HttpRequestMessage(HttpMethod.Post, destination) { Content = new StringContent(body, Encoding.UTF8, "application/json") }; request.Headers.Add("X-Dotisan-Signature", signature); using var response = await clients.CreateClient("webhooks").SendAsync(request, cancellationToken); if (response.IsSuccessStatusCode) { delivery.Status = "delivered"; break; } delivery.Status = "failed"; } catch { delivery.Status = "failed"; } if (attempt < maxAttempts) { delivery.RetryCount++; await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt - 1)), cancellationToken); } } await db.SaveChangesAsync(cancellationToken); } }
         public async Task<bool> ReplayAsync(Guid deliveryId, CancellationToken cancellationToken = default) { var delivery = await db.WebhookDeliveries.SingleOrDefaultAsync(item => item.Id == deliveryId, cancellationToken); if (delivery is null) return false; var secret = configuration["Webhooks:SigningSecret"] ?? throw new InvalidOperationException("Webhooks:SigningSecret must be configured."); var signature = Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(delivery.PayloadJson))); using var request = new HttpRequestMessage(HttpMethod.Post, delivery.Endpoint) { Content = new StringContent(delivery.PayloadJson, Encoding.UTF8, "application/json") }; request.Headers.Add("X-Dotisan-Signature", signature); delivery.Signature = signature; using var response = await clients.CreateClient("webhooks").SendAsync(request, cancellationToken); delivery.Attempts++; delivery.RetryCount++; delivery.Status = response.IsSuccessStatusCode ? "delivered" : "failed"; await db.SaveChangesAsync(cancellationToken); return response.IsSuccessStatusCode; }
     }
+    {{(jobsEnabled ? DurableWebhookSupport(identifier) : string.Empty)}}
     public static class WebhookEndpoints
     {
         public static void Map(IEndpointRouteBuilder endpoints) { var group = endpoints.MapGroup("/api/webhooks"); {{(authenticationEnabled ? "group.RequireAuthorization();" : string.Empty)}} group.MapGet("/deliveries", async (AppDbContext db, CancellationToken cancellationToken) => Results.Ok(await db.WebhookDeliveries.AsNoTracking().OrderByDescending(x => x.CreatedAtUtc).Take(100).ToListAsync(cancellationToken))); group.MapPost("/deliveries/{id:guid}/replay", async (Guid id, IWebhookDispatcher dispatcher, CancellationToken cancellationToken) => await dispatcher.ReplayAsync(id, cancellationToken) ? Results.Accepted($"/api/webhooks/deliveries/{id}", new { deliveryId = id, status = "delivered" }) : Results.NotFound()){{(authenticationEnabled ? ".RequireAuthorization(Permissions.AuthorizationManage)" : string.Empty)}}; }
+    }
+    """;
+
+    private static string DurableWebhookSupport(string identifier) => $$"""
+    public sealed record WebhookDispatchRequested(Guid DeliveryId);
+
+    public sealed class DurableWebhookDispatcher(AppDbContext db, IMessageBus bus, IConfiguration configuration) : IWebhookDispatcher
+    {
+        public async Task DispatchAsync(string eventType, object payload, CancellationToken cancellationToken = default)
+        {
+            var body = JsonSerializer.Serialize(payload);
+            var secret = configuration["Webhooks:SigningSecret"] ?? throw new InvalidOperationException("Webhooks:SigningSecret must be configured.");
+            var signature = Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(body)));
+            foreach (var endpoint in configuration.GetSection("Webhooks:Endpoints").Get<string[]>() ?? [])
+            {
+                if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var destination) || destination.Scheme is not ("http" or "https"))
+                    throw new InvalidOperationException("Webhooks:Endpoints must contain absolute HTTP(S) URLs.");
+                var delivery = new WebhookDelivery { Id = Guid.NewGuid(), EventType = eventType, Endpoint = destination.ToString(), Signature = signature, PayloadJson = body, CreatedAtUtc = DateTimeOffset.UtcNow };
+                db.WebhookDeliveries.Add(delivery);
+                await db.SaveChangesAsync(cancellationToken);
+                await bus.PublishAsync(new WebhookDispatchRequested(delivery.Id));
+            }
+        }
+
+        public async Task<bool> ReplayAsync(Guid deliveryId, CancellationToken cancellationToken = default)
+        {
+            var delivery = await db.WebhookDeliveries.SingleOrDefaultAsync(item => item.Id == deliveryId, cancellationToken);
+            if (delivery is null) return false;
+            delivery.Status = "queued";
+            await db.SaveChangesAsync(cancellationToken);
+            await bus.PublishAsync(new WebhookDispatchRequested(delivery.Id));
+            return true;
+        }
+    }
+
+    public sealed class WebhookDispatchHandler(AppDbContext db, IHttpClientFactory clients, IConfiguration configuration)
+    {
+        public async Task Handle(WebhookDispatchRequested message, CancellationToken cancellationToken)
+        {
+            var delivery = await db.WebhookDeliveries.SingleOrDefaultAsync(item => item.Id == message.DeliveryId, cancellationToken);
+            if (delivery is null) return;
+            var maxAttempts = Math.Clamp(configuration.GetValue("Webhooks:MaxAttempts", 3), 1, 10);
+            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                delivery.Attempts = attempt;
+                try
+                {
+                    using var request = new HttpRequestMessage(HttpMethod.Post, delivery.Endpoint) { Content = new StringContent(delivery.PayloadJson, Encoding.UTF8, "application/json") };
+                    request.Headers.Add("X-Dotisan-Signature", delivery.Signature);
+                    using var response = await clients.CreateClient("webhooks").SendAsync(request, cancellationToken);
+                    delivery.Status = response.IsSuccessStatusCode ? "delivered" : "failed";
+                    if (response.IsSuccessStatusCode) break;
+                }
+                catch (HttpRequestException)
+                {
+                    delivery.Status = "failed";
+                }
+                if (attempt < maxAttempts)
+                {
+                    delivery.RetryCount++;
+                    await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt - 1)), cancellationToken);
+                }
+            }
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
     """;
 
