@@ -159,7 +159,7 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/src/main.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/main.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/routes/index.ts", RoutesIndex(options.AuthenticationEnabled, options.NotificationsEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled)),
             new($"src/{options.Name}.Web/src/App.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/web-app.template"), TemplateContext.Empty)),
-            new($"src/{options.Name}.Web/src/style.css", StyleCss()),
+            new($"src/{options.Name}.Web/src/style.css", TemplateRenderer.Render(TemplateCatalog.Select("static/style.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/dotisan/.gitkeep", string.Empty),
             new($"src/{options.Name}.Web/src/api/client.ts", ApiClient()),
             new($"src/{options.Name}.Web/src/components/ui/Button.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/ui-button.template"), TemplateContext.Empty)),
