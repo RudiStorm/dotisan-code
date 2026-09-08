@@ -114,7 +114,10 @@ internal static class TemplateFiles
                     }))) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
-                ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/IntegrationExamples.cs", IntegrationExamples(identifier)) }
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/IntegrationExamples.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/integration-examples.template"), new TemplateContext(new Dictionary<string, string>
+                    {
+                        ["IDENTIFIER"] = identifier
+                    }))) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Authorization/Permissions.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/permissions.template"), new TemplateContext(new Dictionary<string, string>
