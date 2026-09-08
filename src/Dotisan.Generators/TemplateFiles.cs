@@ -1254,8 +1254,8 @@ internal static class TemplateFiles
             _ => "services:\n"
         };
 
-        var withMailpit = mailProvider == MailProvider.Mailpit
-            ? compose + $$"""
+        var mailService = mailProvider == MailProvider.Mailpit
+            ? $$"""
 
               mailpit:
                 image: axllent/mailpit:v1.21.8
@@ -1268,17 +1268,13 @@ internal static class TemplateFiles
                   timeout: 5s
                   retries: 20
             """
-            : compose;
+            : string.Empty;
 
-        return withMailpit + $$"""
-
-              dashboard:
-                image: mcr.microsoft.com/dotnet/aspire-dashboard:9.4
-                ports:
-                  - "18888:18888"
-                  - "4317:18889"
-                  - "4318:18890"
-            """;
+        return TemplateRenderer.Render(TemplateCatalog.Select("static/compose.template"), new TemplateContext(new Dictionary<string, string>
+        {
+            ["DATABASE_SERVICES"] = compose,
+            ["MAIL_SERVICE"] = mailService
+        }));
     }
 
     private static string TenantContext(string identifier) => $$"""
