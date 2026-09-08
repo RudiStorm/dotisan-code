@@ -61,7 +61,10 @@ internal static class TemplateFiles
             {
                 ["IDENTIFIER"] = identifier
             }))),
-            new($"src/{options.Name}.Api/Infrastructure/DotisanSecurityOptions.cs", DotisanSecurityOptions(identifier)),
+            new($"src/{options.Name}.Api/Infrastructure/DotisanSecurityOptions.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/security-options.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["IDENTIFIER"] = identifier
+            }))),
             new($"src/{options.Name}.Api/Infrastructure/ApplicationBuilderExtensions.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/application-builder-extensions.template"), new TemplateContext(new Dictionary<string, string>
             {
                 ["IDENTIFIER"] = identifier
