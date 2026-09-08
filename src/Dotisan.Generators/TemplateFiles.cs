@@ -66,7 +66,12 @@ internal static class TemplateFiles
                         ["IDENTIFIER"] = identifier
                     }))) }
                 : Array.Empty<TemplateFile>()),
-            ..(options.JobsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Jobs/JobRegistration.cs", JobRegistration(identifier, options.Database)), new TemplateFile($"src/{options.Name}.Api/Jobs/SampleJob.cs", SampleJob(identifier)), new TemplateFile($"src/{options.Name}.Api/Jobs/SampleJobHandler.cs", SampleJobHandler(identifier)), new TemplateFile($"src/{options.Name}.Api/Features/Jobs/JobEndpoints.cs", JobEndpoints(identifier, options.AuthenticationEnabled)) } : Array.Empty<TemplateFile>()),
+            ..(options.JobsEnabled ? new[] {
+                new TemplateFile($"src/{options.Name}.Api/Jobs/JobRegistration.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/job-registration.template"), new TemplateContext(new Dictionary<string, string> { ["IDENTIFIER"] = identifier, ["WOLVERINE_PROVIDER"] = WolverineProviderPackage(options.Database), ["PERSISTENCE_METHOD"] = WolverinePersistenceMethod(options.Database) }))),
+                new TemplateFile($"src/{options.Name}.Api/Jobs/SampleJob.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/sample-job.template"), new TemplateContext(new Dictionary<string, string> { ["IDENTIFIER"] = identifier }))),
+                new TemplateFile($"src/{options.Name}.Api/Jobs/SampleJobHandler.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/sample-job-handler.template"), new TemplateContext(new Dictionary<string, string> { ["IDENTIFIER"] = identifier }))),
+                new TemplateFile($"src/{options.Name}.Api/Features/Jobs/JobEndpoints.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/job-endpoints.template"), new TemplateContext(new Dictionary<string, string> { ["IDENTIFIER"] = identifier, ["ANTIFORGERY_USING"] = options.AuthenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty, ["AUTHORIZATION_USING"] = options.AuthenticationEnabled ? $"using {identifier}.Api.Authorization;" : string.Empty, ["AUTHORIZATION"] = options.AuthenticationEnabled ? ".RequireAuthorization(Permissions.AuthorizationManage)" : string.Empty })))
+            } : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Api/Features/Health/HealthEndpoints.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/health-endpoints.template"), new TemplateContext(new Dictionary<string, string>
             {
                 ["IDENTIFIER"] = identifier
