@@ -14,7 +14,7 @@ internal static class TemplateFiles
             new(".gitignore", TemplateRenderer.Render(TemplateCatalog.Select("static/gitignore.template"), TemplateContext.Empty)),
             new("global.json", TemplateRenderer.Render(TemplateCatalog.Select("static/global.json.template"), TemplateContext.Empty)),
             new(".node-version", TemplateRenderer.Render(TemplateCatalog.Select("static/node-version.template"), TemplateContext.Empty)),
-            new("Directory.Packages.props", PackageVersions()),
+            new("Directory.Packages.props", TemplateRenderer.Render(TemplateCatalog.Select("static/directory-packages.props.template"), TemplateContext.Empty)),
             new("README.md", ProjectReadme(options.Name, options.Database, options.AuthenticationEnabled, options.MultiTenancyEnabled)),
             new("dotisan.config", $$"""
             version: 1
