@@ -292,7 +292,7 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/src/components/ui/Badge.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/ui-badge.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/lib/utils.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/utils.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/components/ui/Badge.test.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/ui-badge-test.template"), TemplateContext.Empty)),
-            new($"src/{options.Name}.Web/src/api/client.test.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/api-client.test.template"), TemplateContext.Empty)),
+            new($"src/{options.Name}.Web/src/api/client.test.ts", TemplateRenderer.Render(TemplateCatalog.Select(options.AuthenticationEnabled ? "static/api-client.test.template" : "static/api-client-plain-test.template"), TemplateContext.Empty)),
             ..(options.NotificationsEnabled || options.ImportsExportsEnabled || options.WebhooksEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/integration-pages.test.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/integration-pages-test.template"), new TemplateContext(new Dictionary<string, string>
                     {
