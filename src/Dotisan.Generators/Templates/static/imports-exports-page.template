@@ -1,0 +1,7 @@
+<script setup lang="ts">
+import { ref } from 'vue';
+import { request } from '../api/client';
+const file = ref<File>(); const message = ref(''); const pending = ref(false);
+async function importFile() { if (!file.value || pending.value) return; pending.value = true; message.value = ''; try { const body = new FormData(); body.append('file', file.value); await request('/api/data/imports', { method: 'POST', body }); message.value = 'Import queued.'; } catch { message.value = 'Import failed.'; } finally { pending.value = false; } }
+</script>
+<template><section class="page-stack"><div class="page-heading"><div><p class="eyebrow">Data</p><h2>Imports and exports</h2></div></div><form @submit.prevent="importFile"><input type="file" accept=".csv,.json" @change="file = ($event.target as HTMLInputElement).files?.[0]" /><button type="submit" :disabled="pending">{{ pending ? 'Queueing...' : 'Queue import' }}</button></form><a href="/api/data/exports/csv">Download CSV export</a><p v-if="message" role="status">{{ message }}</p></section></template>

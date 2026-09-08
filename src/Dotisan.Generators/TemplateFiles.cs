@@ -191,9 +191,9 @@ internal static class TemplateFiles
             {
                 ["PROJECT_NAME"] = options.Name
             }))),
-            ..(options.NotificationsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/NotificationsPage.vue", NotificationsPage()) } : Array.Empty<TemplateFile>()),
-            ..(options.ImportsExportsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/ImportsExportsPage.vue", ImportsExportsPage()) } : Array.Empty<TemplateFile>()),
-            ..(options.WebhooksEnabled ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/WebhooksPage.vue", WebhooksPage()) } : Array.Empty<TemplateFile>()),
+            ..(options.NotificationsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/NotificationsPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/notifications-page.template"), TemplateContext.Empty)) } : Array.Empty<TemplateFile>()),
+            ..(options.ImportsExportsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/ImportsExportsPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/imports-exports-page.template"), TemplateContext.Empty)) } : Array.Empty<TemplateFile>()),
+            ..(options.WebhooksEnabled ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/WebhooksPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/webhooks-page.template"), TemplateContext.Empty)) } : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
                 ? new[] {
                     new TemplateFile($"src/{options.Name}.Web/src/pages/auth/LoginPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/auth-login-page.template"), TemplateContext.Empty)),
