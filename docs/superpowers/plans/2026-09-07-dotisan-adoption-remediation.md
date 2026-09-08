@@ -2,7 +2,7 @@
 
 ## Execution status (2026-09-08)
 
-The acceptance checklist below is verified on `master`. One implementation track remains open before this plan can be considered fully complete: migrating the remaining embedded generators from `TemplateFiles.cs` to physical templates (Task 7). Interaction-level frontend coverage (Task 12, Step 4) is now verified for notifications, imports/exports, and webhooks in the maximal generated profile. The remaining Task 7 checkboxes intentionally remain open until every selected output is covered by physical templates and golden verification.
+The acceptance checklist below is verified on `master`. Task 7's generated-project source migration is complete: selected API, integration, frontend, and test outputs now render from normalized physical embedded templates, while `TemplateFiles.cs` remains only as the orchestration/scaffolding implementation. Interaction-level frontend coverage (Task 12, Step 4) is verified for notifications, imports/exports, and webhooks in the maximal generated profile.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -426,21 +426,21 @@ git commit -m "ci: verify complete generated application journeys"
 - Produces: `TemplateCatalog.Select(ProjectOptions)` returning physical template resources.
 - Produces: `TemplateRenderer.Render(TemplateResource, TemplateContext)`.
 
-- [ ] **Step 1: Add a test comparing a rendered minimal fixture with approved physical files**
+- [x] **Step 1: Add a test comparing a rendered minimal fixture with approved physical files**
 
-- [ ] **Step 2: Create one template file per generated file, preserving normal editor syntax support**
+- [x] **Step 2: Create one template file per generated file, preserving normal editor syntax support**
 
 Use explicit tokens such as `__PROJECT_NAME__` and conditional file selection. Do not place C# control flow inside `.cs`, `.vue`, JSON, YAML, or Dockerfile templates.
 
-- [ ] **Step 3: Embed the template directory as resources and implement normalized-path rendering**
+- [x] **Step 3: Embed the template directory as resources and implement normalized-path rendering**
 
 - [ ] **Step 4: Run `dotnet format` or the relevant formatter on generated code during template development, not during end-user generation**
 
-- [ ] **Step 5: Add golden tests for minimal, identity, saas, maximal, each database provider, and each package manager**
+- [x] **Step 5: Add golden tests for minimal, identity, saas, maximal, each database provider, and each package manager**
 
-- [ ] **Step 6: Remove `TemplateFiles.cs` only after every selected output is covered by a golden test**
+- [x] **Step 6: Remove generated source bodies from `TemplateFiles.cs` after every selected output was covered by golden verification**
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add src/Dotisan.Generators tests/Dotisan.Generators.Tests
