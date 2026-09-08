@@ -204,8 +204,8 @@ internal static class TemplateFiles
                     new TemplateFile($"src/{options.Name}.Web/src/pages/account/ProfilePage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/account-profile-page.template"), TemplateContext.Empty)),
                     new TemplateFile($"src/{options.Name}.Web/src/pages/account/MfaPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/account-mfa-page.template"), TemplateContext.Empty)),
                     new TemplateFile($"src/{options.Name}.Web/src/pages/account/SessionsPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/account-sessions-page.template"), TemplateContext.Empty)),
-                    new TemplateFile($"src/{options.Name}.Web/src/pages/account/ExternalLoginsPage.vue", ExternalLoginsPage()),
-                    new TemplateFile($"src/{options.Name}.Web/src/pages/admin/AuthorizationPage.vue", AuthorizationPage())
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/account/ExternalLoginsPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/account-external-logins-page.template"), TemplateContext.Empty)),
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/admin/AuthorizationPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/admin-authorization-page.template"), TemplateContext.Empty))
                 }
                 : Array.Empty<TemplateFile>()),
             new($"tests/{options.Name}.Api.Tests/{options.Name}.Api.Tests.csproj", TemplateRenderer.Render(TemplateCatalog.Select(options.AuthenticationEnabled ? "static/api-tests-project-auth.template" : "static/api-tests-project-plain.template"), new TemplateContext(new Dictionary<string, string>
