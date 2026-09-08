@@ -31,6 +31,30 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task Canonical_space_separated_commands_support_help()
+    {
+        var console = new MemoryConsole();
+        var app = DotisanApplication.CreateDefault(console);
+
+        var exitCode = await app.RunAsync(["make", "resource", "--help"]);
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Contains("Usage: dotisan make resource", console.Output);
+    }
+
+    [Fact]
+    public async Task Legacy_colon_alias_emits_deprecation_warning()
+    {
+        var console = new MemoryConsole();
+        var app = DotisanApplication.CreateDefault(console);
+
+        var exitCode = await app.RunAsync(["make:resource", "--help"]);
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Contains("deprecated", console.Output, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Registered_command_is_dispatched_without_knowing_its_implementation()
     {
         var console = new MemoryConsole();

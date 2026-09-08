@@ -51,15 +51,38 @@ public sealed class DotisanApplication
 
         var commandName = args[0];
         var commandArguments = args[1..];
-        if (commandName.Equals("make", StringComparison.OrdinalIgnoreCase) && commandArguments.Length > 0)
+        var legacyAlias = false;
+        if (commandName.Equals("make", StringComparison.OrdinalIgnoreCase)
+            || commandName.Equals("add", StringComparison.OrdinalIgnoreCase)
+            || commandName.Equals("remove", StringComparison.OrdinalIgnoreCase))
         {
-            commandName = $"make:{commandArguments[0]}";
+            if (commandArguments.Length == 0)
+            {
+                context.Console.WriteError($"Usage: dotisan {commandName} <subcommand> [options]. Run 'dotisan {commandName} --help'.");
+                return DotisanExitCode.UsageError;
+            }
+
+            commandName = $"{commandName}:{commandArguments[0]}";
             commandArguments = commandArguments[1..];
+        }
+        else if (commandName.Contains(':', StringComparison.Ordinal))
+        {
+            legacyAlias = true;
         }
         if (!registry.TryGet(commandName, out var command) || command is null)
         {
             context.Console.WriteError($"Unknown command '{commandName}'. Run 'dotisan help' to see available commands.");
             return DotisanExitCode.UsageError;
+        }
+
+        if (legacyAlias)
+            context.Console.WriteLine($"Warning: '{args[0]}' is deprecated; use 'dotisan {args[0].Replace(':', ' ')}'.");
+
+        if (commandArguments is ["--help"] or ["-h"])
+        {
+            context.Console.WriteLine($"Usage: dotisan {command.Name.Replace(':', ' ')}");
+            context.Console.WriteLine(command.Description);
+            return DotisanExitCode.Success;
         }
 
         return await command.ExecuteAsync(context, commandArguments, cancellationToken);
