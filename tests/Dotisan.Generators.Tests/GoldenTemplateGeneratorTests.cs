@@ -712,6 +712,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("public const string ProfileView = \"profile.view\";", permissions);
             Assert.Contains("IReadOnlyList<string> All", permissions);
             var accountEndpoints = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Features", "Account", "AccountEndpoints.cs"));
+            var jobEndpoints = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Features", "Jobs", "JobEndpoints.cs"));
             Assert.Contains("MapAccountEndpoints", accountEndpoints);
             Assert.Contains("RegisterRequest", accountEndpoints);
             Assert.Contains("LoginRequest", accountEndpoints);
@@ -786,6 +787,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.DoesNotContain("using Dotisan.Core;", accountEndpoints);
             Assert.Contains("RequireAntiforgeryTokenAttribute", accountEndpoints);
             Assert.DoesNotContain("RequireAntiforgery()", accountEndpoints);
+            Assert.Contains("RequireAntiforgeryTokenAttribute", jobEndpoints);
             Assert.DoesNotContain("AddIdentityCore<ApplicationUser>", plainProgram);
             Assert.DoesNotContain("MapAccountEndpoints", plainProgram);
             Assert.Contains("tests/AuthApp.Api.Tests/AuthenticationEndpointTests.cs", authenticatedPaths);
