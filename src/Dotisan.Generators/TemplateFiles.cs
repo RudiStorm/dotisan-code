@@ -202,8 +202,8 @@ internal static class TemplateFiles
                     new TemplateFile($"src/{options.Name}.Web/src/pages/auth/EmailConfirmationPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/auth-email-confirmation-page.template"), TemplateContext.Empty)),
                     new TemplateFile($"src/{options.Name}.Web/src/pages/auth/MfaChallengePage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/auth-mfa-challenge-page.template"), TemplateContext.Empty)),
                     new TemplateFile($"src/{options.Name}.Web/src/pages/account/ProfilePage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/account-profile-page.template"), TemplateContext.Empty)),
-                    new TemplateFile($"src/{options.Name}.Web/src/pages/account/MfaPage.vue", MfaPage()),
-                    new TemplateFile($"src/{options.Name}.Web/src/pages/account/SessionsPage.vue", SessionsPage()),
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/account/MfaPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/account-mfa-page.template"), TemplateContext.Empty)),
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/account/SessionsPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/account-sessions-page.template"), TemplateContext.Empty)),
                     new TemplateFile($"src/{options.Name}.Web/src/pages/account/ExternalLoginsPage.vue", ExternalLoginsPage()),
                     new TemplateFile($"src/{options.Name}.Web/src/pages/admin/AuthorizationPage.vue", AuthorizationPage())
                 }
