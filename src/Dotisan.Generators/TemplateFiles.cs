@@ -95,7 +95,10 @@ internal static class TemplateFiles
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/IntegrationExamples.cs", IntegrationExamples(identifier)) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
-                ? new[] { new TemplateFile($"src/{options.Name}.Api/Authorization/Permissions.cs", Permissions(identifier)) }
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Authorization/Permissions.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/permissions.template"), new TemplateContext(new Dictionary<string, string>
+                    {
+                        ["IDENTIFIER"] = identifier
+                    }))) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Account/AccountEndpoints.cs", AccountEndpoints(identifier, options.Registration == RegistrationPolicy.Public)) }
