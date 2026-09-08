@@ -54,7 +54,7 @@ internal static class TemplateFiles
         [
             new(".gitignore", "bin/\nobj/\nwwwroot/\nnode_modules/\ndist/\n*.db\n"),
             new("global.json", "{\n  \"sdk\": {\n    \"version\": \"10.0.400\",\n    \"rollForward\": \"latestFeature\",\n    \"allowPrerelease\": false\n  }\n}\n"),
-            new(".node-version", "22\n"),
+            new(".node-version", TemplateRenderer.Render(TemplateCatalog.Select("static/node-version.template"), TemplateContext.Empty)),
             new("Directory.Packages.props", PackageVersions()),
             new("README.md", ProjectReadme(options.Name, options.Database, options.AuthenticationEnabled, options.MultiTenancyEnabled)),
             new("dotisan.config", $$"""

@@ -9,4 +9,8 @@
     <ProjectReference Include="..\Dotisan.Core\Dotisan.Core.csproj" />
     <ProjectReference Include="..\Dotisan.TypeScript\Dotisan.TypeScript.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Templates\**\*.template" />
+  </ItemGroup>
 </Project>
