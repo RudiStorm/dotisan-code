@@ -193,6 +193,8 @@ public sealed class DefaultPrompts : IPrompts
         }
         console.WriteLine($"  Multi-tenancy {(multiTenancyEnabled ? "Enabled" : "Disabled")}");
         console.WriteLine($"  Package       {packageManager}\n");
+        console.WriteLine("  Jobs          None");
+        console.WriteLine("  Integrations  Notifications=None, Storage=None, Caching=None, Imports/Exports=None, Webhooks=None");
         var choice = ReadTuiChoice("What would you like to do?", ["Create project", "Back", "Cancel"], 0, false);
         return choice.Value switch
         {
