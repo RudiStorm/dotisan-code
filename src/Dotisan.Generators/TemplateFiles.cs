@@ -15,7 +15,12 @@ internal static class TemplateFiles
             new("global.json", TemplateRenderer.Render(TemplateCatalog.Select("static/global.json.template"), TemplateContext.Empty)),
             new(".node-version", TemplateRenderer.Render(TemplateCatalog.Select("static/node-version.template"), TemplateContext.Empty)),
             new("Directory.Packages.props", TemplateRenderer.Render(TemplateCatalog.Select("static/directory-packages.props.template"), TemplateContext.Empty)),
-            new("README.md", ProjectReadme(options.Name, options.Database, options.AuthenticationEnabled, options.MultiTenancyEnabled)),
+            new("README.md", TemplateRenderer.Render(TemplateCatalog.Select(options.AuthenticationEnabled ? "static/readme-authenticated.template" : "static/readme-plain.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["PROJECT_NAME"] = options.Name,
+                ["DATABASE_DISPLAY"] = DatabaseDisplayName(options.Database),
+                ["DATABASE_SETUP"] = DatabaseSetup(options.Name, options.Database)
+            }))),
             new("dotisan.config", TemplateRenderer.Render(TemplateCatalog.Select("static/dotisan-config.template"), new TemplateContext(new Dictionary<string, string>
             {
                 ["JOBS"] = options.JobsEnabled ? "wolverine" : "none",
