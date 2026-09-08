@@ -42,7 +42,10 @@ internal static class TemplateFiles
                 workers: false
             """),
             new("dotisan.contract.json", InitialContractManifest(options.AuthenticationEnabled).ToJson()),
-            new("Dockerfile", Dockerfile(options.Name, options.PackageManager)),
+            new("Dockerfile", TemplateRenderer.Render(TemplateCatalog.Select(options.PackageManager == PackageManager.Pnpm ? "static/dockerfile-pnpm.template" : "static/dockerfile-npm.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["PROJECT_NAME"] = options.Name
+            }))),
             new TemplateFile("compose.yaml", DatabaseCompose(options.Name, options.Database, options.MailProvider)),
             new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.Database, options.AuthenticationEnabled, options.JobsEnabled)),
             new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.MultiTenancyEnabled, options.NotificationsEnabled, options.StorageEnabled, options.CachingEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled, options.JobsEnabled)),
