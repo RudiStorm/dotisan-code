@@ -329,7 +329,11 @@ internal static class TemplateFiles
             {
                 ["IDENTIFIER"] = identifier
             }))),
-            ..(options.JobsEnabled ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/JobTests.cs", JobTests(identifier, options.AuthenticationEnabled)) } : Array.Empty<TemplateFile>()),
+            ..(options.JobsEnabled ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/JobTests.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/job-tests.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["IDENTIFIER"] = identifier,
+                ["UNAUTH_STATUS"] = options.AuthenticationEnabled ? "Unauthorized" : "Accepted"
+            }))) } : Array.Empty<TemplateFile>()),
             new($"tests/{options.Name}.Api.Tests/Usings.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/api-usings.template"), TemplateContext.Empty)),
             ..(options.MultiTenancyEnabled
                 ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/TenantContextTests.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/tenant-context-tests.template"), new TemplateContext(new Dictionary<string, string>
@@ -338,7 +342,11 @@ internal static class TemplateFiles
                     }))) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
-                ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/AuthenticationEndpointTests.cs", AuthenticationTests(identifier, options.Registration)) }
+                ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/AuthenticationEndpointTests.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/authentication-tests.template"), new TemplateContext(new Dictionary<string, string>
+                    {
+                        ["IDENTIFIER"] = identifier,
+                        ["REGISTRATION_TESTS"] = options.Registration == RegistrationPolicy.Public ? PublicAuthenticationTests() : RestrictedRegistrationTest()
+                    }))) }
                 : Array.Empty<TemplateFile>()),
             new($"{options.Name}.sln", TemplateRenderer.Render(TemplateCatalog.Select("static/solution.template"), new TemplateContext(new Dictionary<string, string>
             {
