@@ -125,7 +125,17 @@ internal static class TemplateFiles
                 ["IDENTIFIER"] = identifier,
                 ["EMAIL_CONFIRMATION_ENABLED"] = options.AuthenticationEnabled ? "true" : "false"
             }))),
-            ..(options.NotificationsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Notifications.cs", Notifications(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
+            ..(options.NotificationsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Notifications.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/notifications.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["IDENTIFIER"] = identifier,
+                ["AUTH_USING"] = options.AuthenticationEnabled ? $"using {identifier}.Api.Authorization;\nusing Microsoft.AspNetCore.Antiforgery;" : string.Empty,
+                ["TENANT_USING"] = options.MultiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty,
+                ["AUTHORIZATION"] = options.AuthenticationEnabled ? "group.RequireAuthorization();" : string.Empty,
+                ["AUTHORIZATION_POST"] = options.AuthenticationEnabled ? ".RequireAuthorization(Permissions.AuthorizationManage).WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty,
+                ["ANTIFORGERY"] = options.AuthenticationEnabled ? ".WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty,
+                ["TENANT_PARAMETER"] = options.MultiTenancyEnabled ? ", ITenantContext tenantContext" : string.Empty,
+                ["TENANT_VALUE"] = options.MultiTenancyEnabled ? "tenantContext.TenantId" : "null"
+            }))) } : Array.Empty<TemplateFile>()),
             ..(options.StorageEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Storage.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/storage.template"), new TemplateContext(new Dictionary<string, string> { ["IDENTIFIER"] = identifier, ["ANTIFORGERY_USING"] = options.AuthenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty, ["AUTHORIZATION"] = options.AuthenticationEnabled ? "group.RequireAuthorization();" : string.Empty, ["ANTIFORGERY"] = options.AuthenticationEnabled ? ".WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty }))) } : Array.Empty<TemplateFile>()),
             ..(options.CachingEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Caching.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/caching.template"), new TemplateContext(new Dictionary<string, string> { ["IDENTIFIER"] = identifier }))) } : Array.Empty<TemplateFile>()),
             ..(options.ImportsExportsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/ImportsExports.cs", ImportsExports(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
