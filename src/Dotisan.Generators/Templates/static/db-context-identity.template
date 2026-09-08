@@ -1,0 +1,12 @@
+using __IDENTIFIER__.Api.Auditing;
+__INTEGRATION_USING__using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using __IDENTIFIER__.Api.Identity;
+
+namespace __IDENTIFIER__.Api.Data;
+
+public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<ApplicationUser>(options)
+{
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+    public DbSet<ApplicationSession> ApplicationSessions => Set<ApplicationSession>();
+__DBSETS__}

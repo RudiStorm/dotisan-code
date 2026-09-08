@@ -1,0 +1,9 @@
+using __IDENTIFIER__.Api.Auditing;
+__INTEGRATION_USING__using Microsoft.EntityFrameworkCore;
+
+namespace __IDENTIFIER__.Api.Data;
+
+public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+{
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+__DBSETS__}

@@ -1221,9 +1221,20 @@ internal static class TemplateFiles
     }
     """;
 
-    private static string DbContext(string identifier, bool authenticationEnabled, bool notificationsEnabled, bool webhooksEnabled, bool importsExportsEnabled) => authenticationEnabled
-        ? IdentityDbContext(identifier, notificationsEnabled, webhooksEnabled, importsExportsEnabled)
-        : PlainDbContext(identifier, notificationsEnabled, webhooksEnabled, importsExportsEnabled);
+    private static string DbContext(string identifier, bool authenticationEnabled, bool notificationsEnabled, bool webhooksEnabled, bool importsExportsEnabled)
+    {
+        var dbSets = string.Concat(
+            notificationsEnabled ? "    public DbSet<NotificationRecord> Notifications => Set<NotificationRecord>();\n" : string.Empty,
+            webhooksEnabled ? "    public DbSet<WebhookDelivery> WebhookDeliveries => Set<WebhookDelivery>();\n" : string.Empty,
+            importsExportsEnabled ? "    public DbSet<ImportRecord> ImportRecords => Set<ImportRecord>();\n" : string.Empty);
+        var context = new TemplateContext(new Dictionary<string, string>
+        {
+            ["IDENTIFIER"] = identifier,
+            ["INTEGRATION_USING"] = notificationsEnabled || webhooksEnabled || importsExportsEnabled ? $"using {identifier}.Api.Integrations;\n" : string.Empty,
+            ["DBSETS"] = dbSets
+        });
+        return TemplateRenderer.Render(TemplateCatalog.Select(authenticationEnabled ? "static/db-context-identity.template" : "static/db-context-plain.template"), context);
+    }
 
     private static string PlainDbContext(string identifier, bool notificationsEnabled, bool webhooksEnabled, bool importsExportsEnabled) => $$"""
     using {{identifier}}.Api.Auditing;
