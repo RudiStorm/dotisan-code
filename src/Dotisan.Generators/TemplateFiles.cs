@@ -138,7 +138,17 @@ internal static class TemplateFiles
             }))) } : Array.Empty<TemplateFile>()),
             ..(options.StorageEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Storage.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/storage.template"), new TemplateContext(new Dictionary<string, string> { ["IDENTIFIER"] = identifier, ["ANTIFORGERY_USING"] = options.AuthenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty, ["AUTHORIZATION"] = options.AuthenticationEnabled ? "group.RequireAuthorization();" : string.Empty, ["ANTIFORGERY"] = options.AuthenticationEnabled ? ".WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty }))) } : Array.Empty<TemplateFile>()),
             ..(options.CachingEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Caching.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/caching.template"), new TemplateContext(new Dictionary<string, string> { ["IDENTIFIER"] = identifier }))) } : Array.Empty<TemplateFile>()),
-            ..(options.ImportsExportsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/ImportsExports.cs", ImportsExports(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
+            ..(options.ImportsExportsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/ImportsExports.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/imports-exports.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["IDENTIFIER"] = identifier,
+                ["AUTH_USING"] = options.AuthenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty,
+                ["TENANT_USING"] = options.MultiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty,
+                ["AUTHORIZATION"] = options.AuthenticationEnabled ? "group.RequireAuthorization();" : string.Empty,
+                ["ANTIFORGERY"] = options.AuthenticationEnabled ? ".WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty,
+                ["TENANT_PARAMETER"] = options.MultiTenancyEnabled ? ", ITenantContext tenantContext" : string.Empty,
+                ["TENANT_REQUIRE"] = options.MultiTenancyEnabled ? "tenantContext.RequireTenantId()" : "null",
+                ["TENANT_QUERY"] = options.MultiTenancyEnabled ? "var tenantId = tenantContext.RequireTenantId(); query = query.Where(item => item.TenantId == tenantId);" : string.Empty
+            }))) } : Array.Empty<TemplateFile>()),
             ..(options.WebhooksEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Webhooks.cs", Webhooks(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled, options.JobsEnabled)) } : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationUser.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/application-user.template"), new TemplateContext(new Dictionary<string, string>
