@@ -34,7 +34,7 @@ public static class AccountEndpoints
         group.MapGet("/sessions", (ClaimsPrincipal principal, AppDbContext db) => ListSessions(principal, db)).RequireAuthorization().WithName("ListSessions").Produces<SessionsResponse>();
         group.MapDelete("/sessions/{id:guid}", (Guid id, ClaimsPrincipal principal, AppDbContext db) => RevokeSession(id, principal, db)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true)).WithName("RevokeSession");
         group.MapPost("/sessions/revoke-all", (ClaimsPrincipal principal, UserManager<ApplicationUser> users, AppDbContext db) => RevokeAllSessions(principal, users, db)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true)).WithName("RevokeAllSessions");
-        group.MapGet("/external/providers", (IEnumerable<IExternalLoginProvider> providers) => Results.Ok(new { providers = providers.Select(provider => new ExternalLoginProviderDescriptor(provider.Name, provider.DisplayName)) })).AllowAnonymous().WithName("ListExternalProviders").Produces<ExternalProvidersResponse>();
+        group.MapGet("/external/providers", (IEnumerable<IExternalLoginProvider> providers) => Results.Ok(new ExternalProvidersResponse(providers.Select(provider => new ExternalLoginProviderDescriptor(provider.Name, provider.DisplayName)).ToArray()))).AllowAnonymous().WithName("ListExternalProviders").Produces<ExternalProvidersResponse>();
         group.MapGet("/external/{provider}/challenge", (string provider, string? returnUrl, IEnumerable<IExternalLoginProvider> providers, CancellationToken cancellationToken) => ExternalLoginChallenge(provider, returnUrl, providers, cancellationToken)).AllowAnonymous().WithName("ExternalLoginChallenge");
         group.MapGet("/external/{provider}/callback", (string provider, string code, string state, ClaimsPrincipal principal, IEnumerable<IExternalLoginProvider> providers, UserManager<ApplicationUser> users, SignInManager<ApplicationUser> signInManager, AppDbContext db, HttpContext httpContext, IExternalLoginStateStore stateStore, CancellationToken cancellationToken) => ExternalLoginCallback(provider, code, state, principal, providers, users, signInManager, db, httpContext, stateStore, cancellationToken)).AllowAnonymous().WithName("ExternalLoginCallback");
         group.MapPost("/external/{provider}/link", (string provider, string? returnUrl, ClaimsPrincipal principal, IEnumerable<IExternalLoginProvider> providers, CancellationToken cancellationToken) => ExternalLoginChallenge(provider, returnUrl, providers, cancellationToken)).RequireAuthorization().WithMetadata(new RequireAntiforgeryTokenAttribute(true)).WithName("LinkExternalProvider");
@@ -47,7 +47,7 @@ public static class AccountEndpoints
     private static IResult IssueAntiforgery(HttpContext httpContext, IAntiforgery antiforgery)
     {
         var tokens = antiforgery.GetAndStoreTokens(httpContext);
-        return Results.Ok(new { token = tokens.RequestToken });
+        return Results.Ok(new AntiforgeryResponse(tokens.RequestToken!));
     }
 
     private static async Task<IResult> Register(RegisterRequest request, UserManager<ApplicationUser> users, IEmailProvider emailProvider, IAuditWriter audit, HttpContext httpContext, IConfiguration configuration, bool registrationEnabled, CancellationToken cancellationToken)
@@ -119,8 +119,8 @@ public static class AccountEndpoints
     {
         var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null) return Results.Unauthorized();
-        var sessions = (await db.ApplicationSessions.AsNoTracking().Where(session => session.UserId == userId && session.RevokedAt == null).ToListAsync()).Where(session => session.ExpiresAt > DateTimeOffset.UtcNow).OrderByDescending(session => session.LastSeenAt).Select(session => new { session.Id, session.DeviceName, session.CreatedAt, session.LastSeenAt, session.ExpiresAt, session.UserAgent, session.IpAddress }).ToList();
-        return Results.Ok(new { sessions });
+        var sessions = (await db.ApplicationSessions.AsNoTracking().Where(session => session.UserId == userId && session.RevokedAt == null).ToListAsync()).Where(session => session.ExpiresAt > DateTimeOffset.UtcNow).OrderByDescending(session => session.LastSeenAt).Select(session => new SessionInfo(session.Id, session.DeviceName, session.CreatedAt, session.LastSeenAt, session.ExpiresAt, session.UserAgent, session.IpAddress)).ToList();
+        return Results.Ok(new SessionsResponse(sessions));
     }
 
     private static async Task<IResult> RevokeSession(Guid id, ClaimsPrincipal principal, AppDbContext db)
@@ -239,7 +239,7 @@ public static class AccountEndpoints
         if (user is null) return Results.Unauthorized();
         var key = await users.GetAuthenticatorKeyAsync(user);
         if (string.IsNullOrWhiteSpace(key)) { await users.ResetAuthenticatorKeyAsync(user); key = await users.GetAuthenticatorKeyAsync(user); }
-        return Results.Ok(new { sharedKey = key, authenticatorUri = $"otpauth://totp/Dotisan:{Uri.EscapeDataString(user.Email!)}?secret={key}&issuer=Dotisan" });
+        return Results.Ok(new MfaSetupResponse(key!, $"otpauth://totp/Dotisan:{Uri.EscapeDataString(user.Email!)}?secret={key}&issuer=Dotisan"));
     }
 
     private static async Task<IResult> VerifyMfa(MfaCodeRequest request, ClaimsPrincipal principal, UserManager<ApplicationUser> users)
@@ -264,7 +264,7 @@ public static class AccountEndpoints
         var user = await users.GetUserAsync(principal);
         if (user is null) return Results.Unauthorized();
         if (!await users.GetTwoFactorEnabledAsync(user)) return Results.BadRequest(new { code = "mfa_not_enabled" });
-        return Results.Ok(new { recoveryCodes = await users.GenerateNewTwoFactorRecoveryCodesAsync(user, 10) });
+        return Results.Ok(new RecoveryCodesResponse((await users.GenerateNewTwoFactorRecoveryCodesAsync(user, 10))?.ToArray() ?? []));
     }
 
     private static async Task<IResult> ChallengeMfa(MfaCodeRequest request, SignInManager<ApplicationUser> signInManager, AppDbContext db, HttpContext httpContext, CancellationToken cancellationToken)
@@ -302,4 +302,11 @@ public static class AccountEndpoints
     public sealed record EmailConfirmationResendRequest(string Email);
     public sealed record MfaCodeRequest(string Code);
     public sealed record CurrentUserResponse(string Id, string Email);
+    public sealed record AntiforgeryResponse(string Token);
+    public sealed record MfaSetupResponse(string SharedKey, string AuthenticatorUri);
+    public sealed record RecoveryCodesResponse(string[] RecoveryCodes);
+    public sealed record SessionInfo(Guid Id, string DeviceName, DateTimeOffset CreatedAt, DateTimeOffset LastSeenAt, DateTimeOffset ExpiresAt, string? UserAgent, string? IpAddress);
+    public sealed record SessionsResponse(IReadOnlyList<SessionInfo> Sessions);
+    public sealed record ExternalLoginProviderDescriptor(string Name, string DisplayName);
+    public sealed record ExternalProvidersResponse(IReadOnlyList<ExternalLoginProviderDescriptor> Providers);
 }
