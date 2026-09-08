@@ -23,6 +23,21 @@ public enum PackageManager
     Npm
 }
 
+public enum ProjectProfile
+{
+    Minimal,
+    Identity,
+    Saas,
+    Maximal,
+    Custom
+}
+
+public enum JobProvider
+{
+    None,
+    Wolverine
+}
+
 public enum MailProvider
 {
     Console,
@@ -39,13 +54,15 @@ public sealed record ProjectOptions(
     bool MultiTenancyEnabled,
     PackageManager PackageManager)
 {
+    public ProjectProfile Profile { get; init; } = ProjectProfile.Minimal;
+    public JobProvider JobProvider { get; init; } = JobProvider.None;
     public MailProvider MailProvider { get; init; } = MailProvider.Console;
     public bool NotificationsEnabled { get; init; }
     public bool StorageEnabled { get; init; }
     public bool CachingEnabled { get; init; }
     public bool ImportsExportsEnabled { get; init; }
     public bool WebhooksEnabled { get; init; }
-    public bool JobsEnabled { get; init; } = true;
+    public bool JobsEnabled { get; init; }
     private static readonly Regex ValidName = new("^[A-Za-z][A-Za-z0-9_-]*$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     public static ProjectOptions Quick(string name, string outputDirectory)
@@ -68,5 +85,28 @@ public sealed record ProjectOptions(
             Registration: RegistrationPolicy.Disabled,
             MultiTenancyEnabled: false,
             PackageManager.Pnpm);
+    }
+
+    public ProjectOptions WithProfile(ProjectProfile profile)
+    {
+        var authentication = profile is ProjectProfile.Identity or ProjectProfile.Saas or ProjectProfile.Maximal;
+        var tenancy = profile is ProjectProfile.Saas or ProjectProfile.Maximal;
+        var integrations = profile is ProjectProfile.Maximal;
+        var jobs = profile is not ProjectProfile.Minimal;
+
+        return this with
+        {
+            Profile = profile,
+            AuthenticationEnabled = authentication,
+            Registration = authentication ? RegistrationPolicy.Public : RegistrationPolicy.Disabled,
+            MultiTenancyEnabled = tenancy,
+            NotificationsEnabled = integrations,
+            StorageEnabled = integrations,
+            CachingEnabled = integrations,
+            ImportsExportsEnabled = integrations,
+            WebhooksEnabled = integrations,
+            JobsEnabled = jobs,
+            JobProvider = jobs ? JobProvider.Wolverine : JobProvider.None
+        };
     }
 }

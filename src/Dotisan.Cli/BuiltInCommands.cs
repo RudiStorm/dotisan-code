@@ -667,7 +667,7 @@ internal sealed class NewCommand : IDotisanCommand
         var cachingEnabled = false;
         var importsExportsEnabled = false;
         var webhooksEnabled = false;
-        var jobsEnabled = true;
+        var jobsEnabled = false;
         var restore = true;
         string? profile = null;
 
@@ -731,7 +731,7 @@ internal sealed class NewCommand : IDotisanCommand
                         registration = authenticationEnabled ? RegistrationPolicy.Public : RegistrationPolicy.Disabled;
                         multiTenancyEnabled = profile is "saas" or "maximal";
                         notificationsEnabled = storageEnabled = cachingEnabled = importsExportsEnabled = webhooksEnabled = profile == "maximal";
-                        jobsEnabled = profile != "minimal";
+                    jobsEnabled = profile != "minimal";
                     }
                     break;
                 case "--jobs":
@@ -787,8 +787,17 @@ internal sealed class NewCommand : IDotisanCommand
                     ,StorageEnabled = storageEnabled
                     ,CachingEnabled = cachingEnabled
                     ,ImportsExportsEnabled = importsExportsEnabled
-                        ,WebhooksEnabled = webhooksEnabled
+                    ,WebhooksEnabled = webhooksEnabled
                     ,JobsEnabled = jobsEnabled
+                    ,Profile = profile switch
+                    {
+                        "identity" => ProjectProfile.Identity,
+                        "saas" => ProjectProfile.Saas,
+                        "maximal" => ProjectProfile.Maximal,
+                        "custom" => ProjectProfile.Custom,
+                        _ => ProjectProfile.Minimal
+                    }
+                    ,JobProvider = jobsEnabled ? JobProvider.Wolverine : JobProvider.None
                 }
                 : context.Prompts.AskForProject(name, outputDirectory);
         }

@@ -39,7 +39,7 @@ public sealed class GoldenTemplateGeneratorTests
         try
         {
             var result = await new GoldenTemplateGenerator().GenerateAsync(
-                ProjectOptions.Quick("TodoApp", output), CancellationToken.None);
+                ProjectOptions.Quick("TodoApp", output) with { JobsEnabled = true, JobProvider = JobProvider.Wolverine }, CancellationToken.None);
 
             Assert.True(result.Success, result.ErrorMessage);
             Assert.True(File.Exists(Path.Combine(output, "TodoApp.sln")));
@@ -639,7 +639,7 @@ public sealed class GoldenTemplateGeneratorTests
         try
         {
             var authenticated = await new GoldenTemplateGenerator().GenerateAsync(
-                ProjectOptions.Quick("AuthApp", authenticatedOutput) with { AuthenticationEnabled = true }, CancellationToken.None);
+                ProjectOptions.Quick("AuthApp", authenticatedOutput) with { AuthenticationEnabled = true, JobsEnabled = true, JobProvider = JobProvider.Wolverine }, CancellationToken.None);
             var plain = await new GoldenTemplateGenerator().GenerateAsync(
                 ProjectOptions.Quick("PlainApp", plainOutput), CancellationToken.None);
 
@@ -780,7 +780,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("HealthEndpoints.MapHealthEndpoints", authenticatedEndpointRegistry);
             Assert.Contains("JobEndpoints.MapJobEndpoints", authenticatedEndpointRegistry);
             Assert.Contains("HealthEndpoints.MapHealthEndpoints", plainEndpointRegistry);
-            Assert.Contains("JobEndpoints.MapJobEndpoints", plainEndpointRegistry);
+            Assert.DoesNotContain("JobEndpoints.MapJobEndpoints", plainEndpointRegistry);
             Assert.Contains("using Microsoft.AspNetCore.Identity;", authenticatedProgram);
             Assert.DoesNotContain("using Dotisan.Core;", authenticatedProgram);
             Assert.DoesNotContain("using Dotisan.Core;", accountEndpoints);
