@@ -148,6 +148,11 @@ jobs:
 
   generated-api:
     runs-on: ubuntu-latest
+    env:
+      # Generated-project compile and contract smoke tests run in the safe local profile.
+      # This avoids production-only configuration validation (SMTP, HTTPS, key-ring)
+      # from masking whether the generated source itself builds correctly.
+      ASPNETCORE_ENVIRONMENT: Development
     strategy:
       matrix:
         profile: [minimal, identity, saas, maximal]
