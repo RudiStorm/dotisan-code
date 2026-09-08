@@ -159,9 +159,12 @@ internal static class TemplateFiles
             {
                 ["PROJECT_NAME"] = options.Name
             }))),
-            new($"tests/{options.Name}.Api.Tests/HealthEndpointTests.cs", ApiTests(identifier)),
+            new($"tests/{options.Name}.Api.Tests/HealthEndpointTests.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/health-tests.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["IDENTIFIER"] = identifier
+            }))),
             ..(options.JobsEnabled ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/JobTests.cs", JobTests(identifier, options.AuthenticationEnabled)) } : Array.Empty<TemplateFile>()),
-            new($"tests/{options.Name}.Api.Tests/Usings.cs", "global using Xunit;\n"),
+            new($"tests/{options.Name}.Api.Tests/Usings.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/api-usings.template"), TemplateContext.Empty)),
             ..(options.MultiTenancyEnabled
                 ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/TenantContextTests.cs", TenantContextTests(identifier)) }
                 : Array.Empty<TemplateFile>()),
