@@ -9,47 +9,6 @@ internal static class TemplateFiles
     public static IReadOnlyList<TemplateFile> Create(ProjectOptions options, string identifier)
     {
         var packageManager = options.PackageManager == PackageManager.Pnpm ? "pnpm@9.15.0" : "npm@10.9.0";
-        var packageJson = $$"""
-        {
-          "name": "{{options.Name.ToLowerInvariant()}}-web",
-          "private": true,
-          "version": "0.8.6",
-          "packageManager": "{{packageManager}}",
-          "type": "module",
-          "scripts": {
-            "dev": "vite",
-            "build": "vue-tsc -b && vite build",
-            "test": "vitest run --config vitest.config.ts",
-            "test:e2e": "playwright test"
-          },
-          "dependencies": {
-            "@tanstack/vue-query": "^5.59.0",
-            "pinia": "^2.3.0",
-            "vue": "^3.5.0",
-            "vue-router": "^4.4.0",
-            "zod": "^3.23.0",
-            "class-variance-authority": "^0.7.0",
-            "clsx": "^2.1.0",
-            "tailwind-merge": "^2.5.0"
-          },
-          "devDependencies": {
-            "@types/node": "^22.0.0",
-            "@vitejs/plugin-vue": "^5.2.0",
-            "@vue/tsconfig": "^0.7.0",
-            "typescript": "~5.6.0",
-            "vite": "^6.0.0",
-            "vitest": "^5.0.0",
-            "vue-tsc": "^2.1.0",
-            "@vue/test-utils": "^2.4.0",
-            "@playwright/test": "^1.49.0",
-            "tailwindcss": "^3.4.0",
-            "postcss": "^8.5.28",
-            "autoprefixer": "^10.4.0",
-            "jsdom": "^25.0.0"
-          }
-        }
-        """;
-
         return
         [
             new(".gitignore", TemplateRenderer.Render(TemplateCatalog.Select("static/gitignore.template"), TemplateContext.Empty)),
@@ -131,7 +90,11 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.NotificationsEnabled, options.StorageEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled, options.JobsEnabled)),
             new($"src/{options.Name}.Api/appsettings.json", AppSettings(options.Name, options.Database, DevelopmentWebPort(options.Name), options.JobsEnabled)),
             new($"src/{options.Name}.Api/appsettings.Development.json", DevelopmentAppSettings(options.MailProvider)),
-            new($"src/{options.Name}.Web/package.json", packageJson),
+            new($"src/{options.Name}.Web/package.json", TemplateRenderer.Render(TemplateCatalog.Select("static/web-package.json.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["PACKAGE_NAME"] = options.Name.ToLowerInvariant(),
+                ["PACKAGE_MANAGER"] = packageManager
+            }))),
             new($"src/{options.Name}.Web/index.html", WebIndex(options.Name)),
             new($"src/{options.Name}.Web/tsconfig.json", TemplateRenderer.Render(TemplateCatalog.Select("static/web-tsconfig.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/tsconfig.app.json", TemplateRenderer.Render(TemplateCatalog.Select("static/web-tsconfig.app.template"), TemplateContext.Empty)),
