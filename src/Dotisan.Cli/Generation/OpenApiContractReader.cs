@@ -119,7 +119,8 @@ public static class OpenApiContractReader
     private static (string Location, EndpointParameterMetadata Metadata) ReadParameter(JsonElement parameter, Dictionary<string, ContractModel> schemas)
     {
         var parsed = ReadSchema(parameter.GetProperty("schema"), schemas);
-        return (parameter.GetProperty("in").GetString()!, new EndpointParameterMetadata(parameter.GetProperty("name").GetString()!, parsed.Descriptor!, parsed.Nullable, !parameter.GetProperty("required").GetBoolean()));
+        var required = parameter.TryGetProperty("required", out var requiredProperty) && requiredProperty.ValueKind == JsonValueKind.True;
+        return (parameter.GetProperty("in").GetString()!, new EndpointParameterMetadata(parameter.GetProperty("name").GetString()!, parsed.Descriptor!, parsed.Nullable, !required));
     }
 
     private static (ContractTypeDescriptor Descriptor, bool Nullable) ReadSchema(JsonElement schema, Dictionary<string, ContractModel> schemas)

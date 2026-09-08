@@ -49,4 +49,16 @@ public sealed class OpenApiContractReaderTests
         Assert.Equal("void", restored.Endpoints.Single().Request);
         Assert.Equal("void", restored.Endpoints.Single().Response);
     }
+
+    [Fact]
+    public void Defaults_parameter_required_to_false_when_openapi_omits_it()
+    {
+        const string json = """
+        {"openapi":"3.0.1","info":{"title":"Test","version":"v1"},"paths":{"/api/customers":{"get":{"operationId":"customers.list","parameters":[{"name":"filter","in":"query","schema":{"type":"string"}}],"responses":{"200":{"description":"ok"}}}}}}
+        """;
+
+        var restored = OpenApiContractReader.Read(json);
+
+        Assert.True(restored.EndpointMetadata!.Single().QueryParameters.Single().Optional);
+    }
 }
