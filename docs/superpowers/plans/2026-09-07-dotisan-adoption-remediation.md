@@ -636,7 +636,7 @@ git commit -m "feat: harden generated notifications"
 
 - [ ] **Step 3: Add accessible labels, table captions, focus styles, status announcements, and confirmation for destructive session actions**
 
-- [ ] **Step 4: Add Vitest tests for login errors, antiforgery propagation, session revocation, imports, notifications, and webhook replay**
+- [x] **Step 4: Add Vitest tests for login errors, antiforgery propagation, session revocation, imports, notifications, and webhook replay**
 
 - [ ] **Step 5: Expand Playwright from a shell-heading check to registration, login, navigation, failed request, and protected-route flows**
 

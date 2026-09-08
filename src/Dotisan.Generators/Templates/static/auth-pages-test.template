@@ -1,0 +1,50 @@
+import { flushPromises, mount } from '@vue/test-utils';
+import { createMemoryHistory, createRouter } from 'vue-router';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import LoginPage from './auth/LoginPage.vue';
+import SessionsPage from './account/SessionsPage.vue';
+import { issueAntiforgery, login, listSessions, revokeSession } from '../dotisan/services';
+
+vi.mock('../dotisan/services', () => ({
+  ApiError: class ApiError extends Error { fieldErrors: Record<string, string[]> = {}; },
+  issueAntiforgery: vi.fn(),
+  login: vi.fn(),
+  listSessions: vi.fn(),
+  revokeSession: vi.fn()
+}));
+
+const issueAntiforgeryMock = vi.mocked(issueAntiforgery);
+const loginMock = vi.mocked(login);
+const listSessionsMock = vi.mocked(listSessions);
+const revokeSessionMock = vi.mocked(revokeSession);
+
+describe('generated authentication pages', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    issueAntiforgeryMock.mockResolvedValue({ token: 'xsrf-token' });
+  });
+
+  it('propagates antiforgery tokens and renders login errors', async () => {
+    loginMock.mockRejectedValueOnce(new Error('Invalid credentials'));
+    const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/auth/login', component: LoginPage }] });
+    await router.push('/auth/login');
+    await router.isReady();
+    const wrapper = mount(LoginPage, { global: { plugins: [router], stubs: { RouterLink: true } } });
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(issueAntiforgeryMock).toHaveBeenCalledOnce();
+    expect(loginMock).toHaveBeenCalledWith(expect.any(Object), { headers: { 'X-XSRF-TOKEN': 'xsrf-token' } });
+    expect(wrapper.text()).toContain('Invalid credentials');
+  });
+
+  it('revokes a selected session after confirmation', async () => {
+    listSessionsMock.mockResolvedValue({ sessions: [{ id: 's1', deviceName: 'Laptop', createdAt: '', lastSeenAt: '', expiresAt: '', userAgent: 'Browser', ipAddress: '127.0.0.1' }] });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const wrapper = mount(SessionsPage, { global: { stubs: { RouterLink: true } } });
+    await flushPromises();
+    revokeSessionMock.mockResolvedValue(undefined);
+    await wrapper.get('li button').trigger('click');
+    await flushPromises();
+    expect(revokeSessionMock).toHaveBeenCalledWith('s1');
+  });
+});

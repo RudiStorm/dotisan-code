@@ -353,6 +353,9 @@ internal static class TemplateFiles
                         ["REGISTRATION_TESTS"] = TemplateRenderer.Render(TemplateCatalog.Select(options.Registration == RegistrationPolicy.Public ? "static/public-authentication-tests.template" : "static/restricted-registration-test.template"), TemplateContext.Empty)
                     }))) }
                 : Array.Empty<TemplateFile>()),
+            ..(options.AuthenticationEnabled
+                ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/auth-pages.test.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/auth-pages-test.template"), TemplateContext.Empty)) }
+                : Array.Empty<TemplateFile>()),
             new($"{options.Name}.sln", TemplateRenderer.Render(TemplateCatalog.Select("static/solution.template"), new TemplateContext(new Dictionary<string, string>
             {
                 ["PROJECT_NAME"] = options.Name
