@@ -1,0 +1,12 @@
+import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
+import PortalLayout from '../layouts/PortalLayout.vue';
+import DashboardPage from '../pages/DashboardPage.vue';
+__NOTIFICATIONS_IMPORT__
+__IMPORTS_IMPORT__
+__WEBHOOKS_IMPORT__
+
+const routes: RouteRecordRaw[] = [
+  { path: '/', component: PortalLayout, children: [{ path: '', component: DashboardPage__OPTIONAL_ROUTES__ }] }
+];
+// DOTISAN:ROUTES
+export default createRouter({ history: createWebHistory(), routes });

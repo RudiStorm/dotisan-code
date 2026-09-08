@@ -157,7 +157,15 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/components.json", TemplateRenderer.Render(TemplateCatalog.Select("static/components.json.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/env.d.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/web-env.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/main.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/main.template"), TemplateContext.Empty)),
-            new($"src/{options.Name}.Web/src/routes/index.ts", RoutesIndex(options.AuthenticationEnabled, options.NotificationsEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled)),
+            new($"src/{options.Name}.Web/src/routes/index.ts", TemplateRenderer.Render(TemplateCatalog.Select(options.AuthenticationEnabled ? "static/routes-auth.template" : "static/routes-plain.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["NOTIFICATIONS_IMPORT"] = options.NotificationsEnabled ? "import NotificationsPage from '../pages/NotificationsPage.vue';\n" : string.Empty,
+                ["IMPORTS_IMPORT"] = options.ImportsExportsEnabled ? "import ImportsExportsPage from '../pages/ImportsExportsPage.vue';\n" : string.Empty,
+                ["WEBHOOKS_IMPORT"] = options.WebhooksEnabled ? "import WebhooksPage from '../pages/WebhooksPage.vue';\n" : string.Empty,
+                ["OPTIONAL_ROUTES"] = options.AuthenticationEnabled
+                    ? string.Concat(options.NotificationsEnabled ? "{ path: 'notifications', component: NotificationsPage }, " : string.Empty, options.ImportsExportsEnabled ? "{ path: 'data', component: ImportsExportsPage }, " : string.Empty, options.WebhooksEnabled ? "{ path: 'webhooks', component: WebhooksPage }, " : string.Empty)
+                    : string.Concat(options.NotificationsEnabled ? ", { path: 'notifications', component: NotificationsPage }" : string.Empty, options.ImportsExportsEnabled ? ", { path: 'data', component: ImportsExportsPage }" : string.Empty, options.WebhooksEnabled ? ", { path: 'webhooks', component: WebhooksPage }" : string.Empty)
+            }))),
             new($"src/{options.Name}.Web/src/App.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/web-app.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/style.css", TemplateRenderer.Render(TemplateCatalog.Select("static/style.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/dotisan/.gitkeep", string.Empty),
