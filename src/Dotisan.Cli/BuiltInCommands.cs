@@ -771,6 +771,26 @@ internal sealed class NewCommand : IDotisanCommand
             }
         }
 
+        if (profile is not null and not "custom")
+        {
+            var expectedAuth = profile is "identity" or "saas" or "maximal";
+            var expectedTenancy = profile is "saas" or "maximal";
+            var expectedIntegrations = profile == "maximal";
+            var expectedJobs = profile != "minimal";
+            if (authenticationEnabled != expectedAuth
+                || (authenticationEnabled ? registration : RegistrationPolicy.Disabled) != (expectedAuth ? RegistrationPolicy.Public : RegistrationPolicy.Disabled)
+                || multiTenancyEnabled != expectedTenancy
+                || notificationsEnabled != expectedIntegrations
+                || storageEnabled != expectedIntegrations
+                || cachingEnabled != expectedIntegrations
+                || importsExportsEnabled != expectedIntegrations
+                || webhooksEnabled != expectedIntegrations
+                || jobsEnabled != expectedJobs)
+            {
+                return UsageError(context, "Profile options conflict with explicit feature flags. Use --profile custom for manual overrides.");
+            }
+        }
+
         ProjectOptions? options;
         try
         {
@@ -795,7 +815,18 @@ internal sealed class NewCommand : IDotisanCommand
                         "saas" => ProjectProfile.Saas,
                         "maximal" => ProjectProfile.Maximal,
                         "custom" => ProjectProfile.Custom,
-                        _ => ProjectProfile.Minimal
+                        _ => (database != DatabaseProvider.SQLite
+                            || authenticationEnabled
+                            || registration != RegistrationPolicy.Disabled
+                            || multiTenancyEnabled
+                            || notificationsEnabled
+                            || storageEnabled
+                            || cachingEnabled
+                            || importsExportsEnabled
+                            || webhooksEnabled
+                            || jobsEnabled)
+                            ? ProjectProfile.Custom
+                            : ProjectProfile.Minimal
                     }
                     ,JobProvider = jobsEnabled ? JobProvider.Wolverine : JobProvider.None
                 }

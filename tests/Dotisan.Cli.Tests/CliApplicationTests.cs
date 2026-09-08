@@ -55,6 +55,20 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task Profile_rejects_conflicting_feature_flags()
+    {
+        var console = new MemoryConsole();
+        var generator = new TrackingProjectGenerator();
+        var app = DotisanApplication.CreateDefault(console, projectGenerator: generator);
+
+        var exitCode = await app.RunAsync(["new", "TodoApp", "--yes", "--profile", "minimal", "--auth", "yes"]);
+
+        Assert.Equal(DotisanExitCode.UsageError, exitCode);
+        Assert.False(generator.WasCalled);
+        Assert.Contains("conflict", console.ErrorOutput, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Registered_command_is_dispatched_without_knowing_its_implementation()
     {
         var console = new MemoryConsole();
