@@ -22,6 +22,11 @@ internal sealed class HelpCommand(DotisanCommandRegistry registry) : IDotisanCom
         context.Console.WriteLine("Commands:");
         context.Console.WriteLine("  dotisan new <ProjectName>    Create a new Dotisan application");
         context.Console.WriteLine("      Profiles: --profile minimal|identity|saas|maximal|custom");
+        context.Console.WriteLine("  dotisan make resource <Name>  Scaffold a resource (make:resource is a compatibility alias)");
+        context.Console.WriteLine("  dotisan make endpoint <Name>  Scaffold an endpoint");
+        context.Console.WriteLine("  dotisan make crud <Name>      Scaffold CRUD UI and API files");
+        context.Console.WriteLine("  dotisan add integration <Name>    Add an integration recipe");
+        context.Console.WriteLine("  dotisan remove integration <Name> Remove an integration recipe");
         foreach (var command in registry.Commands.Where(command => command.Name is not "help" and not "new"))
         {
             context.Console.WriteLine($"  {command.Name,-25} {command.Description}");
