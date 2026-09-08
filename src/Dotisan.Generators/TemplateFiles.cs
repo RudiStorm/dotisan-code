@@ -89,10 +89,16 @@ internal static class TemplateFiles
             ..(options.ImportsExportsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/ImportsExports.cs", ImportsExports(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
             ..(options.WebhooksEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Webhooks.cs", Webhooks(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled, options.JobsEnabled)) } : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
-                ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationUser.cs", ApplicationUser(identifier)) }
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationUser.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/application-user.template"), new TemplateContext(new Dictionary<string, string>
+                    {
+                        ["IDENTIFIER"] = identifier
+                    }))) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
-                ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationSession.cs", ApplicationSession(identifier)) }
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationSession.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/application-session.template"), new TemplateContext(new Dictionary<string, string>
+                    {
+                        ["IDENTIFIER"] = identifier
+                    }))) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/IEmailProvider.cs", EmailSender(identifier)) }
