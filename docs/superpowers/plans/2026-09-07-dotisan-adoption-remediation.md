@@ -2,7 +2,7 @@
 
 ## Execution status (2026-09-08)
 
-The acceptance checklist below is verified on `master`. Two implementation tracks remain open before this plan can be considered fully complete: migrating the remaining embedded generators from `TemplateFiles.cs` to physical templates (Task 7), and expanding interaction-level frontend tests beyond generated page-export and shared-client coverage (Task 12, Step 4). Those checkboxes intentionally remain open until the stronger requirements are implemented and verified.
+The acceptance checklist below is verified on `master`. One implementation track remains open before this plan can be considered fully complete: migrating the remaining embedded generators from `TemplateFiles.cs` to physical templates (Task 7). Interaction-level frontend coverage (Task 12, Step 4) is now verified for notifications, imports/exports, and webhooks in the maximal generated profile. The remaining Task 7 checkboxes intentionally remain open until every selected output is covered by physical templates and golden verification.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
