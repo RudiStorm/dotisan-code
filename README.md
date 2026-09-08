@@ -66,7 +66,7 @@ Useful development variants:
 ```powershell
 dotisan dev --lean                 # API only
 dotisan dev --environment Staging  # use a different ASP.NET Core environment
-dotisan dev --observability        # enable OTLP export for the API process
+dotisan dev --observability        # enable OTLP export when generated with --observability yes
 dotisan run                        # run only the API with dotnet run
 dotisan build                      # build the API and frontend
 dotisan build --no-frontend        # build only the .NET solution
