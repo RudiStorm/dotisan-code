@@ -293,20 +293,21 @@ public static class AccountEndpoints
             : Results.Ok(new CurrentUserResponse(id, email));
     }
 
-    public sealed record RegisterRequest(string Email, string Password);
-    public sealed record LoginRequest(string Email, string Password, bool RememberMe);
-    public sealed record LoginResponse(string Code);
-    public sealed record PasswordResetRequest(string Email);
-    public sealed record PasswordResetConfirmRequest(string Email, string Token, string NewPassword);
-    public sealed record EmailConfirmationRequest(string Email, string Token);
-    public sealed record EmailConfirmationResendRequest(string Email);
-    public sealed record MfaCodeRequest(string Code);
-    public sealed record CurrentUserResponse(string Id, string Email);
-    public sealed record AntiforgeryResponse(string Token);
-    public sealed record MfaSetupResponse(string SharedKey, string AuthenticatorUri);
-    public sealed record RecoveryCodesResponse(string[] RecoveryCodes);
-    public sealed record SessionInfo(Guid Id, string DeviceName, DateTimeOffset CreatedAt, DateTimeOffset LastSeenAt, DateTimeOffset ExpiresAt, string? UserAgent, string? IpAddress);
-    public sealed record SessionsResponse(SessionInfo[] Sessions);
-    public sealed record ExternalLoginProviderDescriptor(string Name, string DisplayName);
-    public sealed record ExternalProvidersResponse(ExternalLoginProviderDescriptor[] Providers);
 }
+
+public sealed record RegisterRequest(string Email, string Password);
+public sealed record LoginRequest(string Email, string Password, bool RememberMe);
+public sealed record LoginResponse(string Code);
+public sealed record PasswordResetRequest(string Email);
+public sealed record PasswordResetConfirmRequest(string Email, string Token, string NewPassword);
+public sealed record EmailConfirmationRequest(string Email, string Token);
+public sealed record EmailConfirmationResendRequest(string Email);
+public sealed record MfaCodeRequest(string Code);
+public sealed record CurrentUserResponse(string Id, string Email);
+public sealed record AntiforgeryResponse(string Token);
+public sealed record MfaSetupResponse(string SharedKey, string AuthenticatorUri);
+public sealed record RecoveryCodesResponse(string[] RecoveryCodes);
+public sealed record SessionInfo(Guid Id, string DeviceName, DateTimeOffset CreatedAt, DateTimeOffset LastSeenAt, DateTimeOffset ExpiresAt, string? UserAgent, string? IpAddress);
+public sealed record SessionsResponse(SessionInfo[] Sessions);
+public sealed record ExternalLoginProviderDescriptor(string Name, string DisplayName);
+public sealed record ExternalProvidersResponse(ExternalLoginProviderDescriptor[] Providers);
