@@ -23,6 +23,19 @@ public sealed class DocumentationConsistencyTests
         }
     }
 
+    [Fact]
+    public void Shell_completions_include_canonical_nested_commands()
+    {
+        var root = FindRepositoryRoot();
+        foreach (var shell in new[] { "dotisan.bash", "dotisan.ps1", "dotisan.zsh" })
+        {
+            var content = File.ReadAllText(Path.Combine(root, "docs", "completions", shell));
+            Assert.Contains("make", content, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("add", content, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("remove", content, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     private static string FindRepositoryRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
