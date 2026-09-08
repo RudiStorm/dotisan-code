@@ -1,0 +1,23 @@
+version: 1
+profile: quick
+jobs: __JOBS__
+database: __DATABASE__
+authentication: __AUTHENTICATION__
+multi_tenancy: __MULTI_TENANCY__
+api_port: __API_PORT__
+web_port: __WEB_PORT__
+mail_provider: __MAIL_PROVIDER__
+notifications: __NOTIFICATIONS__
+storage: __STORAGE__
+caching: __CACHING__
+imports_exports: __IMPORTS_EXPORTS__
+webhooks: __WEBHOOKS__
+package_manager: __PACKAGE_MANAGER__
+dev:
+  services:
+    api: true
+    frontend: true
+    database: true
+    observability: false
+    mail: __MAIL_SERVICE__
+    workers: false

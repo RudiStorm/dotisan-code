@@ -16,31 +16,23 @@ internal static class TemplateFiles
             new(".node-version", TemplateRenderer.Render(TemplateCatalog.Select("static/node-version.template"), TemplateContext.Empty)),
             new("Directory.Packages.props", TemplateRenderer.Render(TemplateCatalog.Select("static/directory-packages.props.template"), TemplateContext.Empty)),
             new("README.md", ProjectReadme(options.Name, options.Database, options.AuthenticationEnabled, options.MultiTenancyEnabled)),
-            new("dotisan.config", $$"""
-            version: 1
-            profile: quick
-            jobs: {{(options.JobsEnabled ? "wolverine" : "none")}}
-            database: {{options.Database.ToString().ToLowerInvariant()}}
-            authentication: {{(options.AuthenticationEnabled ? "enabled" : "disabled")}}
-            multi_tenancy: {{(options.MultiTenancyEnabled ? "enabled" : "disabled")}}
-            api_port: {{DevelopmentApiPort(options.Name)}}
-            web_port: {{DevelopmentWebPort(options.Name)}}
-            mail_provider: {{options.MailProvider.ToString().ToLowerInvariant()}}
-            notifications: {{(options.NotificationsEnabled ? "enabled" : "disabled")}}
-            storage: {{(options.StorageEnabled ? "enabled" : "disabled")}}
-            caching: {{(options.CachingEnabled ? "enabled" : "disabled")}}
-            imports_exports: {{(options.ImportsExportsEnabled ? "enabled" : "disabled")}}
-            webhooks: {{(options.WebhooksEnabled ? "enabled" : "disabled")}}
-            package_manager: {{options.PackageManager.ToString().ToLowerInvariant()}}
-            dev:
-              services:
-                api: true
-                frontend: true
-                database: true
-                observability: false
-                mail: {{(options.MailProvider == MailProvider.Mailpit ? "true" : "false")}}
-                workers: false
-            """),
+            new("dotisan.config", TemplateRenderer.Render(TemplateCatalog.Select("static/dotisan-config.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["JOBS"] = options.JobsEnabled ? "wolverine" : "none",
+                ["DATABASE"] = options.Database.ToString().ToLowerInvariant(),
+                ["AUTHENTICATION"] = options.AuthenticationEnabled ? "enabled" : "disabled",
+                ["MULTI_TENANCY"] = options.MultiTenancyEnabled ? "enabled" : "disabled",
+                ["API_PORT"] = DevelopmentApiPort(options.Name).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["WEB_PORT"] = DevelopmentWebPort(options.Name).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["MAIL_PROVIDER"] = options.MailProvider.ToString().ToLowerInvariant(),
+                ["NOTIFICATIONS"] = options.NotificationsEnabled ? "enabled" : "disabled",
+                ["STORAGE"] = options.StorageEnabled ? "enabled" : "disabled",
+                ["CACHING"] = options.CachingEnabled ? "enabled" : "disabled",
+                ["IMPORTS_EXPORTS"] = options.ImportsExportsEnabled ? "enabled" : "disabled",
+                ["WEBHOOKS"] = options.WebhooksEnabled ? "enabled" : "disabled",
+                ["PACKAGE_MANAGER"] = options.PackageManager.ToString().ToLowerInvariant(),
+                ["MAIL_SERVICE"] = options.MailProvider == MailProvider.Mailpit ? "true" : "false"
+            }))),
             new("dotisan.contract.json", InitialContractManifest(options.AuthenticationEnabled).ToJson()),
             new("Dockerfile", TemplateRenderer.Render(TemplateCatalog.Select(options.PackageManager == PackageManager.Pnpm ? "static/dockerfile-pnpm.template" : "static/dockerfile-npm.template"), new TemplateContext(new Dictionary<string, string>
             {
