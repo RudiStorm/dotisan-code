@@ -155,7 +155,10 @@ internal static class TemplateFiles
                     new TemplateFile($"src/{options.Name}.Web/src/pages/admin/AuthorizationPage.vue", AuthorizationPage())
                 }
                 : Array.Empty<TemplateFile>()),
-            new($"tests/{options.Name}.Api.Tests/{options.Name}.Api.Tests.csproj", ApiTestsProject(options.Name, options.AuthenticationEnabled)),
+            new($"tests/{options.Name}.Api.Tests/{options.Name}.Api.Tests.csproj", TemplateRenderer.Render(TemplateCatalog.Select(options.AuthenticationEnabled ? "static/api-tests-project-auth.template" : "static/api-tests-project-plain.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["PROJECT_NAME"] = options.Name
+            }))),
             new($"tests/{options.Name}.Api.Tests/HealthEndpointTests.cs", ApiTests(identifier)),
             ..(options.JobsEnabled ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/JobTests.cs", JobTests(identifier, options.AuthenticationEnabled)) } : Array.Empty<TemplateFile>()),
             new($"tests/{options.Name}.Api.Tests/Usings.cs", "global using Xunit;\n"),
