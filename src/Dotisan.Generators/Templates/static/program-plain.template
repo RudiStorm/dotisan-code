@@ -1,0 +1,69 @@
+using __IDENTIFIER__.Api.Auditing;
+__TENANT_USING__
+using Microsoft.EntityFrameworkCore;
+using __IDENTIFIER__.Api.Data;
+using __IDENTIFIER__.Api.Infrastructure;
+__JOBS_USING__
+using __IDENTIFIER__.Api.Features.Health;
+using Microsoft.AspNetCore.SignalR;
+__INTEGRATIONS_USING__
+__WOLVERINE_USING__
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+using OpenTelemetry.Logs;
+using Microsoft.AspNetCore.HttpOverrides;
+using System.Net;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddOptions<DotisanSecurityOptions>().BindConfiguration("Dotisan:Security").ValidateDataAnnotations().ValidateOnStart();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    foreach (var value in builder.Configuration.GetSection("Dotisan:Security:KnownProxies").Get<string[]>() ?? [])
+        if (IPAddress.TryParse(value, out var address)) options.KnownProxies.Add(address);
+});
+builder.Services.AddCors(options => options.AddPolicy("frontend", policy =>
+{
+    var frontendUrl = builder.Environment.IsDevelopment() ? builder.Configuration["FrontendUrl"] : builder.Configuration["Dotisan:Security:FrontendUrl"] ?? builder.Configuration["FrontendUrl"];
+    if (Uri.TryCreate(frontendUrl, UriKind.Absolute, out var origin)) policy.WithOrigins(origin.GetLeftPart(UriPartial.Authority)).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+}));
+if (args.Contains("--dotisan-observability", StringComparer.OrdinalIgnoreCase)) builder.Configuration["OpenTelemetry:Enabled"] = "true";
+builder.Services.AddOpenApi();
+builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context => context.ProblemDetails.Extensions["correlationId"] = context.HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? context.HttpContext.TraceIdentifier);
+var openTelemetry = builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddEntityFrameworkCoreInstrumentation()).WithMetrics(metrics => metrics.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation());
+builder.Logging.AddOpenTelemetry(logging => logging.IncludeFormattedMessage = true);
+if (builder.Configuration.GetValue("OpenTelemetry:Enabled", false)) openTelemetry.UseOtlpExporter();
+var connectionString = ResolveConnectionString(builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required."), builder.Environment.ContentRootPath);
+builder.Services.AddDbContext<AppDbContext>(options => __DATABASE_REGISTRATION__);
+builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
+if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing")) DotisanProductionConfiguration.Validate(builder.Configuration, builder.Environment.EnvironmentName, emailConfirmationEnabled: false, dataProtectionEnabled: false);
+builder.Services.AddScoped<IAuditWriter, AuditWriter>();
+__NOTIFICATIONS_SERVICES__
+__STORAGE_SERVICES__
+__CACHING_SERVICES__
+__IMPORTS_SERVICES__
+__WEBHOOK_SERVICES__
+__TENANT_SERVICES__
+__JOBS_SERVICES__
+
+var app = builder.Build();
+app.UseDotisanPipeline();
+if (app.Environment.IsDevelopment()) app.MapOpenApi();
+app.MapDotisanEndpoints();
+app.MapFallbackToFile("index.html");
+app.Run();
+
+static string ResolveConnectionString(string configured, string contentRoot)
+{
+    if (!configured.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase)) return configured;
+    var parts = configured.Split(';');
+    var dataSource = parts[0]["Data Source=".Length..].Trim();
+    if (Path.IsPathRooted(dataSource) || dataSource.Contains('|')) return configured;
+    var resolvedPath = Path.Combine(contentRoot, dataSource);
+    Directory.CreateDirectory(Path.GetDirectoryName(resolvedPath)!);
+    parts[0] = $"Data Source={resolvedPath}";
+    return string.Join(';', parts);
+}
+
+public partial class Program { }
