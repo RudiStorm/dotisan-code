@@ -1,0 +1,18 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { request } from './client';
+
+describe('request', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('propagates an antiforgery token for mutations', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ token: 'csrf-token' }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(request<{ ok: boolean }>('/api/example', { method: 'POST', body: '{}' })).resolves.toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/example', expect.objectContaining({ credentials: 'include' }));
+    const options = fetchMock.mock.calls[1][1] as RequestInit;
+    expect(new Headers(options.headers).get('X-XSRF-TOKEN')).toBe('csrf-token');
+  });
+});

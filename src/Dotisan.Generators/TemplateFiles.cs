@@ -161,14 +161,14 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/src/App.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/web-app.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/style.css", TemplateRenderer.Render(TemplateCatalog.Select("static/style.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/dotisan/.gitkeep", string.Empty),
-            new($"src/{options.Name}.Web/src/api/client.ts", ApiClient()),
+            new($"src/{options.Name}.Web/src/api/client.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/api-client.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/components/ui/Button.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/ui-button.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/components/ui/Input.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/ui-input.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/components/ui/Card.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/ui-card.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/components/ui/Badge.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/ui-badge.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/lib/utils.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/utils.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/components/ui/Badge.test.ts", UiBadgeTest()),
-            new($"src/{options.Name}.Web/src/api/client.test.ts", ApiClientTest()),
+            new($"src/{options.Name}.Web/src/api/client.test.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/api-client.test.template"), TemplateContext.Empty)),
             ..(options.NotificationsEnabled || options.ImportsExportsEnabled || options.WebhooksEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/integration-pages.test.ts", IntegrationPagesTest(options.NotificationsEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled)) }
                 : Array.Empty<TemplateFile>()),
