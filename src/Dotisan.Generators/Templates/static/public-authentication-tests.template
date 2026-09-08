@@ -1,0 +1,48 @@
+
+    [Fact]
+    public async Task Public_registration_requires_email_confirmation_before_protected_access()
+    {
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+        var antiforgery = await GetAntiforgeryToken(client);
+        using var register = new HttpRequestMessage(HttpMethod.Post, "/api/account/register");
+        register.Headers.Add("X-XSRF-TOKEN", antiforgery);
+        register.Content = JsonContent.Create(new { email = "person@example.com", password = "Password1!" });
+
+        var registration = await client.SendAsync(register);
+        Assert.Equal(HttpStatusCode.OK, registration.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/account/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Registration_email_contains_a_confirmable_frontend_link()
+    {
+        var email = $"confirm-{Guid.NewGuid():N}@example.com";
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = true });
+        var antiforgery = await GetAntiforgeryToken(client);
+        using var register = new HttpRequestMessage(HttpMethod.Post, "/api/account/register");
+        register.Headers.Add("X-XSRF-TOKEN", antiforgery);
+        register.Content = JsonContent.Create(new { email, password = "Password1!" });
+
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(register)).StatusCode);
+        var link = factory.EmailProvider.LastBody.Split('\n', StringSplitOptions.RemoveEmptyEntries).Single(line => line.Contains("/auth/confirm-email?", StringComparison.Ordinal)).Trim();
+        var query = link[(link.IndexOf('?') + 1)..].Split('&').Select(part => part.Split('=', 2)).ToDictionary(part => part[0], part => Uri.UnescapeDataString(part[1]));
+        using var confirmation = new HttpRequestMessage(HttpMethod.Post, "/api/account/email-confirmation/confirm");
+        confirmation.Headers.Add("X-XSRF-TOKEN", await GetAntiforgeryToken(client));
+        confirmation.Content = JsonContent.Create(new { email = query["email"], token = query["token"] });
+
+        Assert.Equal(HttpStatusCode.NoContent, (await client.SendAsync(confirmation)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Logout_clears_the_authentication_cookie()
+    {
+        using var client = await SignInAsync("logout@example.com");
+
+        var antiforgery = await GetAntiforgeryToken(client);
+        using var logout = new HttpRequestMessage(HttpMethod.Post, "/api/account/logout");
+        logout.Headers.Add("X-XSRF-TOKEN", antiforgery);
+        Assert.Equal(HttpStatusCode.NoContent, (await client.SendAsync(logout)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/account/me")).StatusCode);
+    }
+
+

@@ -1,0 +1,9 @@
+  it('replays a webhook delivery', async () => {
+    requestMock.mockResolvedValueOnce([{ id: 'd1', eventType: 'CustomerCreated', endpoint: 'https://example.test', status: 'failed', attempts: 1 }]);
+    const wrapper = mount(WebhooksPage);
+    await flushPromises();
+    requestMock.mockResolvedValueOnce(undefined);
+    await wrapper.get('button').trigger('click');
+    await flushPromises();
+    expect(requestMock).toHaveBeenLastCalledWith('/api/webhooks/deliveries/d1/replay', { method: 'POST' });
+  });

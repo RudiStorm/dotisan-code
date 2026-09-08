@@ -1,0 +1,13 @@
+  it('loads notifications and marks an unread item as read', async () => {
+    requestMock.mockResolvedValueOnce({ notifications: [{ id: 'n1', title: 'Welcome', body: 'Hello', isRead: false }] });
+    const wrapper = mount(NotificationsPage);
+    await flushPromises();
+    expect(wrapper.text()).toContain('Welcome');
+    requestMock.mockResolvedValueOnce(undefined);
+    await wrapper.get('button').trigger('click');
+    await flushPromises();
+    expect(requestMock).toHaveBeenLastCalledWith('/api/notifications/n1/read', { method: 'POST' });
+    expect(wrapper.find('button').exists()).toBe(false);
+  });
+  
+

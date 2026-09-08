@@ -1,0 +1,14 @@
+  it('queues an import after a file is selected', async () => {
+    requestMock.mockResolvedValueOnce(undefined);
+    const wrapper = mount(ImportsExportsPage);
+    const file = new File(['id,name'], 'customers.csv', { type: 'text/csv' });
+    const input = wrapper.get('input[type=file]');
+    Object.defineProperty(input.element, 'files', { configurable: true, value: [file] });
+    await input.trigger('change');
+    await wrapper.get('form').trigger('submit');
+    await flushPromises();
+    expect(requestMock).toHaveBeenCalledWith('/api/data/imports', expect.objectContaining({ method: 'POST', body: expect.any(FormData) }));
+    expect(wrapper.text()).toContain('Import queued.');
+  });
+  
+

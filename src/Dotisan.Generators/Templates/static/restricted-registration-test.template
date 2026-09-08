@@ -1,0 +1,17 @@
+
+    [Fact]
+    public async Task Restricted_registration_returns_a_stable_problem_code()
+    {
+        using var client = factory.CreateClient();
+        var antiforgery = await GetAntiforgeryToken(client);
+        using var register = new HttpRequestMessage(HttpMethod.Post, "/api/account/register");
+        register.Headers.Add("X-XSRF-TOKEN", antiforgery);
+        register.Content = JsonContent.Create(new { email = "person@example.com", password = "Password1!" });
+
+        var response = await client.SendAsync(register);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("registration_unavailable", body, StringComparison.Ordinal);
+    }
+
+
