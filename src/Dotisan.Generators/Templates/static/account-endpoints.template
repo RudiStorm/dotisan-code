@@ -306,7 +306,7 @@ public static class AccountEndpoints
     public sealed record MfaSetupResponse(string SharedKey, string AuthenticatorUri);
     public sealed record RecoveryCodesResponse(string[] RecoveryCodes);
     public sealed record SessionInfo(Guid Id, string DeviceName, DateTimeOffset CreatedAt, DateTimeOffset LastSeenAt, DateTimeOffset ExpiresAt, string? UserAgent, string? IpAddress);
-    public sealed record SessionsResponse(IReadOnlyList<SessionInfo> Sessions);
+    public sealed record SessionsResponse(SessionInfo[] Sessions);
     public sealed record ExternalLoginProviderDescriptor(string Name, string DisplayName);
-    public sealed record ExternalProvidersResponse(IReadOnlyList<ExternalLoginProviderDescriptor> Providers);
+    public sealed record ExternalProvidersResponse(ExternalLoginProviderDescriptor[] Providers);
 }
