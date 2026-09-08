@@ -39,7 +39,13 @@ internal static class TemplateFiles
                 ["PROJECT_NAME"] = options.Name
             }))),
             new TemplateFile("compose.yaml", DatabaseCompose(options.Name, options.Database, options.MailProvider)),
-            new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.Database, options.AuthenticationEnabled, options.JobsEnabled)),
+            new($"src/{options.Name}.Api/{options.Name}.Api.csproj", TemplateRenderer.Render(TemplateCatalog.Select("static/api-project.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["ROOT_NAMESPACE"] = options.Name.Replace('-', '_'),
+                ["DATABASE_PACKAGE"] = DatabasePackage(options.Database),
+                ["JOBS_PACKAGES"] = options.JobsEnabled ? $"    <PackageReference Include=\"WolverineFx\" />\n    <PackageReference Include=\"WolverineFx.EntityFrameworkCore\" />\n    <PackageReference Include=\"WolverineFx.RuntimeCompilation\" />\n    <PackageReference Include=\"WolverineFx.{WolverineProviderPackage(options.Database)}\" />" : string.Empty,
+                ["AUTH_PACKAGE"] = options.AuthenticationEnabled ? "    <PackageReference Include=\"Microsoft.AspNetCore.Identity.EntityFrameworkCore\" />" : string.Empty
+            }))),
             new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.MultiTenancyEnabled, options.NotificationsEnabled, options.StorageEnabled, options.CachingEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled, options.JobsEnabled)),
             new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled, options.NotificationsEnabled, options.WebhooksEnabled, options.ImportsExportsEnabled)),
             new($"src/{options.Name}.Api/Auditing/AuditEntry.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/audit-entry.template"), new TemplateContext(new Dictionary<string, string>
