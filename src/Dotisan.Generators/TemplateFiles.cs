@@ -167,14 +167,24 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/src/components/ui/Card.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/ui-card.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/components/ui/Badge.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/ui-badge.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/lib/utils.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/utils.template"), TemplateContext.Empty)),
-            new($"src/{options.Name}.Web/src/components/ui/Badge.test.ts", UiBadgeTest()),
+            new($"src/{options.Name}.Web/src/components/ui/Badge.test.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/ui-badge-test.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/api/client.test.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/api-client.test.template"), TemplateContext.Empty)),
             ..(options.NotificationsEnabled || options.ImportsExportsEnabled || options.WebhooksEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/integration-pages.test.ts", IntegrationPagesTest(options.NotificationsEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled)) }
                 : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Web/tests/e2e/shell.spec.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/frontend-smoke.template"), TemplateContext.Empty)),
-            new($"src/{options.Name}.Web/src/components/AppSidebar.vue", AppSidebar(options.Name, options.AuthenticationEnabled)),
-            new($"src/{options.Name}.Web/src/components/AppHeader.vue", AppHeader(options.Name, options.AuthenticationEnabled)),
+            new($"src/{options.Name}.Web/src/components/AppSidebar.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/app-sidebar.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["PROJECT_NAME"] = options.Name,
+                ["AUTH_LINKS"] = options.AuthenticationEnabled ? "  { label: 'Profile', to: '/profile' }, { label: 'MFA security', to: '/security/mfa' }, { label: 'Sessions', to: '/security/sessions' }, { label: 'External logins', to: '/security/external-logins' }, { label: 'Authorization', to: '/admin/authorization' }," : string.Empty
+            }))),
+            new($"src/{options.Name}.Web/src/components/AppHeader.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/app-header.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["PROJECT_NAME"] = options.Name,
+                ["AUTH_IMPORT"] = options.AuthenticationEnabled ? "import { logout } from '../dotisan/services';" : string.Empty,
+                ["AUTH_FUNCTION"] = options.AuthenticationEnabled ? "async function signOut() { await logout(); window.location.assign('/auth/login'); }" : string.Empty,
+                ["AUTH_MENU"] = options.AuthenticationEnabled ? "    <div class=\"user-menu\"><UiButton variant=\"ghost\" @click=\"menuOpen = !menuOpen\">Account ▾</UiButton><div v-if=\"menuOpen\" class=\"user-menu__panel\"><RouterLink to=\"/profile\">Profile</RouterLink><UiButton variant=\"ghost\" @click=\"signOut\">Sign out</UiButton></div></div>" : string.Empty
+            }))),
             new($"src/{options.Name}.Web/src/layouts/PortalLayout.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/portal-layout.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/layouts/AuthLayout.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/auth-layout.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/pages/DashboardPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/dashboard-page.template"), new TemplateContext(new Dictionary<string, string>
