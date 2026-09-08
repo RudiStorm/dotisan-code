@@ -98,11 +98,18 @@ internal static class TemplateFiles
                 ["PACKAGE_NAME"] = options.Name.ToLowerInvariant(),
                 ["PACKAGE_MANAGER"] = packageManager
             }))),
-            new($"src/{options.Name}.Web/index.html", WebIndex(options.Name)),
+            new($"src/{options.Name}.Web/index.html", TemplateRenderer.Render(TemplateCatalog.Select("static/web-index.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["PROJECT_NAME"] = options.Name
+            }))),
             new($"src/{options.Name}.Web/tsconfig.json", TemplateRenderer.Render(TemplateCatalog.Select("static/web-tsconfig.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/tsconfig.app.json", TemplateRenderer.Render(TemplateCatalog.Select("static/web-tsconfig.app.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/tsconfig.node.json", TemplateRenderer.Render(TemplateCatalog.Select("static/web-tsconfig.node.template"), TemplateContext.Empty)),
-            new($"src/{options.Name}.Web/vite.config.ts", ViteConfig(DevelopmentApiPort(options.Name), DevelopmentWebPort(options.Name))),
+            new($"src/{options.Name}.Web/vite.config.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/vite.config.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["API_PORT"] = DevelopmentApiPort(options.Name).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["WEB_PORT"] = DevelopmentWebPort(options.Name).ToString(System.Globalization.CultureInfo.InvariantCulture)
+            }))),
             new($"src/{options.Name}.Web/tailwind.config.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/tailwind.config.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/postcss.config.cjs", TemplateRenderer.Render(TemplateCatalog.Select("static/postcss.config.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/playwright.config.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/playwright.config.template"), TemplateContext.Empty)),
