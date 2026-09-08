@@ -1,0 +1,30 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+
+namespace __IDENTIFIER__.Api.Infrastructure;
+
+public static class ApplicationBuilderExtensions
+{
+    public static WebApplication UseDotisanPipeline(this WebApplication app)
+    {
+        app.UseForwardedHeaders();
+        app.Use(async (context, next) =>
+        {
+            var supplied = context.Request.Headers["X-Correlation-ID"].FirstOrDefault();
+            var correlationId = !string.IsNullOrWhiteSpace(supplied) && supplied.Length <= 100 && supplied.All(character => char.IsLetterOrDigit(character) || character is '-' or '_') ? supplied : Guid.NewGuid().ToString("N");
+            context.Request.Headers["X-Correlation-ID"] = correlationId;
+            context.Response.Headers["X-Correlation-ID"] = correlationId;
+            await next(context);
+        });
+        app.UseExceptionHandler();
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseHsts();
+            app.UseHttpsRedirection();
+        }
+        app.UseDefaultFiles();
+        app.UseStaticFiles();
+        app.UseCors("frontend");
+        return app;
+    }
+}

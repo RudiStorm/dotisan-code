@@ -59,7 +59,10 @@ internal static class TemplateFiles
             ..(options.JobsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Jobs/JobRegistration.cs", JobRegistration(identifier, options.Database)), new TemplateFile($"src/{options.Name}.Api/Jobs/SampleJob.cs", SampleJob(identifier)), new TemplateFile($"src/{options.Name}.Api/Jobs/SampleJobHandler.cs", SampleJobHandler(identifier)), new TemplateFile($"src/{options.Name}.Api/Features/Jobs/JobEndpoints.cs", JobEndpoints(identifier, options.AuthenticationEnabled)) } : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Api/Features/Health/HealthEndpoints.cs", HealthEndpoints(identifier)),
             new($"src/{options.Name}.Api/Infrastructure/DotisanSecurityOptions.cs", DotisanSecurityOptions(identifier)),
-            new($"src/{options.Name}.Api/Infrastructure/ApplicationBuilderExtensions.cs", ApplicationBuilderExtensions(identifier)),
+            new($"src/{options.Name}.Api/Infrastructure/ApplicationBuilderExtensions.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/application-builder-extensions.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["IDENTIFIER"] = identifier
+            }))),
             new($"src/{options.Name}.Api/Infrastructure/DotisanProductionConfiguration.cs", DotisanProductionConfiguration(identifier, options.AuthenticationEnabled)),
             ..(options.NotificationsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Notifications.cs", Notifications(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
             ..(options.StorageEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Storage.cs", Storage(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
