@@ -2,7 +2,7 @@
 
 ## Execution status (2026-09-08)
 
-The acceptance checklist below is verified on `master`. Task 7's generated-project source migration is complete: selected API, integration, frontend, and test outputs now render from normalized physical embedded templates, while `TemplateFiles.cs` remains only as the orchestration/scaffolding implementation. Interaction-level frontend coverage (Task 12, Step 4) is verified for login errors, antiforgery propagation, session revocation, notifications, imports/exports, and webhooks. The release matrix has been exercised with minimal/npm, identity/pnpm, saas/npm, and maximal/pnpm profiles.
+The acceptance checklist below is verified on `master`. Task 7's generated-project source migration is complete: selected API, integration, frontend, and test outputs now render from normalized physical embedded templates, while `TemplateFiles.cs` remains only as the orchestration/scaffolding implementation. Interaction-level frontend coverage (Task 12, Step 4) is verified for login errors, antiforgery propagation, session revocation, notifications, imports/exports, and webhooks. The release matrix has been exercised with minimal/npm, identity/pnpm, saas/npm, and maximal/pnpm profiles. A packed-tool clean-machine smoke test and `.nupkg`/`.snupkg` inspection also pass. Publishing a prerelease package remains an external release action and has not been performed.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
