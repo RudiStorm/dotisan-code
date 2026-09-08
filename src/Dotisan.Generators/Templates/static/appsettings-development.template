@@ -1,0 +1,9 @@
+{
+  "Dotisan": { "Jobs": { "Enabled": false } },
+  "Mail": {
+    "Provider": "__MAIL_PROVIDER__",
+    "Mailpit": { "BaseUrl": "http://localhost:8025/api/v1", "From": "no-reply@localhost" },
+    "Smtp": { "Host": "localhost", "Port": 25, "From": "no-reply@localhost" }
+  },
+  "Logging": { "LogLevel": { "Default": "Information", "Microsoft.AspNetCore": "Information" } }
+}

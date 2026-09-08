@@ -1,0 +1,12 @@
+{
+  "ConnectionStrings": { "DefaultConnection": "__CONNECTION_STRING__" },
+  "Audit": { "Enabled": true },
+  "OpenTelemetry": { "Enabled": false },
+  "Dotisan": {
+    "Security": { "FrontendUrl": "https://localhost:__WEB_PORT__", "DataProtectionKeyDirectory": "DataProtection-Keys", "KnownProxies": [] },
+    "Jobs": { "Enabled": __JOBS_ENABLED__, "MaxAttempts": 3, "RetryDelaySeconds": 5 }
+  },
+  "FrontendUrl": "http://localhost:__WEB_PORT__",
+  "Logging": { "LogLevel": { "Default": "Information", "Microsoft.AspNetCore": "Warning" } },
+  "AllowedHosts": "*"
+}

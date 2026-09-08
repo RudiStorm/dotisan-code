@@ -123,8 +123,16 @@ internal static class TemplateFiles
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Authorization/AuthorizationEndpoints.cs", AuthorizationEndpoints(identifier)) }
                 : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.NotificationsEnabled, options.StorageEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled, options.JobsEnabled)),
-            new($"src/{options.Name}.Api/appsettings.json", AppSettings(options.Name, options.Database, DevelopmentWebPort(options.Name), options.JobsEnabled)),
-            new($"src/{options.Name}.Api/appsettings.Development.json", DevelopmentAppSettings(options.MailProvider)),
+            new($"src/{options.Name}.Api/appsettings.json", TemplateRenderer.Render(TemplateCatalog.Select("static/appsettings.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["CONNECTION_STRING"] = ConnectionString(options.Name, options.Database),
+                ["WEB_PORT"] = DevelopmentWebPort(options.Name).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["JOBS_ENABLED"] = options.JobsEnabled ? "true" : "false"
+            }))),
+            new($"src/{options.Name}.Api/appsettings.Development.json", TemplateRenderer.Render(TemplateCatalog.Select("static/appsettings-development.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["MAIL_PROVIDER"] = options.MailProvider.ToString().ToLowerInvariant()
+            }))),
             new($"src/{options.Name}.Web/package.json", TemplateRenderer.Render(TemplateCatalog.Select("static/web-package.json.template"), new TemplateContext(new Dictionary<string, string>
             {
                 ["PACKAGE_NAME"] = options.Name.ToLowerInvariant(),
@@ -1046,15 +1054,17 @@ internal static class TemplateFiles
         _ => "options.UseSqlite(connectionString)"
     };
 
+    private static string ConnectionString(string name, DatabaseProvider database) => database switch
+    {
+        DatabaseProvider.SqlServer => $"Server=localhost,1433;Database={name};User Id=sa;Password=DotisanDev123!;TrustServerCertificate=True",
+        DatabaseProvider.PostgreSQL => $"Host=localhost;Database={name.ToLowerInvariant()};Username=postgres;Password=postgres",
+        DatabaseProvider.MySQL => $"Server=localhost;Database={name.ToLowerInvariant()};User=root;Password=root",
+        _ => $"Data Source=Data/{name}.db"
+    };
+
     private static string AppSettings(string name, DatabaseProvider database, int webPort, bool jobsEnabled)
     {
-        var connectionString = database switch
-        {
-            DatabaseProvider.SqlServer => $"Server=localhost,1433;Database={name};User Id=sa;Password=DotisanDev123!;TrustServerCertificate=True",
-            DatabaseProvider.PostgreSQL => $"Host=localhost;Database={name.ToLowerInvariant()};Username=postgres;Password=postgres",
-            DatabaseProvider.MySQL => $"Server=localhost;Database={name.ToLowerInvariant()};User=root;Password=root",
-            _ => $"Data Source=Data/{name}.db"
-        };
+        var connectionString = ConnectionString(name, database);
 
         return $$"""
         {
