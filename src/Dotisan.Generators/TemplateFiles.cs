@@ -175,9 +175,12 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/tests/e2e/shell.spec.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/frontend-smoke.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/components/AppSidebar.vue", AppSidebar(options.Name, options.AuthenticationEnabled)),
             new($"src/{options.Name}.Web/src/components/AppHeader.vue", AppHeader(options.Name, options.AuthenticationEnabled)),
-            new($"src/{options.Name}.Web/src/layouts/PortalLayout.vue", PortalLayout()),
-            new($"src/{options.Name}.Web/src/layouts/AuthLayout.vue", AuthLayout()),
-            new($"src/{options.Name}.Web/src/pages/DashboardPage.vue", DashboardPage(options.Name)),
+            new($"src/{options.Name}.Web/src/layouts/PortalLayout.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/portal-layout.template"), TemplateContext.Empty)),
+            new($"src/{options.Name}.Web/src/layouts/AuthLayout.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/auth-layout.template"), TemplateContext.Empty)),
+            new($"src/{options.Name}.Web/src/pages/DashboardPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/dashboard-page.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["PROJECT_NAME"] = options.Name
+            }))),
             ..(options.NotificationsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/NotificationsPage.vue", NotificationsPage()) } : Array.Empty<TemplateFile>()),
             ..(options.ImportsExportsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/ImportsExportsPage.vue", ImportsExportsPage()) } : Array.Empty<TemplateFile>()),
             ..(options.WebhooksEnabled ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/WebhooksPage.vue", WebhooksPage()) } : Array.Empty<TemplateFile>()),
