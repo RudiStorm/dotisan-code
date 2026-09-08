@@ -50,8 +50,14 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Api/{options.Name}.Api.csproj", ApiProject(options.Name, options.Database, options.AuthenticationEnabled, options.JobsEnabled)),
             new($"src/{options.Name}.Api/Program.cs", ApiProgram(identifier, options.Database, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.MultiTenancyEnabled, options.NotificationsEnabled, options.StorageEnabled, options.CachingEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled, options.JobsEnabled)),
             new($"src/{options.Name}.Api/Data/AppDbContext.cs", DbContext(identifier, options.AuthenticationEnabled, options.NotificationsEnabled, options.WebhooksEnabled, options.ImportsExportsEnabled)),
-            new($"src/{options.Name}.Api/Auditing/AuditEntry.cs", AuditEntry(identifier)),
-            new($"src/{options.Name}.Api/Auditing/IAuditWriter.cs", AuditWriterContract(identifier)),
+            new($"src/{options.Name}.Api/Auditing/AuditEntry.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/audit-entry.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["IDENTIFIER"] = identifier
+            }))),
+            new($"src/{options.Name}.Api/Auditing/IAuditWriter.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/audit-writer-contract.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["IDENTIFIER"] = identifier
+            }))),
             new($"src/{options.Name}.Api/Auditing/AuditWriter.cs", AuditWriter(identifier, options.MultiTenancyEnabled)),
             ..(options.MultiTenancyEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Tenancy/TenantContext.cs", TenantContext(identifier)) }
