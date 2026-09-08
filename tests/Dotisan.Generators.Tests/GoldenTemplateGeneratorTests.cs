@@ -665,14 +665,15 @@ public sealed class GoldenTemplateGeneratorTests
             var dbContext = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Data", "AppDbContext.cs"));
             var user = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Identity", "ApplicationUser.cs"));
             var authenticatedProgram = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Program.cs"));
+            var applicationPipeline = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Infrastructure", "ApplicationBuilderExtensions.cs"));
             var productionConfiguration = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Infrastructure", "DotisanProductionConfiguration.cs"));
-            Assert.Contains("X-Correlation-ID", authenticatedProgram);
+            Assert.Contains("X-Correlation-ID", applicationPipeline);
             Assert.Contains("CustomizeProblemDetails", authenticatedProgram);
             Assert.Contains("DotisanProductionConfiguration.Validate", authenticatedProgram);
             Assert.Contains("Dotisan:Security:FrontendUrl must be an absolute HTTPS URL outside Development", productionConfiguration);
             Assert.Contains("Dotisan:Security:DataProtectionKeyDirectory is required outside Development", productionConfiguration);
             Assert.Contains("Mail:Provider must be smtp or a custom provider outside Development", authenticatedProgram);
-            Assert.Contains("UseForwardedHeaders", authenticatedProgram);
+            Assert.Contains("UseForwardedHeaders", applicationPipeline);
             Assert.Contains("KnownProxies", authenticatedProgram);
             Assert.Contains("CookieSecurePolicy.Always", authenticatedProgram);
             Assert.Contains("WithOrigins", authenticatedProgram);

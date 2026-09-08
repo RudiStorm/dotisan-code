@@ -97,6 +97,7 @@ internal static class TemplateFiles
             ..(options.JobsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Jobs/JobRegistration.cs", JobRegistration(identifier, options.Database)), new TemplateFile($"src/{options.Name}.Api/Jobs/SampleJob.cs", SampleJob(identifier)), new TemplateFile($"src/{options.Name}.Api/Jobs/SampleJobHandler.cs", SampleJobHandler(identifier)), new TemplateFile($"src/{options.Name}.Api/Features/Jobs/JobEndpoints.cs", JobEndpoints(identifier, options.AuthenticationEnabled)) } : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Api/Features/Health/HealthEndpoints.cs", HealthEndpoints(identifier)),
             new($"src/{options.Name}.Api/Infrastructure/DotisanSecurityOptions.cs", DotisanSecurityOptions(identifier)),
+            new($"src/{options.Name}.Api/Infrastructure/ApplicationBuilderExtensions.cs", ApplicationBuilderExtensions(identifier)),
             new($"src/{options.Name}.Api/Infrastructure/DotisanProductionConfiguration.cs", DotisanProductionConfiguration(identifier, options.AuthenticationEnabled)),
             ..(options.NotificationsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Notifications.cs", Notifications(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
             ..(options.StorageEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Storage.cs", Storage(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
@@ -759,26 +760,7 @@ internal static class TemplateFiles
     {{(jobsEnabled ? "builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));" : string.Empty)}}
 
     var app = builder.Build();
-    app.UseForwardedHeaders();
-    app.Use(async (context, next) =>
-    {
-        var supplied = context.Request.Headers["X-Correlation-ID"].FirstOrDefault();
-        var correlationId = !string.IsNullOrWhiteSpace(supplied) && supplied.Length <= 100 && supplied.All(character => char.IsLetterOrDigit(character) || character is '-' or '_')
-            ? supplied
-            : Guid.NewGuid().ToString("N");
-        context.Request.Headers["X-Correlation-ID"] = correlationId;
-        context.Response.Headers["X-Correlation-ID"] = correlationId;
-        await next(context);
-    });
-    app.UseExceptionHandler();
-    if (!app.Environment.IsDevelopment())
-    {
-        app.UseHsts();
-        app.UseHttpsRedirection();
-    }
-    app.UseDefaultFiles();
-    app.UseStaticFiles();
-    app.UseCors("frontend");
+    app.UseDotisanPipeline();
     if (app.Environment.IsDevelopment())
     {
         app.MapOpenApi();
@@ -967,26 +949,7 @@ internal static class TemplateFiles
     builder.Services.AddRateLimiter(options => options.AddPolicy("account", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
 
     var app = builder.Build();
-    app.UseForwardedHeaders();
-    app.Use(async (context, next) =>
-    {
-        var supplied = context.Request.Headers["X-Correlation-ID"].FirstOrDefault();
-        var correlationId = !string.IsNullOrWhiteSpace(supplied) && supplied.Length <= 100 && supplied.All(character => char.IsLetterOrDigit(character) || character is '-' or '_')
-            ? supplied
-            : Guid.NewGuid().ToString("N");
-        context.Request.Headers["X-Correlation-ID"] = correlationId;
-        context.Response.Headers["X-Correlation-ID"] = correlationId;
-        await next(context);
-    });
-    app.UseExceptionHandler();
-    if (!app.Environment.IsDevelopment())
-    {
-        app.UseHsts();
-        app.UseHttpsRedirection();
-    }
-    app.UseDefaultFiles();
-    app.UseStaticFiles();
-    app.UseCors("frontend");
+    app.UseDotisanPipeline();
     if (app.Environment.IsDevelopment())
     {
         app.MapOpenApi();
@@ -1839,6 +1802,39 @@ internal static class TemplateFiles
         public sealed record EmailConfirmationResendRequest(string Email);
         public sealed record MfaCodeRequest(string Code);
         public sealed record CurrentUserResponse(string Id, string Email);
+    }
+    """;
+
+    private static string ApplicationBuilderExtensions(string identifier) => $$"""
+    using Microsoft.AspNetCore.Builder;
+    using Microsoft.AspNetCore.Http;
+
+    namespace {{identifier}}.Api.Infrastructure;
+
+    public static class ApplicationBuilderExtensions
+    {
+        public static WebApplication UseDotisanPipeline(this WebApplication app)
+        {
+            app.UseForwardedHeaders();
+            app.Use(async (context, next) =>
+            {
+                var supplied = context.Request.Headers["X-Correlation-ID"].FirstOrDefault();
+                var correlationId = !string.IsNullOrWhiteSpace(supplied) && supplied.Length <= 100 && supplied.All(character => char.IsLetterOrDigit(character) || character is '-' or '_') ? supplied : Guid.NewGuid().ToString("N");
+                context.Request.Headers["X-Correlation-ID"] = correlationId;
+                context.Response.Headers["X-Correlation-ID"] = correlationId;
+                await next(context);
+            });
+            app.UseExceptionHandler();
+            if (!app.Environment.IsDevelopment())
+            {
+                app.UseHsts();
+                app.UseHttpsRedirection();
+            }
+            app.UseDefaultFiles();
+            app.UseStaticFiles();
+            app.UseCors("frontend");
+            return app;
+        }
     }
     """;
 
