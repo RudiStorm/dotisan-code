@@ -2689,15 +2689,57 @@ internal static class TemplateFiles
     """;
 
     private static string IntegrationPagesTest(bool notificationsEnabled, bool importsExportsEnabled, bool webhooksEnabled) => $$"""
-    import { describe, expect, it } from 'vitest';
+    import { mount, flushPromises } from '@vue/test-utils';
+    import { beforeEach, describe, expect, it } from 'vitest';
+    import { vi } from 'vitest';
+    import { request } from '../api/client';
     {{(notificationsEnabled ? "import NotificationsPage from './NotificationsPage.vue';\n" : string.Empty)}}
     {{(importsExportsEnabled ? "import ImportsExportsPage from './ImportsExportsPage.vue';\n" : string.Empty)}}
     {{(webhooksEnabled ? "import WebhooksPage from './WebhooksPage.vue';\n" : string.Empty)}}
 
+    vi.mock('../api/client', () => ({ request: vi.fn() }));
+    const requestMock = vi.mocked(request);
+
     describe('generated integration pages', () => {
-      it('exports each enabled integration page', () => {
-        expect([{{(notificationsEnabled ? "NotificationsPage" : string.Empty)}}{{(notificationsEnabled && (importsExportsEnabled || webhooksEnabled) ? ", " : string.Empty)}}{{(importsExportsEnabled ? "ImportsExportsPage" : string.Empty)}}{{(importsExportsEnabled && webhooksEnabled ? ", " : string.Empty)}}{{(webhooksEnabled ? "WebhooksPage" : string.Empty)}}]).toHaveLength({{(notificationsEnabled ? 1 : 0) + (importsExportsEnabled ? 1 : 0) + (webhooksEnabled ? 1 : 0)}});
+      beforeEach(() => requestMock.mockReset());
+      {{(notificationsEnabled ? """
+      it('loads notifications and marks an unread item as read', async () => {
+        requestMock.mockResolvedValueOnce({ notifications: [{ id: 'n1', title: 'Welcome', body: 'Hello', isRead: false }] });
+        const wrapper = mount(NotificationsPage);
+        await flushPromises();
+        expect(wrapper.text()).toContain('Welcome');
+        requestMock.mockResolvedValueOnce(undefined);
+        await wrapper.get('button').trigger('click');
+        await flushPromises();
+        expect(requestMock).toHaveBeenLastCalledWith('/api/notifications/n1/read', { method: 'POST' });
+        expect(wrapper.find('button').exists()).toBe(false);
       });
+      """ : string.Empty)}}
+      {{(importsExportsEnabled ? """
+      it('queues an import after a file is selected', async () => {
+        requestMock.mockResolvedValueOnce(undefined);
+        const wrapper = mount(ImportsExportsPage);
+        const file = new File(['id,name'], 'customers.csv', { type: 'text/csv' });
+        const input = wrapper.get('input[type=file]');
+        Object.defineProperty(input.element, 'files', { configurable: true, value: [file] });
+        await input.trigger('change');
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+        expect(requestMock).toHaveBeenCalledWith('/api/data/imports', expect.objectContaining({ method: 'POST', body: expect.any(FormData) }));
+        expect(wrapper.text()).toContain('Import queued.');
+      });
+      """ : string.Empty)}}
+      {{(webhooksEnabled ? """
+      it('replays a webhook delivery', async () => {
+        requestMock.mockResolvedValueOnce([{ id: 'd1', eventType: 'CustomerCreated', endpoint: 'https://example.test', status: 'failed', attempts: 1 }]);
+        const wrapper = mount(WebhooksPage);
+        await flushPromises();
+        requestMock.mockResolvedValueOnce(undefined);
+        await wrapper.get('button').trigger('click');
+        await flushPromises();
+        expect(requestMock).toHaveBeenLastCalledWith('/api/webhooks/deliveries/d1/replay', { method: 'POST' });
+      });
+      """ : string.Empty)}}
     });
     """;
 
