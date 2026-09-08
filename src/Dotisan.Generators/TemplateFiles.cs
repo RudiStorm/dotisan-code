@@ -198,8 +198,8 @@ internal static class TemplateFiles
                 ? new[] {
                     new TemplateFile($"src/{options.Name}.Web/src/pages/auth/LoginPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/auth-login-page.template"), TemplateContext.Empty)),
                     new TemplateFile($"src/{options.Name}.Web/src/pages/auth/RegisterPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/auth-register-page.template"), TemplateContext.Empty)),
-                    new TemplateFile($"src/{options.Name}.Web/src/pages/auth/ForgotPasswordPage.vue", ForgotPasswordPage()),
-                    new TemplateFile($"src/{options.Name}.Web/src/pages/auth/EmailConfirmationPage.vue", EmailConfirmationPage()),
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/auth/ForgotPasswordPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/auth-forgot-password-page.template"), TemplateContext.Empty)),
+                    new TemplateFile($"src/{options.Name}.Web/src/pages/auth/EmailConfirmationPage.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/auth-email-confirmation-page.template"), TemplateContext.Empty)),
                     new TemplateFile($"src/{options.Name}.Web/src/pages/auth/MfaChallengePage.vue", MfaChallengePage()),
                     new TemplateFile($"src/{options.Name}.Web/src/pages/account/ProfilePage.vue", ProfilePage()),
                     new TemplateFile($"src/{options.Name}.Web/src/pages/account/MfaPage.vue", MfaPage()),
