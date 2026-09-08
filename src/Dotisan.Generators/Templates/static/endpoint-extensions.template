@@ -1,0 +1,26 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
+using __IDENTIFIER__.Api.Features.Health;
+__JOBS_USING__
+__INTEGRATIONS_USING__
+__AUTH_USING__
+
+namespace __IDENTIFIER__.Api.Infrastructure;
+
+public static class DotisanEndpointExtensions
+{
+    // Endpoint registration is intentionally explicit and inspectable.
+    public static IEndpointRouteBuilder MapDotisanEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        // DOTISAN:ENDPOINTS
+        HealthEndpoints.MapHealthEndpoints(endpoints);
+__JOB_MAP__
+__NOTIFICATIONS_MAP__
+__STORAGE_MAP__
+__IMPORTS_MAP__
+__WEBHOOKS_MAP__
+__AUTH_MAP__
+        return endpoints;
+    }
+}

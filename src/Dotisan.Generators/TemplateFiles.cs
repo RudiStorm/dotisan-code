@@ -141,7 +141,19 @@ internal static class TemplateFiles
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Features/Authorization/AuthorizationEndpoints.cs", AuthorizationEndpoints(identifier)) }
                 : Array.Empty<TemplateFile>()),
-            new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", EndpointExtensions(identifier, options.AuthenticationEnabled, options.Registration == RegistrationPolicy.Public, options.NotificationsEnabled, options.StorageEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled, options.JobsEnabled)),
+            new($"src/{options.Name}.Api/Infrastructure/DotisanEndpointExtensions.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/endpoint-extensions.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["IDENTIFIER"] = identifier,
+                ["JOBS_USING"] = options.JobsEnabled ? $"using {identifier}.Api.Features.Jobs;" : string.Empty,
+                ["INTEGRATIONS_USING"] = options.NotificationsEnabled || options.StorageEnabled || options.ImportsExportsEnabled || options.WebhooksEnabled ? $"using {identifier}.Api.Integrations;" : string.Empty,
+                ["AUTH_USING"] = options.AuthenticationEnabled ? $"using {identifier}.Api.Features.Account;\nusing {identifier}.Api.Features.Authorization;" : string.Empty,
+                ["JOB_MAP"] = options.JobsEnabled ? "        JobEndpoints.MapJobEndpoints(endpoints);" : string.Empty,
+                ["NOTIFICATIONS_MAP"] = options.NotificationsEnabled ? "        NotificationEndpoints.Map(endpoints); endpoints.MapHub<NotificationHub>(\"/hubs/notifications\");" : string.Empty,
+                ["STORAGE_MAP"] = options.StorageEnabled ? "        StorageEndpoints.Map(endpoints);" : string.Empty,
+                ["IMPORTS_MAP"] = options.ImportsExportsEnabled ? "        ImportExportEndpoints.Map(endpoints);" : string.Empty,
+                ["WEBHOOKS_MAP"] = options.WebhooksEnabled ? "        WebhookEndpoints.Map(endpoints);" : string.Empty,
+                ["AUTH_MAP"] = options.AuthenticationEnabled ? $"        AccountEndpoints.MapAccountEndpoints(endpoints, {(options.Registration == RegistrationPolicy.Public ? "true" : "false")});\n        AuthorizationEndpoints.MapAuthorizationEndpoints(endpoints);" : string.Empty
+            }))),
             new($"src/{options.Name}.Api/appsettings.json", TemplateRenderer.Render(TemplateCatalog.Select("static/appsettings.template"), new TemplateContext(new Dictionary<string, string>
             {
                 ["CONNECTION_STRING"] = ConnectionString(options.Name, options.Database),
