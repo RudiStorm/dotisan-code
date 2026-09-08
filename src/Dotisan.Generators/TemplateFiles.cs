@@ -110,7 +110,10 @@ internal static class TemplateFiles
                     }))) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
-                ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/IExternalLoginProvider.cs", ExternalLoginProvider(identifier)) }
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/IExternalLoginProvider.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/external-login-provider.template"), new TemplateContext(new Dictionary<string, string>
+                    {
+                        ["IDENTIFIER"] = identifier
+                    }))) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/IntegrationExamples.cs", IntegrationExamples(identifier)) }
