@@ -58,7 +58,10 @@ internal static class TemplateFiles
             {
                 ["IDENTIFIER"] = identifier
             }))),
-            new($"src/{options.Name}.Api/Auditing/AuditWriter.cs", AuditWriter(identifier, options.MultiTenancyEnabled)),
+            new($"src/{options.Name}.Api/Auditing/AuditWriter.cs", TemplateRenderer.Render(TemplateCatalog.Select(options.MultiTenancyEnabled ? "static/audit-writer-tenant.template" : "static/audit-writer.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["IDENTIFIER"] = identifier
+            }))),
             ..(options.MultiTenancyEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Tenancy/TenantContext.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/tenant-context.template"), new TemplateContext(new Dictionary<string, string>
                     {
