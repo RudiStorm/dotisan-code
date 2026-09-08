@@ -853,6 +853,25 @@ public sealed class GoldenTemplateGeneratorTests
     }
 
     [Fact]
+    public async Task Plain_client_does_not_call_missing_antiforgery_endpoint()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-plain-client-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var result = await new GoldenTemplateGenerator().GenerateAsync(ProjectOptions.Quick("PlainClientApp", output), CancellationToken.None);
+            Assert.True(result.Success, result.ErrorMessage);
+            var client = await File.ReadAllTextAsync(Path.Combine(output, "src", "PlainClientApp.Web", "src", "api", "client.ts"));
+            Assert.DoesNotContain("antiforgery", client, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("X-XSRF-TOKEN", client, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(output))
+                Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Pnpm_docker_install_matches_manifest_tool_version()
     {
         var output = Path.Combine(Path.GetTempPath(), "dotisan-pnpm-docker-test-" + Guid.NewGuid().ToString("N"));

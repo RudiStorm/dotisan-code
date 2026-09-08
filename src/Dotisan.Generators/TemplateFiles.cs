@@ -275,7 +275,15 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/src/App.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/web-app.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/style.css", TemplateRenderer.Render(TemplateCatalog.Select("static/style.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/dotisan/.gitkeep", string.Empty),
-            new($"src/{options.Name}.Web/src/api/client.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/api-client.template"), TemplateContext.Empty)),
+            new($"src/{options.Name}.Web/src/api/client.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/api-client.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["ANTIFORGERY_FUNCTION"] = options.AuthenticationEnabled
+                    ? "export async function issueAntiforgery(): Promise<string> {\n  const response = await fetch('/api/account/antiforgery', { credentials: 'include' });\n  if (!response.ok) throw new Error('Could not obtain an antiforgery token.');\n  return (await response.json() as { token: string }).token;\n}"
+                    : string.Empty,
+                ["ANTIFORGERY_HEADER"] = options.AuthenticationEnabled
+                    ? "  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') headers.set('X-XSRF-TOKEN', await issueAntiforgery());"
+                    : string.Empty
+            }))),
             new($"src/{options.Name}.Web/src/components/ui/Button.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/ui-button.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/components/ui/Input.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/ui-input.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/components/ui/Card.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/ui-card.template"), TemplateContext.Empty)),
