@@ -57,7 +57,10 @@ internal static class TemplateFiles
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Tenancy/TenantContext.cs", TenantContext(identifier)) }
                 : Array.Empty<TemplateFile>()),
             ..(options.JobsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Jobs/JobRegistration.cs", JobRegistration(identifier, options.Database)), new TemplateFile($"src/{options.Name}.Api/Jobs/SampleJob.cs", SampleJob(identifier)), new TemplateFile($"src/{options.Name}.Api/Jobs/SampleJobHandler.cs", SampleJobHandler(identifier)), new TemplateFile($"src/{options.Name}.Api/Features/Jobs/JobEndpoints.cs", JobEndpoints(identifier, options.AuthenticationEnabled)) } : Array.Empty<TemplateFile>()),
-            new($"src/{options.Name}.Api/Features/Health/HealthEndpoints.cs", HealthEndpoints(identifier)),
+            new($"src/{options.Name}.Api/Features/Health/HealthEndpoints.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/health-endpoints.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["IDENTIFIER"] = identifier
+            }))),
             new($"src/{options.Name}.Api/Infrastructure/DotisanSecurityOptions.cs", DotisanSecurityOptions(identifier)),
             new($"src/{options.Name}.Api/Infrastructure/ApplicationBuilderExtensions.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/application-builder-extensions.template"), new TemplateContext(new Dictionary<string, string>
             {
