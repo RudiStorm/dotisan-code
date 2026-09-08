@@ -149,7 +149,16 @@ internal static class TemplateFiles
                 ["TENANT_REQUIRE"] = options.MultiTenancyEnabled ? "tenantContext.RequireTenantId()" : "null",
                 ["TENANT_QUERY"] = options.MultiTenancyEnabled ? "var tenantId = tenantContext.RequireTenantId(); query = query.Where(item => item.TenantId == tenantId);" : string.Empty
             }))) } : Array.Empty<TemplateFile>()),
-            ..(options.WebhooksEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Webhooks.cs", Webhooks(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled, options.JobsEnabled)) } : Array.Empty<TemplateFile>()),
+            ..(options.WebhooksEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Webhooks.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/webhooks.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["IDENTIFIER"] = identifier,
+                ["AUTH_USING"] = options.AuthenticationEnabled ? $"using {identifier}.Api.Authorization;" : string.Empty,
+                ["WOLVERINE_USING"] = options.JobsEnabled ? "using Wolverine;" : string.Empty,
+                ["AUTHORIZATION"] = options.AuthenticationEnabled ? "group.RequireAuthorization();" : string.Empty,
+                ["AUTHORIZATION_REPLAY"] = options.AuthenticationEnabled ? ".RequireAuthorization(Permissions.AuthorizationManage)" : string.Empty,
+                ["REPLAY_STATUS"] = options.JobsEnabled ? "\"queued\"" : "\"delivered\"",
+                ["DURABLE_SUPPORT"] = options.JobsEnabled ? DurableWebhookSupport(identifier) : string.Empty
+            }))) } : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Identity/ApplicationUser.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/application-user.template"), new TemplateContext(new Dictionary<string, string>
                     {
