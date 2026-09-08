@@ -246,7 +246,10 @@ internal static class TemplateFiles
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"tests/{options.Name}.Api.Tests/AuthenticationEndpointTests.cs", AuthenticationTests(identifier, options.Registration)) }
                 : Array.Empty<TemplateFile>()),
-            new($"{options.Name}.sln", Solution(options.Name))
+            new($"{options.Name}.sln", TemplateRenderer.Render(TemplateCatalog.Select("static/solution.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["PROJECT_NAME"] = options.Name
+            })))
         ];
     }
 
