@@ -47,6 +47,25 @@ public sealed class ProjectOptionsTests
         Assert.Equal(provider == JobProvider.Wolverine, options.JobsEnabled);
     }
 
+    [Fact]
+    public void Custom_profile_preserves_explicit_choices()
+    {
+        var options = ProjectOptions.Quick("TodoApp", "C:\\work\\TodoApp") with
+        {
+            AuthenticationEnabled = true,
+            JobsEnabled = true,
+            JobProvider = JobProvider.Wolverine,
+            NotificationsEnabled = true
+        };
+
+        var custom = options.WithProfile(ProjectProfile.Custom);
+
+        Assert.Equal(ProjectProfile.Custom, custom.Profile);
+        Assert.True(custom.AuthenticationEnabled);
+        Assert.True(custom.JobsEnabled);
+        Assert.True(custom.NotificationsEnabled);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("not valid")]

@@ -89,6 +89,9 @@ public sealed record ProjectOptions(
 
     public ProjectOptions WithProfile(ProjectProfile profile)
     {
+        if (profile == ProjectProfile.Custom)
+            return this with { Profile = ProjectProfile.Custom };
+
         var authentication = profile is ProjectProfile.Identity or ProjectProfile.Saas or ProjectProfile.Maximal;
         var tenancy = profile is ProjectProfile.Saas or ProjectProfile.Maximal;
         var integrations = profile is ProjectProfile.Maximal;
