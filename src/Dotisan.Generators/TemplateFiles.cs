@@ -272,7 +272,15 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/src/components/ui/Badge.test.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/ui-badge-test.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/api/client.test.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/api-client.test.template"), TemplateContext.Empty)),
             ..(options.NotificationsEnabled || options.ImportsExportsEnabled || options.WebhooksEnabled
-                ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/integration-pages.test.ts", IntegrationPagesTest(options.NotificationsEnabled, options.ImportsExportsEnabled, options.WebhooksEnabled)) }
+                ? new[] { new TemplateFile($"src/{options.Name}.Web/src/pages/integration-pages.test.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/integration-pages-test.template"), new TemplateContext(new Dictionary<string, string>
+                    {
+                        ["NOTIFICATIONS_IMPORT"] = options.NotificationsEnabled ? "import NotificationsPage from './NotificationsPage.vue';" : string.Empty,
+                        ["IMPORTS_IMPORT"] = options.ImportsExportsEnabled ? "import ImportsExportsPage from './ImportsExportsPage.vue';" : string.Empty,
+                        ["WEBHOOKS_IMPORT"] = options.WebhooksEnabled ? "import WebhooksPage from './WebhooksPage.vue';" : string.Empty,
+                        ["NOTIFICATIONS_TEST"] = options.NotificationsEnabled ? IntegrationNotificationsTest() : string.Empty,
+                        ["IMPORTS_TEST"] = options.ImportsExportsEnabled ? IntegrationImportsTest() : string.Empty,
+                        ["WEBHOOKS_TEST"] = options.WebhooksEnabled ? IntegrationWebhooksTest() : string.Empty
+                    }))) }
                 : Array.Empty<TemplateFile>()),
             new($"src/{options.Name}.Web/tests/e2e/shell.spec.ts", TemplateRenderer.Render(TemplateCatalog.Select("static/frontend-smoke.template"), TemplateContext.Empty)),
             new($"src/{options.Name}.Web/src/components/AppSidebar.vue", TemplateRenderer.Render(TemplateCatalog.Select("static/app-sidebar.template"), new TemplateContext(new Dictionary<string, string>
@@ -2766,6 +2774,47 @@ internal static class TemplateFiles
       });
     });
     """;
+
+    private static string IntegrationNotificationsTest() => """
+      it('loads notifications and marks an unread item as read', async () => {
+        requestMock.mockResolvedValueOnce({ notifications: [{ id: 'n1', title: 'Welcome', body: 'Hello', isRead: false }] });
+        const wrapper = mount(NotificationsPage);
+        await flushPromises();
+        expect(wrapper.text()).toContain('Welcome');
+        requestMock.mockResolvedValueOnce(undefined);
+        await wrapper.get('button').trigger('click');
+        await flushPromises();
+        expect(requestMock).toHaveBeenLastCalledWith('/api/notifications/n1/read', { method: 'POST' });
+        expect(wrapper.find('button').exists()).toBe(false);
+      });
+      """;
+
+    private static string IntegrationImportsTest() => """
+      it('queues an import after a file is selected', async () => {
+        requestMock.mockResolvedValueOnce(undefined);
+        const wrapper = mount(ImportsExportsPage);
+        const file = new File(['id,name'], 'customers.csv', { type: 'text/csv' });
+        const input = wrapper.get('input[type=file]');
+        Object.defineProperty(input.element, 'files', { configurable: true, value: [file] });
+        await input.trigger('change');
+        await wrapper.get('form').trigger('submit');
+        await flushPromises();
+        expect(requestMock).toHaveBeenCalledWith('/api/data/imports', expect.objectContaining({ method: 'POST', body: expect.any(FormData) }));
+        expect(wrapper.text()).toContain('Import queued.');
+      });
+      """;
+
+    private static string IntegrationWebhooksTest() => """
+      it('replays a webhook delivery', async () => {
+        requestMock.mockResolvedValueOnce([{ id: 'd1', eventType: 'CustomerCreated', endpoint: 'https://example.test', status: 'failed', attempts: 1 }]);
+        const wrapper = mount(WebhooksPage);
+        await flushPromises();
+        requestMock.mockResolvedValueOnce(undefined);
+        await wrapper.get('button').trigger('click');
+        await flushPromises();
+        expect(requestMock).toHaveBeenLastCalledWith('/api/webhooks/deliveries/d1/replay', { method: 'POST' });
+      });
+      """;
 
     private static string IntegrationPagesTest(bool notificationsEnabled, bool importsExportsEnabled, bool webhooksEnabled) => $$"""
     import { mount, flushPromises } from '@vue/test-utils';

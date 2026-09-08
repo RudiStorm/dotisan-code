@@ -1,0 +1,17 @@
+import { mount, flushPromises } from '@vue/test-utils';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { vi } from 'vitest';
+import { request } from '../api/client';
+__NOTIFICATIONS_IMPORT__
+__IMPORTS_IMPORT__
+__WEBHOOKS_IMPORT__
+
+vi.mock('../api/client', () => ({ request: vi.fn() }));
+const requestMock = vi.mocked(request);
+
+describe('generated integration pages', () => {
+  beforeEach(() => requestMock.mockReset());
+__NOTIFICATIONS_TEST__
+__IMPORTS_TEST__
+__WEBHOOKS_TEST__
+});
