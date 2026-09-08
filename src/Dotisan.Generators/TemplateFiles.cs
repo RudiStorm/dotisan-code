@@ -127,7 +127,7 @@ internal static class TemplateFiles
             }))),
             ..(options.NotificationsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Notifications.cs", Notifications(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
             ..(options.StorageEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Storage.cs", Storage(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
-            ..(options.CachingEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Caching.cs", Caching(identifier)) } : Array.Empty<TemplateFile>()),
+            ..(options.CachingEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Caching.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/caching.template"), new TemplateContext(new Dictionary<string, string> { ["IDENTIFIER"] = identifier }))) } : Array.Empty<TemplateFile>()),
             ..(options.ImportsExportsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/ImportsExports.cs", ImportsExports(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
             ..(options.WebhooksEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Webhooks.cs", Webhooks(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled, options.JobsEnabled)) } : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
