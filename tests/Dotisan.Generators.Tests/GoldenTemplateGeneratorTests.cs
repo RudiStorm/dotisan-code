@@ -86,10 +86,10 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.DoesNotContain("<PackageReference Include=\"SQLitePCLRaw.lib.e_sqlite3\"", apiProject);
             Assert.Contains("AddOpenApi", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.Contains("MapOpenApi", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
-            Assert.Contains("OpenTelemetry.Extensions.Hosting", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "TodoApp.Api.csproj")));
-            Assert.Contains("OpenTelemetry.Exporter.OpenTelemetryProtocol", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "TodoApp.Api.csproj")));
-            Assert.Contains("AddAspNetCoreInstrumentation", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
-            Assert.Contains("AddHttpClientInstrumentation", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
+            Assert.DoesNotContain("OpenTelemetry.Extensions.Hosting", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "TodoApp.Api.csproj")));
+            Assert.DoesNotContain("OpenTelemetry.Exporter.OpenTelemetryProtocol", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "TodoApp.Api.csproj")));
+            Assert.DoesNotContain("AddAspNetCoreInstrumentation", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
+            Assert.DoesNotContain("AddHttpClientInstrumentation", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.Contains("\"OpenTelemetry\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "JobRegistration.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "SampleJob.cs")));
@@ -376,7 +376,7 @@ public sealed class GoldenTemplateGeneratorTests
     }
 
     [Fact]
-    public async Task Generated_api_contains_aspire_and_complete_opentelemetry_wiring()
+    public async Task Generated_api_keeps_observability_opt_in()
     {
         var output = Path.Combine(Path.GetTempPath(), "dotisan-observability-test-" + Guid.NewGuid().ToString("N"));
         try
@@ -385,8 +385,8 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(generated.Success, generated.ErrorMessage);
             var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "ObservabilityApp.Api", "Program.cs"));
             var compose = await File.ReadAllTextAsync(Path.Combine(output, "compose.yaml"));
-            Assert.Contains("AddEntityFrameworkCoreInstrumentation", program);
-            Assert.Contains("AddOpenTelemetry(logging", program);
+            Assert.DoesNotContain("AddEntityFrameworkCoreInstrumentation", program);
+            Assert.DoesNotContain("AddOpenTelemetry(logging", program);
             Assert.Contains("aspire-dashboard", compose);
             Assert.Contains("18888:18888", compose);
         }

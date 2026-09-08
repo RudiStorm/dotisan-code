@@ -8,10 +8,7 @@ using __IDENTIFIER__.Api.Features.Health;
 using Microsoft.AspNetCore.SignalR;
 __INTEGRATIONS_USING__
 __WOLVERINE_USING__
-using OpenTelemetry;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Trace;
-using OpenTelemetry.Logs;
+__OTEL_USINGS__
 using Microsoft.AspNetCore.HttpOverrides;
 using System.Net;
 
@@ -28,12 +25,9 @@ builder.Services.AddCors(options => options.AddPolicy("frontend", policy =>
     var frontendUrl = builder.Environment.IsDevelopment() ? builder.Configuration["FrontendUrl"] : builder.Configuration["Dotisan:Security:FrontendUrl"] ?? builder.Configuration["FrontendUrl"];
     if (Uri.TryCreate(frontendUrl, UriKind.Absolute, out var origin)) policy.WithOrigins(origin.GetLeftPart(UriPartial.Authority)).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
 }));
-if (args.Contains("--dotisan-observability", StringComparer.OrdinalIgnoreCase)) builder.Configuration["OpenTelemetry:Enabled"] = "true";
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context => context.ProblemDetails.Extensions["correlationId"] = context.HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? context.HttpContext.TraceIdentifier);
-var openTelemetry = builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddEntityFrameworkCoreInstrumentation()).WithMetrics(metrics => metrics.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation());
-builder.Logging.AddOpenTelemetry(logging => logging.IncludeFormattedMessage = true);
-if (builder.Configuration.GetValue("OpenTelemetry:Enabled", false)) openTelemetry.UseOtlpExporter();
+__OTEL_SERVICES__
 var connectionString = ResolveConnectionString(builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required."), builder.Environment.ContentRootPath);
 builder.Services.AddDbContext<AppDbContext>(options => __DATABASE_REGISTRATION__);
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
