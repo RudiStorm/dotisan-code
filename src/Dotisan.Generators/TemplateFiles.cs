@@ -104,7 +104,10 @@ internal static class TemplateFiles
                     }))) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
-                ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/IEmailProvider.cs", EmailSender(identifier)) }
+                ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/IEmailProvider.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/email-provider.template"), new TemplateContext(new Dictionary<string, string>
+                    {
+                        ["IDENTIFIER"] = identifier
+                    }))) }
                 : Array.Empty<TemplateFile>()),
             ..(options.AuthenticationEnabled
                 ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/IExternalLoginProvider.cs", ExternalLoginProvider(identifier)) }
