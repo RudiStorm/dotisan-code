@@ -180,4 +180,4 @@ jobs:
           dotnet run --project ../../src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- generate --check --no-openapi --no-build
       - name: Verify generated frontend
         shell: bash
-        run: scripts/test-generated-project.sh "${{ github.workspace }}/generated/${{ matrix.profile }}-${{ matrix.package_manager }}" "${{ matrix.package_manager }}"
+        run: bash scripts/test-generated-project.sh "${{ github.workspace }}/generated/${{ matrix.profile }}-${{ matrix.package_manager }}" "${{ matrix.package_manager }}"
