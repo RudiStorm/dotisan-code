@@ -120,7 +120,7 @@ public static class AccountEndpoints
         var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
         if (userId is null) return Results.Unauthorized();
         var sessions = (await db.ApplicationSessions.AsNoTracking().Where(session => session.UserId == userId && session.RevokedAt == null).ToListAsync()).Where(session => session.ExpiresAt > DateTimeOffset.UtcNow).OrderByDescending(session => session.LastSeenAt).Select(session => new SessionInfo(session.Id, session.DeviceName, session.CreatedAt, session.LastSeenAt, session.ExpiresAt, session.UserAgent, session.IpAddress)).ToList();
-        return Results.Ok(new SessionsResponse(sessions));
+        return Results.Ok(new SessionsResponse(sessions.ToArray()));
     }
 
     private static async Task<IResult> RevokeSession(Guid id, ClaimsPrincipal principal, AppDbContext db)
