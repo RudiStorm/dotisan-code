@@ -162,6 +162,14 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.x'
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22.x'
+      - name: Enable package-manager tooling
+        shell: bash
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
       - name: Generate project
         shell: pwsh
         run: |
