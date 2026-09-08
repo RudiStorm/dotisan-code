@@ -178,11 +178,12 @@ jobs:
       - run: dotnet build generated/${{ matrix.profile }}-${{ matrix.package_manager }}/GeneratedApp${{ matrix.profile }}${{ matrix.package_manager }}.sln --configuration Release --no-restore --warnaserror
       - run: dotnet test generated/${{ matrix.profile }}-${{ matrix.package_manager }}/GeneratedApp${{ matrix.profile }}${{ matrix.package_manager }}.sln --configuration Release --no-build --no-restore --verbosity minimal
       - name: Exercise resource and contract generation workflow
-        if: matrix.profile == 'maximal'
+        if: matrix.profile == 'identity' || matrix.profile == 'maximal'
         shell: bash
         run: |
           cd generated/${{ matrix.profile }}-${{ matrix.package_manager }}
           dotnet run --project ../../src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- make:resource Customer
+          dotnet run --project ../../src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- make:crud Customer
           dotnet build GeneratedApp${{ matrix.profile }}${{ matrix.package_manager }}.sln --configuration Release --no-restore --warnaserror
           dotnet run --project ../../src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- generate --no-openapi --no-build
           dotnet run --project ../../src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- generate --check --no-openapi --no-build
