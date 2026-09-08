@@ -21,6 +21,8 @@ internal static class TemplateFiles
                 ["DATABASE_DISPLAY"] = DatabaseDisplayName(options.Database),
                 ["DATABASE_SETUP"] = DatabaseSetup(options.Name, options.Database)
             }))),
+            new("PRODUCT.md", TemplateRenderer.Render(TemplateCatalog.Select("static/product.template"), TemplateContext.Empty)),
+            new("DESIGN.md", TemplateRenderer.Render(TemplateCatalog.Select("static/design.template"), TemplateContext.Empty)),
             new("dotisan.config", TemplateRenderer.Render(TemplateCatalog.Select("static/dotisan-config.template"), new TemplateContext(new Dictionary<string, string>
             {
                 ["JOBS"] = options.JobsEnabled ? "wolverine" : "none",

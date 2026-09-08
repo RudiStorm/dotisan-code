@@ -53,6 +53,8 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "dotisan", "services.ts")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "dotisan", "queries.ts")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "routes", "index.ts")));
+            Assert.True(File.Exists(Path.Combine(output, "PRODUCT.md")));
+            Assert.True(File.Exists(Path.Combine(output, "DESIGN.md")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "components", "ui", "Button.vue")));
             Assert.Contains("\"skipLibCheck\": true", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "tsconfig.app.json")));
             Assert.Contains("\"skipLibCheck\": true", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "tsconfig.node.json")));

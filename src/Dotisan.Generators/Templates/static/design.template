@@ -1,0 +1,9 @@
+# Design baseline
+
+The generated Vue portal provides an accessible baseline with shared layout,
+form, card, and status components. Treat it as application-owned source:
+replace the visual language, typography, spacing, and interaction patterns to
+match your product.
+
+Preserve keyboard navigation, visible focus states, semantic labels, loading
+states, empty states, and actionable error messages while customizing screens.
