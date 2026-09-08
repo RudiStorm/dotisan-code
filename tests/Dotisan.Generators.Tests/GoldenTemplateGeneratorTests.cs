@@ -400,6 +400,31 @@ public sealed class GoldenTemplateGeneratorTests
     }
 
     [Fact]
+    public async Task Explicit_observability_adds_otlp_dependencies_and_wiring()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-observability-enabled-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var generated = await new GoldenTemplateGenerator().GenerateAsync(
+                ProjectOptions.Quick("ObservabilityEnabledApp", output) with { ObservabilityEnabled = true },
+                CancellationToken.None);
+            Assert.True(generated.Success, generated.ErrorMessage);
+            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "ObservabilityEnabledApp.Api", "Program.cs"));
+            var project = await File.ReadAllTextAsync(Path.Combine(output, "src", "ObservabilityEnabledApp.Api", "ObservabilityEnabledApp.Api.csproj"));
+            var config = await File.ReadAllTextAsync(Path.Combine(output, "dotisan.config"));
+            Assert.Contains("AddEntityFrameworkCoreInstrumentation", program);
+            Assert.Contains("UseOtlpExporter", program);
+            Assert.Contains("OpenTelemetry.Exporter.OpenTelemetryProtocol", project);
+            Assert.Contains("observability: true", config);
+        }
+        finally
+        {
+            if (Directory.Exists(output))
+                Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Generated_webhooks_use_the_named_timeout_client()
     {
         var output = Path.Combine(Path.GetTempPath(), "dotisan-webhook-client-test-" + Guid.NewGuid().ToString("N"));

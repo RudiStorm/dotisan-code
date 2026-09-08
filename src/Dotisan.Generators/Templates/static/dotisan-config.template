@@ -18,6 +18,6 @@ dev:
     api: true
     frontend: true
     database: true
-    observability: false
+    observability: __OBSERVABILITY__
     mail: __MAIL_SERVICE__
     workers: false

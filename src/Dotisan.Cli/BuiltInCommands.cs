@@ -672,6 +672,7 @@ internal sealed class NewCommand : IDotisanCommand
         var cachingEnabled = false;
         var importsExportsEnabled = false;
         var webhooksEnabled = false;
+        var observabilityEnabled = false;
         var jobsEnabled = false;
         var restore = true;
         string? profile = null;
@@ -768,6 +769,10 @@ internal sealed class NewCommand : IDotisanCommand
                     if (!TryReadValue(arguments, ref index, out var webhooksValue) || !TryParseYesNo(webhooksValue, out webhooksEnabled))
                         return UsageError(context, "--webhooks must be yes or no.");
                     break;
+                case "--observability":
+                    if (!TryReadValue(arguments, ref index, out var observabilityValue) || !TryParseYesNo(observabilityValue, out observabilityEnabled))
+                        return UsageError(context, "--observability must be yes or no.");
+                    break;
                 case "--no-restore":
                     restore = false;
                     break;
@@ -790,6 +795,7 @@ internal sealed class NewCommand : IDotisanCommand
                 || cachingEnabled != expectedIntegrations
                 || importsExportsEnabled != expectedIntegrations
                 || webhooksEnabled != expectedIntegrations
+                || observabilityEnabled
                 || jobsEnabled != expectedJobs)
             {
                 return UsageError(context, "Profile options conflict with explicit feature flags. Use --profile custom for manual overrides.");
@@ -813,6 +819,7 @@ internal sealed class NewCommand : IDotisanCommand
                     ,CachingEnabled = cachingEnabled
                     ,ImportsExportsEnabled = importsExportsEnabled
                     ,WebhooksEnabled = webhooksEnabled
+                    ,ObservabilityEnabled = observabilityEnabled
                     ,JobsEnabled = jobsEnabled
                     ,Profile = profile switch
                     {

@@ -12,6 +12,7 @@
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" PrivateAssets="all" />
 __JOBS_PACKAGES__
+__OTEL_PACKAGES__
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
 __AUTH_PACKAGE__
   </ItemGroup>

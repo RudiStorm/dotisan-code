@@ -62,6 +62,7 @@ public sealed record ProjectOptions(
     public bool CachingEnabled { get; init; }
     public bool ImportsExportsEnabled { get; init; }
     public bool WebhooksEnabled { get; init; }
+    public bool ObservabilityEnabled { get; init; }
     public bool JobsEnabled { get; init; }
     private static readonly Regex ValidName = new("^[A-Za-z][A-Za-z0-9_-]*$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 

@@ -39,6 +39,7 @@ internal static class TemplateFiles
                 ["WEBHOOKS"] = options.WebhooksEnabled ? "enabled" : "disabled",
                 ["PACKAGE_MANAGER"] = options.PackageManager.ToString().ToLowerInvariant(),
                 ["MAIL_SERVICE"] = options.MailProvider == MailProvider.Mailpit ? "true" : "false"
+                ,["OBSERVABILITY"] = options.ObservabilityEnabled ? "true" : "false"
             }))),
             new("dotisan.contract.json", InitialContractManifest(options.AuthenticationEnabled).ToJson()),
             new("Dockerfile", TemplateRenderer.Render(TemplateCatalog.Select(options.PackageManager == PackageManager.Pnpm ? "static/dockerfile-pnpm.template" : "static/dockerfile-npm.template"), new TemplateContext(new Dictionary<string, string>
@@ -52,6 +53,7 @@ internal static class TemplateFiles
                 ["DATABASE_PACKAGE"] = DatabasePackage(options.Database),
                 ["JOBS_PACKAGES"] = options.JobsEnabled ? $"    <PackageReference Include=\"WolverineFx\" />\n    <PackageReference Include=\"WolverineFx.EntityFrameworkCore\" />\n    <PackageReference Include=\"WolverineFx.RuntimeCompilation\" />\n    <PackageReference Include=\"WolverineFx.{WolverineProviderPackage(options.Database)}\" />" : string.Empty,
                 ["AUTH_PACKAGE"] = options.AuthenticationEnabled ? "    <PackageReference Include=\"Microsoft.AspNetCore.Identity.EntityFrameworkCore\" />" : string.Empty
+                ,["OTEL_PACKAGES"] = options.ObservabilityEnabled ? "    <PackageReference Include=\"OpenTelemetry.Extensions.Hosting\" />\n    <PackageReference Include=\"OpenTelemetry.Instrumentation.AspNetCore\" />\n    <PackageReference Include=\"OpenTelemetry.Instrumentation.EntityFrameworkCore\" />\n    <PackageReference Include=\"OpenTelemetry.Instrumentation.Http\" />\n    <PackageReference Include=\"OpenTelemetry.Exporter.OpenTelemetryProtocol\" />" : string.Empty
             }))),
             new($"src/{options.Name}.Api/Program.cs", options.AuthenticationEnabled
                 ? TemplateRenderer.Render(TemplateCatalog.Select("static/program-auth.template"), new TemplateContext(new Dictionary<string, string>
@@ -60,8 +62,8 @@ internal static class TemplateFiles
                     ["TENANT_USING"] = options.MultiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty,
                     ["JOBS_USING"] = options.JobsEnabled ? $"using {identifier}.Api.Jobs;" : string.Empty,
                     ["WOLVERINE_USING"] = options.JobsEnabled ? "using Wolverine;" : string.Empty,
-                    ["OTEL_USINGS"] = string.Empty,
-                    ["OTEL_SERVICES"] = string.Empty,
+                    ["OTEL_USINGS"] = options.ObservabilityEnabled ? "using OpenTelemetry;\nusing OpenTelemetry.Metrics;\nusing OpenTelemetry.Trace;\nusing OpenTelemetry.Logs;" : string.Empty,
+                    ["OTEL_SERVICES"] = ObservabilityServices(options.ObservabilityEnabled),
                     ["DATABASE_REGISTRATION"] = DatabaseRegistration(options.Database),
                     ["NOTIFICATIONS_SERVICES"] = options.NotificationsEnabled ? "builder.Services.AddSignalR();\nbuilder.Services.AddSingleton<IUserIdProvider, NotificationUserIdProvider>();\nbuilder.Services.AddScoped<INotificationStore, EfNotificationStore>();" : string.Empty,
                     ["STORAGE_SERVICES"] = options.StorageEnabled ? "builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();" : string.Empty,
@@ -78,8 +80,8 @@ internal static class TemplateFiles
                     ["JOBS_USING"] = options.JobsEnabled ? $"using {identifier}.Api.Jobs;" : string.Empty,
                     ["INTEGRATIONS_USING"] = options.NotificationsEnabled || options.StorageEnabled || options.CachingEnabled || options.ImportsExportsEnabled || options.WebhooksEnabled ? $"using {identifier}.Api.Integrations;" : string.Empty,
                     ["WOLVERINE_USING"] = options.JobsEnabled ? "using Wolverine;" : string.Empty,
-                    ["OTEL_USINGS"] = string.Empty,
-                    ["OTEL_SERVICES"] = string.Empty,
+                    ["OTEL_USINGS"] = options.ObservabilityEnabled ? "using OpenTelemetry;\nusing OpenTelemetry.Metrics;\nusing OpenTelemetry.Trace;\nusing OpenTelemetry.Logs;" : string.Empty,
+                    ["OTEL_SERVICES"] = ObservabilityServices(options.ObservabilityEnabled),
                     ["DATABASE_REGISTRATION"] = DatabaseRegistration(options.Database),
                     ["NOTIFICATIONS_SERVICES"] = options.NotificationsEnabled ? "builder.Services.AddSignalR();\nbuilder.Services.AddSingleton<IUserIdProvider, NotificationUserIdProvider>();\nbuilder.Services.AddScoped<INotificationStore, EfNotificationStore>();" : string.Empty,
                     ["STORAGE_SERVICES"] = options.StorageEnabled ? "builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();" : string.Empty,
@@ -376,6 +378,10 @@ internal static class TemplateFiles
             })))
         ];
     }
+
+    private static string ObservabilityServices(bool enabled) => enabled
+        ? "if (args.Contains(\"--dotisan-observability\", StringComparer.OrdinalIgnoreCase)) builder.Configuration[\"OpenTelemetry:Enabled\"] = \"true\";\nvar openTelemetry = builder.Services.AddOpenTelemetry().WithTracing(tracing => tracing.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddEntityFrameworkCoreInstrumentation()).WithMetrics(metrics => metrics.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation());\nbuilder.Logging.AddOpenTelemetry(logging => logging.IncludeFormattedMessage = true);\nif (builder.Configuration.GetValue(\"OpenTelemetry:Enabled\", false)) openTelemetry.UseOtlpExporter();"
+        : string.Empty;
 
     private static string WolverineProviderPackage(DatabaseProvider database) => database switch
     {
