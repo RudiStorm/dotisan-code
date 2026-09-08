@@ -69,7 +69,11 @@ internal static class TemplateFiles
             {
                 ["IDENTIFIER"] = identifier
             }))),
-            new($"src/{options.Name}.Api/Infrastructure/DotisanProductionConfiguration.cs", DotisanProductionConfiguration(identifier, options.AuthenticationEnabled)),
+            new($"src/{options.Name}.Api/Infrastructure/DotisanProductionConfiguration.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/production-configuration.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["IDENTIFIER"] = identifier,
+                ["EMAIL_CONFIRMATION_ENABLED"] = options.AuthenticationEnabled ? "true" : "false"
+            }))),
             ..(options.NotificationsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Notifications.cs", Notifications(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
             ..(options.StorageEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Storage.cs", Storage(identifier, options.AuthenticationEnabled, options.MultiTenancyEnabled)) } : Array.Empty<TemplateFile>()),
             ..(options.CachingEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Caching.cs", Caching(identifier)) } : Array.Empty<TemplateFile>()),
