@@ -82,7 +82,8 @@ public static class OpenApiContractReader
 
     private static (string Type, ContractTypeDescriptor? Descriptor, bool Nullable) ReadContentSchema(JsonElement body, Dictionary<string, ContractModel> schemas)
     {
-        var schema = body.GetProperty("content").GetProperty("application/json").GetProperty("schema");
+        if (!TryReadContentSchema(body, out var schema))
+            return ("void", null, false);
         var parsed = ReadSchema(schema, schemas);
         return (parsed.Descriptor?.ReferenceName?.Replace("global::", string.Empty, StringComparison.Ordinal) ?? "void", parsed.Descriptor, parsed.Nullable);
     }
@@ -91,10 +92,28 @@ public static class OpenApiContractReader
     {
         var response = operation.GetProperty("responses").EnumerateObject().OrderBy(item => item.Name, StringComparer.Ordinal).First();
         var status = int.TryParse(response.Name, out var code) ? code : 200;
-        if (!response.Value.TryGetProperty("content", out var content)) return ("void", status);
-        var schema = content.GetProperty("application/json").GetProperty("schema");
+        if (!TryReadContentSchema(response.Value, out var schema)) return ("void", status);
         var parsed = ReadSchema(schema, schemas);
         return (parsed.Descriptor?.ReferenceName?.Replace("global::", string.Empty, StringComparison.Ordinal) ?? "void", status);
+    }
+
+    private static bool TryReadContentSchema(JsonElement element, out JsonElement schema)
+    {
+        schema = default;
+        if (!element.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Object)
+            return false;
+
+        if (content.TryGetProperty("application/json", out var json)
+            && json.TryGetProperty("schema", out schema))
+            return true;
+
+        foreach (var mediaType in content.EnumerateObject())
+        {
+            if (mediaType.Value.TryGetProperty("schema", out schema))
+                return true;
+        }
+
+        return false;
     }
 
     private static (string Location, EndpointParameterMetadata Metadata) ReadParameter(JsonElement parameter, Dictionary<string, ContractModel> schemas)
