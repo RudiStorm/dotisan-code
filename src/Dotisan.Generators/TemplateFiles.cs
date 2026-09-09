@@ -1,4 +1,5 @@
 using Dotisan.Core;
+using System.Reflection;
 
 namespace Dotisan.Generators;
 
@@ -237,7 +238,8 @@ internal static class TemplateFiles
             new($"src/{options.Name}.Web/package.json", TemplateRenderer.Render(TemplateCatalog.Select("static/web-package.json.template"), new TemplateContext(new Dictionary<string, string>
             {
                 ["PACKAGE_NAME"] = options.Name.ToLowerInvariant(),
-                ["PACKAGE_MANAGER"] = packageManager
+                ["PACKAGE_MANAGER"] = packageManager,
+                ["VERSION"] = PackageVersion()
             }))),
             new($"src/{options.Name}.Web/index.html", TemplateRenderer.Render(TemplateCatalog.Select("static/web-index.template"), new TemplateContext(new Dictionary<string, string>
             {
@@ -595,6 +597,10 @@ internal static class TemplateFiles
     private static int DevelopmentApiPort(string name) => 5000 + Math.Abs(name.Aggregate(17, (hash, character) => unchecked(hash * 31 + character))) % 1000;
 
     private static int DevelopmentWebPort(string name) => 5173 + Math.Abs(name.Aggregate(23, (hash, character) => unchecked(hash * 31 + character))) % 1000;
+
+    private static string PackageVersion() => typeof(TemplateFiles).Assembly
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+        ?.Split('+', 2)[0] ?? "0.0.0";
 
     private static string AuthenticationServices() => """
         builder.Services.AddIdentityCore<ApplicationUser>(options =>
