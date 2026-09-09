@@ -87,9 +87,33 @@ jobs:
       - run: npm ci --prefix tests/browser
       - run: npm audit --prefix tests/browser --omit=dev --audit-level=high
 
+  database-compose-smoke:
+    name: PostgreSQL Compose smoke
+    runs-on: ubuntu-latest
+    needs: repository
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.x'
+      - name: Generate PostgreSQL project
+        shell: bash
+        run: |
+          dotnet run --project src/Dotisan.Cli/Dotisan.Cli.csproj --configuration Release -- new ComposeSmoke --profile minimal --database postgresql --yes --no-restore --output "$RUNNER_TEMP/dotisan-compose"
+      - name: Start generated PostgreSQL service
+        shell: bash
+        run: |
+          set -euo pipefail
+          compose_file="$RUNNER_TEMP/dotisan-compose/compose.yaml"
+          test -f "$compose_file"
+          docker compose -f "$compose_file" config >/dev/null
+          trap 'docker compose -f "$compose_file" down --volumes --remove-orphans' EXIT
+          docker compose -f "$compose_file" up -d --wait --wait-timeout 120 database
+          docker compose -f "$compose_file" ps database
+
   pack-and-inspect:
     runs-on: ubuntu-latest
-    needs: [repository, generated-api, browser-smoke, dependency-audit]
+    needs: [repository, generated-api, browser-smoke, dependency-audit, database-compose-smoke]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-dotnet@v5

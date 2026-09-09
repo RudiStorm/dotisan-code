@@ -86,7 +86,7 @@ Do not begin a later phase while an earlier phase has a failing acceptance gate.
 - Consumes: `DotisanApplication.CreateDefault(...)` and generated workspace commands.
 - Produces: a regression test proving `new -> make:resource -> generate -> generate --check -> build`.
 
-- [ ] **Step 1: Write an end-to-end test that generates an authenticated application, scaffolds `Customer`, generates contracts, and verifies output**
+- [x] **Step 1: Write an end-to-end test that generates an authenticated application, scaffolds `Customer`, generates contracts, and verifies output**
 
 ```csharp
 [Fact]
@@ -109,7 +109,7 @@ public async Task Resource_generation_updates_contract_and_preserves_a_buildable
 }
 ```
 
-- [ ] **Step 2: Run only the new test and confirm the current failure**
+- [x] **Step 2: Run only the new test and confirm the current failure**
 
 ```powershell
 dotnet test tests\Dotisan.Cli.Tests\Dotisan.Cli.Tests.csproj -c Release --filter FullyQualifiedName~GoldenPathTests
@@ -117,11 +117,11 @@ dotnet test tests\Dotisan.Cli.Tests\Dotisan.Cli.Tests.csproj -c Release --filter
 
 Expected: FAIL because `dotisan generate` throws or the Customer operations are absent.
 
-- [ ] **Step 3: Add assertions that a failed generation leaves every existing generated file byte-for-byte unchanged**
+- [x] **Step 3: Add assertions that a failed generation leaves every existing generated file byte-for-byte unchanged**
 
 Capture SHA-256 hashes for `models.ts`, `schemas.ts`, `services.ts`, `queries.ts`, `openapi.json`, and `dotisan.contract.json`; force an invalid contract; assert all hashes remain unchanged.
 
-- [ ] **Step 4: Commit the red tests**
+- [x] **Step 4: Commit the red tests**
 
 ```powershell
 git add tests/Dotisan.Cli.Tests
@@ -138,7 +138,7 @@ git commit -m "test: reproduce broken contract generation workflow"
 - Consumes: JSON with `schemaVersion`, `endpoints`, `endpointMetadata`, and `models`.
 - Produces: `ContractManifest.FromJson(string)` that preserves aligned endpoint metadata.
 
-- [ ] **Step 1: Add a failing metadata round-trip test**
+- [x] **Step 1: Add a failing metadata round-trip test**
 
 ```csharp
 [Fact]
@@ -153,13 +153,13 @@ public void Json_round_trip_preserves_endpoint_metadata()
 }
 ```
 
-- [ ] **Step 2: Run the focused test and confirm metadata is currently null**
+- [x] **Step 2: Run the focused test and confirm metadata is currently null**
 
 ```powershell
 dotnet test tests\Dotisan.Core.Tests\Dotisan.Core.Tests.csproj -c Release --filter Json_round_trip_preserves_endpoint_metadata
 ```
 
-- [ ] **Step 3: Replace the three-argument JSON constructor with the complete constructor**
+- [x] **Step 3: Replace the three-argument JSON constructor with the complete constructor**
 
 ```csharp
 [JsonConstructor]
@@ -175,9 +175,9 @@ public ContractManifest(
 
 Remove `[JsonConstructor]` from any overload that cannot reconstruct the complete serialized shape.
 
-- [ ] **Step 4: Add tests for missing metadata, count mismatch, deterministic ordering, and legacy empty manifests**
+- [x] **Step 4: Add tests for missing metadata, count mismatch, deterministic ordering, and legacy empty manifests**
 
-- [ ] **Step 5: Run the core and OpenAPI suites**
+- [x] **Step 5: Run the core and OpenAPI suites**
 
 ```powershell
 dotnet test tests\Dotisan.Core.Tests\Dotisan.Core.Tests.csproj -c Release
@@ -186,7 +186,7 @@ dotnet test tests\Dotisan.OpenApi.Tests\Dotisan.OpenApi.Tests.csproj -c Release
 
 Expected: all tests pass with zero failed tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/Dotisan.Core/ContractManifest.cs tests/Dotisan.Core.Tests
@@ -207,7 +207,7 @@ git commit -m "fix: preserve endpoint metadata during contract deserialization"
 - Produces: `AtomicArtifactPublisher.PublishAsync(string root, IReadOnlyList<GeneratedArtifact> artifacts, CancellationToken)`.
 - Guarantees: no target file changes if rendering or validation fails.
 
-- [ ] **Step 1: Write failing publisher tests for success, renderer failure, cancellation, and replacement of existing files**
+- [x] **Step 1: Write failing publisher tests for success, renderer failure, cancellation, and replacement of existing files**
 
 ```csharp
 public sealed record GeneratedArtifact(string RelativePath, string Content);
@@ -221,15 +221,15 @@ public interface IGeneratedArtifactPublisher
 }
 ```
 
-- [ ] **Step 2: Implement staging beneath `.dotisan/staging/<guid>`**
+- [x] **Step 2: Implement staging beneath `.dotisan/staging/<guid>`**
 
 Validate that every normalized artifact path remains beneath the target root. Write and validate all staged files first. Replace target files only after staging completes. Always remove the staging directory in `finally`.
 
-- [ ] **Step 3: Change `ContractGenerationService` to compute every artifact before publishing**
+- [x] **Step 3: Change `ContractGenerationService` to compute every artifact before publishing**
 
 The order must be: acquire canonical contract, parse, validate, render all TypeScript, render OpenAPI/derived manifest, compare for `--check`, then publish once.
 
-- [ ] **Step 4: Return a typed failure instead of allowing renderer exceptions to reach `Program.cs`**
+- [x] **Step 4: Return a typed failure instead of allowing renderer exceptions to reach `Program.cs`**
 
 ```csharp
 catch (Exception exception) when (exception is
@@ -241,13 +241,13 @@ catch (Exception exception) when (exception is
 
 Log stack traces only behind an explicit `--verbose` option.
 
-- [ ] **Step 5: Run the focused CLI tests and the red golden-path test**
+- [x] **Step 5: Run the focused CLI tests and the red golden-path test**
 
 ```powershell
 dotnet test tests\Dotisan.Cli.Tests\Dotisan.Cli.Tests.csproj -c Release --filter "GenerationCommandTests|GoldenPathTests"
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/Dotisan.Cli/Generation src/Dotisan.Cli/BuiltInCommands.cs tests/Dotisan.Cli.Tests
@@ -270,9 +270,9 @@ git commit -m "fix: publish generated contracts atomically"
 - Produces: `ContractManifest OpenApiContractReader.Read(string json)`.
 - Defines: `dotisan.contract.json` is derived output and never hand-edited input.
 
-- [ ] **Step 1: Add contract-reader fixtures covering route parameters, query parameters, request bodies, nullable fields, arrays, enums, errors, authorization, and validation constraints**
+- [x] **Step 1: Add contract-reader fixtures covering route parameters, query parameters, request bodies, nullable fields, arrays, enums, errors, authorization, and validation constraints**
 
-- [ ] **Step 2: Configure generated API projects for build-time OpenAPI output**
+- [x] **Step 2: Configure generated API projects for build-time OpenAPI output**
 
 ```xml
 <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" PrivateAssets="all" />
@@ -283,31 +283,31 @@ git commit -m "fix: publish generated contracts atomically"
 
 Write build output beneath `obj/dotisan/openapi`; do not write generated artifacts into source directories during an ordinary build.
 
-- [ ] **Step 3: Add complete ASP.NET Core metadata to every generated endpoint**
+- [x] **Step 3: Add complete ASP.NET Core metadata to every generated endpoint**
 
 Use stable endpoint names, tags, `TypedResults`, `.Accepts<T>()`, `.Produces<T>()`, `.ProducesProblem(...)`, authorization metadata, and built-in .NET 10 validation. Remove inferred success codes that assume every POST returns 201.
 
-- [ ] **Step 4: Implement `OpenApiContractReader.Read` as a pure conversion**
+- [x] **Step 4: Implement `OpenApiContractReader.Read` as a pure conversion**
 
 Reject duplicate operation IDs, missing operation IDs, unresolved schema references, unsupported request shapes, or path-template/parameter mismatches with an error containing the operation ID and source path.
 
-- [ ] **Step 5: Update `dotisan generate` to build the API document and derive all downstream artifacts from it**
+- [x] **Step 5: Update `dotisan generate` to build the API document and derive all downstream artifacts from it**
 
 The command must not start the application, connect to the database, run migrations, or instantiate production integrations.
 
-- [ ] **Step 6: Remove `DOTISAN_CONTRACT_FALLBACK` and the embedded manifest constant from generated projects**
+- [x] **Step 6: Remove `DOTISAN_CONTRACT_FALLBACK` and the embedded manifest constant from generated projects**
 
-- [ ] **Step 7: Mark the old source-generator path obsolete for one release and document removal timing**
+- [x] **Step 7: Mark the old source-generator path obsolete for one release and document removal timing**
 
 If no shipped consumer can depend on it yet, remove the unused projects from `Dotisan.sln` instead of preserving dead architecture.
 
-- [ ] **Step 8: Run contract, OpenAPI, generator, CLI, and golden-path tests**
+- [x] **Step 8: Run contract, OpenAPI, generator, CLI, and golden-path tests**
 
 ```powershell
 dotnet test Dotisan.sln -c Release --no-restore
 ```
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```powershell
 git add src tests
@@ -330,7 +330,7 @@ git commit -m "feat: derive client contracts from ASP.NET Core OpenAPI"
 - Produces body arguments only for operations with request bodies.
 - Encodes every path and query value.
 
-- [ ] **Step 1: Add failing tests for `/users/{id:guid}`, optional queries, multiple parameters, reserved characters, void responses, and ProblemDetails**
+- [x] **Step 1: Add failing tests for `/users/{id:guid}`, optional queries, multiple parameters, reserved characters, void responses, and ProblemDetails**
 
 Expected generated shape:
 
@@ -351,11 +351,11 @@ export async function getUser(
 }
 ```
 
-- [ ] **Step 2: Replace string concatenation in `BuildUrl` with structured path/query rendering**
+- [x] **Step 2: Replace string concatenation in `BuildUrl` with structured path/query rendering**
 
-- [ ] **Step 3: Ensure TanStack Query keys include every path and query argument**
+- [x] **Step 3: Ensure TanStack Query keys include every path and query argument**
 
-- [ ] **Step 4: Run TypeScript generator tests and compile a generated authenticated frontend**
+- [x] **Step 4: Run TypeScript generator tests and compile a generated authenticated frontend**
 
 ```powershell
 dotnet test tests\Dotisan.TypeScript.Tests\Dotisan.TypeScript.Tests.csproj -c Release
@@ -363,7 +363,7 @@ dotisan new ContractWeb --yes --auth yes --registration public --output $env:TEM
 npm run build --prefix $env:TEMP\dotisan-contract-web\src\ContractWeb.Web
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/Dotisan.TypeScript tests/Dotisan.TypeScript.Tests Dotisan.sln
@@ -385,7 +385,7 @@ git commit -m "fix: generate valid typed path and query clients"
 - Consumes: profile, package manager, authentication flag, and database provider.
 - Produces: one repeatable local/CI generated-project acceptance command.
 
-- [ ] **Step 1: Extract generated-project verification into scripts that stop on the first non-zero exit code**
+- [x] **Step 1: Extract generated-project verification into scripts that stop on the first non-zero exit code**
 
 ```powershell
 $ErrorActionPreference = 'Stop'
@@ -397,17 +397,17 @@ dotnet test $solution -c Release --no-build --no-restore
 & $packageManager test --prefix $web
 ```
 
-- [ ] **Step 2: Add a CI matrix for `minimal`, `identity`, `saas`, and `maximal` with npm and pnpm**
+- [x] **Step 2: Add a CI matrix for `minimal`, `identity`, `saas`, and `maximal` with npm and pnpm**
 
-- [ ] **Step 3: Run `make:resource`, `make:crud`, `generate`, and `generate --check` in identity and maximal jobs**
+- [x] **Step 3: Run `make:resource`, `make:crud`, `generate`, and `generate --check` in identity and maximal jobs**
 
-- [ ] **Step 4: Add a generated frontend audit job**
+- [x] **Step 4: Add a generated frontend audit job**
 
 Run both `npm audit --omit=dev --audit-level=high` and a full-tree audit whose accepted exceptions are documented with expiry dates.
 
-- [ ] **Step 5: Add at least one SQL Server or PostgreSQL Compose smoke test; keep SQLite on every matrix row**
+- [x] **Step 5: Add at least one SQL Server or PostgreSQL Compose smoke test; keep SQLite on every matrix row**
 
-- [ ] **Step 6: Run both scripts locally against one profile, then commit**
+- [x] **Step 6: Run both scripts locally against one profile, then commit**
 
 ```powershell
 git add .github/workflows/ci.yml scripts
@@ -464,17 +464,17 @@ git commit -m "refactor: move generated applications to physical templates"
 - Add: `JobProvider { None, Wolverine }`.
 - Default: minimal profile, SQLite, no authentication, no Wolverine, basic ASP.NET Core logging, no OTLP exporter packages.
 
-- [ ] **Step 1: Write profile-expansion tests with exact expected options and package references**
+- [x] **Step 1: Write profile-expansion tests with exact expected options and package references**
 
-- [ ] **Step 2: Add `--profile minimal|identity|saas|custom` and `--jobs none|wolverine`**
+- [x] **Step 2: Add `--profile minimal|identity|saas|custom` and `--jobs none|wolverine`**
 
-- [ ] **Step 3: Keep existing flags as explicit custom-profile overrides and reject contradictory combinations**
+- [x] **Step 3: Keep existing flags as explicit custom-profile overrides and reject contradictory combinations**
 
-- [ ] **Step 4: Make the review screen show every dependency-bearing choice before file creation**
+- [x] **Step 4: Make the review screen show every dependency-bearing choice before file creation**
 
-- [ ] **Step 5: Verify the minimal API project has no Wolverine, Identity, SignalR, or OpenTelemetry exporter references**
+- [x] **Step 5: Verify the minimal API project has no Wolverine, Identity, SignalR, or OpenTelemetry exporter references**
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src tests
@@ -495,17 +495,17 @@ git commit -m "feat: add focused project profiles and lightweight defaults"
 - Compatibility aliases: retain colon commands for one documented deprecation cycle.
 - Every command supports `--help`; root supports `--version` and machine-readable `--json` where useful.
 
-- [ ] **Step 1: Add parser tests for nested commands, aliases, help, unknown options, missing values, cancellation, and exit codes**
+- [x] **Step 1: Add parser tests for nested commands, aliases, help, unknown options, missing values, cancellation, and exit codes**
 
 - [ ] **Step 2: Move each command into a focused file without changing behavior**
 
-- [ ] **Step 3: Add canonical space-separated commands and deprecation warnings for aliases**
+- [x] **Step 3: Add canonical space-separated commands and deprecation warnings for aliases**
 
-- [ ] **Step 4: Ensure command failures never print an unhandled stack trace by default**
+- [x] **Step 4: Ensure command failures never print an unhandled stack trace by default**
 
-- [ ] **Step 5: Generate shell completion documentation or scripts for PowerShell, bash, and zsh**
+- [x] **Step 5: Generate shell completion documentation or scripts for PowerShell, bash, and zsh**
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/Dotisan.Cli tests/Dotisan.Cli.Tests README.md
@@ -561,7 +561,7 @@ git commit -m "refactor: simplify generated application composition"
 
 - [ ] **Step 1: Add integration tests proving every cookie-authenticated POST, PUT, PATCH, and DELETE rejects a missing or invalid antiforgery token**
 
-- [ ] **Step 2: Protect sample job endpoints or omit them from authenticated production profiles**
+- [x] **Step 2: Protect sample job endpoints or omit them from authenticated production profiles**
 
 - [x] **Step 3: Require feature permissions for role assignment, sending notifications to other users, storage deletion, import/export, and webhook replay**
 
@@ -569,7 +569,7 @@ git commit -m "refactor: simplify generated application composition"
 
 - [ ] **Step 5: Add tests for 401, 403, 400, valid token success, and tenant isolation**
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/Dotisan.Generators/Templates tests
@@ -632,7 +632,7 @@ git commit -m "feat: harden generated notifications"
 - Mutation helpers acquire/send antiforgery tokens automatically when cookie authentication is selected.
 - Pages expose loading, empty, success, and error states.
 
-- [ ] **Step 1: Replace direct page-level `fetch` calls with generated services or a single typed client**
+- [x] **Step 1: Replace direct page-level `fetch` calls with generated services or a single typed client**
 
 - [x] **Step 2: Add pending-state disabling, error messages, success confirmation, and retry behavior to imports, notifications, webhooks, sessions, and authorization pages**
 
@@ -644,7 +644,7 @@ git commit -m "feat: harden generated notifications"
 
 - [x] **Step 6: Add `PRODUCT.md` and `DESIGN.md` for Dotisan's own generated portal baseline, while clearly documenting that applications should customize them**
 
-- [ ] **Step 7: Run frontend verification**
+- [x] **Step 7: Run frontend verification**
 
 ```powershell
 npm run build
@@ -689,7 +689,7 @@ git commit -m "test: cover generated portal workflows"
 
 - [x] **Step 5: Add a documentation test that fails on the retired claims `creates and applies the initial migration` and `creates and applies the initial Identity schema`**
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/Dotisan.Cli README.md project.md docs tests
@@ -764,17 +764,17 @@ git commit -m "build: make generated and published artifacts reproducible"
 - NuGet package metadata includes authors, repository URL/type, project URL, tags, icon, readme, license, release notes, and symbols.
 - Public support and security reporting boundaries are explicit.
 
-- [ ] **Step 1: Add the MIT license text matching `PackageLicenseExpression=MIT`**
+- [x] **Step 1: Add the MIT license text matching `PackageLicenseExpression=MIT`**
 
-- [ ] **Step 2: Add contribution setup, test commands, template-change rules, generated-fixture rules, and pull-request expectations**
+- [x] **Step 2: Add contribution setup, test commands, template-change rules, generated-fixture rules, and pull-request expectations**
 
-- [ ] **Step 3: Add a changelog using Keep a Changelog headings and SemVer versions**
+- [x] **Step 3: Add a changelog using Keep a Changelog headings and SemVer versions**
 
-- [ ] **Step 4: Populate complete NuGet metadata and inspect the resulting nuspec**
+- [x] **Step 4: Populate complete NuGet metadata and inspect the resulting nuspec**
 
-- [ ] **Step 5: Add release gates that reject dirty generated output, stale contracts, tag/version mismatch, missing package metadata, vulnerable production dependencies, and failed golden paths**
+- [x] **Step 5: Add release gates that reject dirty generated output, stale contracts, tag/version mismatch, missing package metadata, vulnerable production dependencies, and failed golden paths**
 
-- [ ] **Step 6: Run the complete release candidate acceptance sequence**
+- [x] **Step 6: Run the complete release candidate acceptance sequence**
 
 ```powershell
 dotnet restore Dotisan.sln
@@ -791,7 +791,7 @@ git status --short
 
 Expected: every command succeeds; only explicitly expected artifact files appear in `git status`.
 
-- [ ] **Step 7: Perform a clean-machine smoke test**
+- [x] **Step 7: Perform a clean-machine smoke test**
 
 Install the packed global tool into an empty tool path, generate a project outside the repository, remove access to the Dotisan source tree, then restore, build, test, generate a resource, regenerate contracts, build the frontend, build the container, and start it.
 
