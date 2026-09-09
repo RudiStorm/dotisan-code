@@ -13,8 +13,8 @@ operational work in its row.
 | Caching | distributed implementation guidance, namespaced keys, and an invalidation example |
 
 Current generated capabilities are development-adapter unless explicitly
-stated otherwise. S3-compatible storage is example-only because no provider
-adapter is generated. Replace or extend the generated implementation, review
+stated otherwise. Local and S3-compatible storage are example-only because
+durable metadata/ownership and a provider adapter are not generated. Replace or extend the generated implementation, review
 tenant boundaries, configure secret storage, and add operational monitoring
 before promoting any capability to production.
 

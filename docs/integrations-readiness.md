@@ -5,7 +5,7 @@ Generated integrations are opt-in. Select only capabilities whose operational re
 | Capability | Generated behavior | Readiness |
 | --- | --- | --- |
 | Notifications | EF-backed records and SignalR delivery with authorization | development-adapter; add retention, pagination, and delivery monitoring before production |
-| Local storage | Validated keys, streamed writes, configurable size limit | development-adapter; use a reviewed durable adapter for multi-node deployments |
+| Local storage | Validated keys, streamed writes, configurable size limit | example-only; add durable metadata/ownership and a reviewed provider before production |
 | S3-compatible storage | No adapter is generated | example-only; integrate and test an approved SDK explicitly |
 | Imports/exports | CSV/JSON validation, bounded upload, EF-backed status, queued message, tenant-scoped reads when tenancy is enabled | development-adapter; add durable payload storage, domain processing, retention, and monitoring before production |
 | Webhooks | HMAC delivery records, URL validation, timeout, durable background dispatch when jobs are enabled, retries, replay authorization, fresh replay signatures | development-adapter; add destination policy, secret rotation, and observability before production |
