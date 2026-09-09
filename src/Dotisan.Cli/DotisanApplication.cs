@@ -1,8 +1,8 @@
+using System.Reflection;
+using Dotisan.Cli.Diagnostics;
+using Dotisan.Cli.Generation;
 using Dotisan.Core;
 using Dotisan.Generators;
-using Dotisan.Cli.Generation;
-using Dotisan.Cli.Diagnostics;
-using System.Reflection;
 
 namespace Dotisan.Cli;
 

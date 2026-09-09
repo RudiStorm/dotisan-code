@@ -75,7 +75,8 @@ public sealed class DefaultPrompts : IPrompts
             Registration = registration,
             MultiTenancyEnabled = multiTenancyEnabled,
             PackageManager = packageManager
-            ,MailProvider = mailProvider
+            ,
+            MailProvider = mailProvider
         };
     }
 

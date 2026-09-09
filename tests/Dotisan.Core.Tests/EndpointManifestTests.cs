@@ -1,6 +1,6 @@
-using Dotisan.Core;
 using System.Security.Cryptography;
 using System.Text;
+using Dotisan.Core;
 
 namespace Dotisan.Core.Tests;
 

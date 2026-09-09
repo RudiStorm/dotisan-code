@@ -1,5 +1,5 @@
-using Dotisan.Core;
 using Dotisan.Cli.Generation;
+using Dotisan.Core;
 
 namespace Dotisan.Cli.Tests;
 

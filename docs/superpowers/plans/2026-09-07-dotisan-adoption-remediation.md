@@ -436,7 +436,7 @@ Use explicit tokens such as `__PROJECT_NAME__` and conditional file selection. D
 
 - [x] **Step 3: Embed the template directory as resources and implement normalized-path rendering**
 
-- [ ] **Step 4: Run `dotnet format` or the relevant formatter on generated code during template development, not during end-user generation**
+- [x] **Step 4: Run `dotnet format` or the relevant formatter on generated code during template development, not during end-user generation**
 
 - [x] **Step 5: Add golden tests for minimal, identity, saas, maximal, each database provider, and each package manager**
 

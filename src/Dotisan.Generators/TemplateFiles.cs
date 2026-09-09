@@ -1,5 +1,5 @@
-using Dotisan.Core;
 using System.Reflection;
+using Dotisan.Core;
 
 namespace Dotisan.Generators;
 

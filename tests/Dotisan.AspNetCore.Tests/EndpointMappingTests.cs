@@ -1,7 +1,7 @@
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
 using Dotisan.AspNetCore;
 using Dotisan.Core;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 
 namespace Dotisan.AspNetCore.Tests;
 

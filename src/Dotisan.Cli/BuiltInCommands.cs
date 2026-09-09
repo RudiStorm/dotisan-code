@@ -1,9 +1,9 @@
 using System.Text.Json;
+using Dotisan.Cli.Diagnostics;
+using Dotisan.Cli.Generation;
 using Dotisan.Core;
 using Dotisan.Core.Diagnostics;
 using Dotisan.Core.Jobs;
-using Dotisan.Cli.Generation;
-using Dotisan.Cli.Diagnostics;
 using Dotisan.Generators;
 
 namespace Dotisan.Cli;
@@ -737,7 +737,7 @@ internal sealed class NewCommand : IDotisanCommand
                         registration = authenticationEnabled ? RegistrationPolicy.Public : RegistrationPolicy.Disabled;
                         multiTenancyEnabled = profile is "saas" or "maximal";
                         notificationsEnabled = storageEnabled = cachingEnabled = importsExportsEnabled = webhooksEnabled = profile == "maximal";
-                    jobsEnabled = profile != "minimal";
+                        jobsEnabled = profile != "minimal";
                     }
                     break;
                 case "--jobs":
@@ -813,15 +813,24 @@ internal sealed class NewCommand : IDotisanCommand
                     Registration = registration,
                     MultiTenancyEnabled = multiTenancyEnabled,
                     PackageManager = packageManager
-                    ,MailProvider = mailProvider
-                    ,NotificationsEnabled = notificationsEnabled
-                    ,StorageEnabled = storageEnabled
-                    ,CachingEnabled = cachingEnabled
-                    ,ImportsExportsEnabled = importsExportsEnabled
-                    ,WebhooksEnabled = webhooksEnabled
-                    ,ObservabilityEnabled = observabilityEnabled
-                    ,JobsEnabled = jobsEnabled
-                    ,Profile = profile switch
+                    ,
+                    MailProvider = mailProvider
+                    ,
+                    NotificationsEnabled = notificationsEnabled
+                    ,
+                    StorageEnabled = storageEnabled
+                    ,
+                    CachingEnabled = cachingEnabled
+                    ,
+                    ImportsExportsEnabled = importsExportsEnabled
+                    ,
+                    WebhooksEnabled = webhooksEnabled
+                    ,
+                    ObservabilityEnabled = observabilityEnabled
+                    ,
+                    JobsEnabled = jobsEnabled
+                    ,
+                    Profile = profile switch
                     {
                         "identity" => ProjectProfile.Identity,
                         "saas" => ProjectProfile.Saas,
@@ -840,7 +849,8 @@ internal sealed class NewCommand : IDotisanCommand
                             ? ProjectProfile.Custom
                             : ProjectProfile.Minimal
                     }
-                    ,JobProvider = jobsEnabled ? JobProvider.Wolverine : JobProvider.None
+                    ,
+                    JobProvider = jobsEnabled ? JobProvider.Wolverine : JobProvider.None
                 }
                 : context.Prompts.AskForProject(name, outputDirectory);
         }

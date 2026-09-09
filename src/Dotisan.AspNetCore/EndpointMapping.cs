@@ -1,5 +1,5 @@
-using Microsoft.AspNetCore.Routing;
 using Dotisan.Core;
+using Microsoft.AspNetCore.Routing;
 
 namespace Dotisan.AspNetCore;
 
