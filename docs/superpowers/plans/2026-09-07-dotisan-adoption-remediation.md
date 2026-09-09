@@ -652,7 +652,7 @@ npm test
 npm run test:e2e
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```powershell
 git add src/Dotisan.Generators/Templates/Web tests
