@@ -636,7 +636,7 @@ git commit -m "feat: harden generated notifications"
 
 - [x] **Step 2: Add pending-state disabling, error messages, success confirmation, and retry behavior to imports, notifications, webhooks, sessions, and authorization pages**
 
-- [ ] **Step 3: Add accessible labels, table captions, focus styles, status announcements, and confirmation for destructive session actions**
+- [x] **Step 3: Add accessible labels, table captions, focus styles, status announcements, and confirmation for destructive session actions**
 
 - [x] **Step 4: Add Vitest tests for login errors, antiforgery propagation, session revocation, imports, notifications, and webhook replay**
 

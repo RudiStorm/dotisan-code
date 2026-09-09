@@ -2,7 +2,7 @@
     requestMock.mockResolvedValueOnce(undefined);
     const wrapper = mount(ImportsExportsPage);
     const file = new File(['id,name'], 'customers.csv', { type: 'text/csv' });
-    const input = wrapper.get('input[type=file]');
+    const input = wrapper.get('#import-file');
     Object.defineProperty(input.element, 'files', { configurable: true, value: [file] });
     await input.trigger('change');
     await wrapper.get('form').trigger('submit');
@@ -11,4 +11,3 @@
     expect(wrapper.text()).toContain('Import queued.');
   });
   
-
