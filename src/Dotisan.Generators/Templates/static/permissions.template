@@ -5,6 +5,10 @@ public static class Permissions
     public const string ClaimType = "permission";
     public const string ProfileView = "profile.view";
     public const string AuthorizationManage = "authorization.manage";
+    public const string NotificationsSend = "notifications.send";
+    public const string ImportExportManage = "import-export.manage";
+    public const string StorageDelete = "storage.delete";
+    public const string WebhookReplay = "webhook.replay";
     // DOTISAN:RESOURCE_PERMISSIONS
-    public static IReadOnlyList<string> All { get; } = [ProfileView, AuthorizationManage];
+    public static IReadOnlyList<string> All { get; } = [ProfileView, AuthorizationManage, NotificationsSend, ImportExportManage, StorageDelete, WebhookReplay];
 }

@@ -136,19 +136,19 @@ internal static class TemplateFiles
                 ["AUTH_USING"] = options.AuthenticationEnabled ? $"using {identifier}.Api.Authorization;\nusing Microsoft.AspNetCore.Antiforgery;" : string.Empty,
                 ["TENANT_USING"] = options.MultiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty,
                 ["AUTHORIZATION"] = options.AuthenticationEnabled ? "group.RequireAuthorization();" : string.Empty,
-                ["AUTHORIZATION_POST"] = options.AuthenticationEnabled ? ".RequireAuthorization(Permissions.AuthorizationManage).WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty,
+                ["AUTHORIZATION_POST"] = options.AuthenticationEnabled ? ".RequireAuthorization(Permissions.NotificationsSend).WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty,
                 ["ANTIFORGERY"] = options.AuthenticationEnabled ? ".WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty,
                 ["TENANT_PARAMETER"] = options.MultiTenancyEnabled ? ", ITenantContext tenantContext" : string.Empty,
                 ["TENANT_VALUE"] = options.MultiTenancyEnabled ? "tenantContext.TenantId" : "null"
             }))) } : Array.Empty<TemplateFile>()),
-            ..(options.StorageEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Storage.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/storage.template"), new TemplateContext(new Dictionary<string, string> { ["IDENTIFIER"] = identifier, ["ANTIFORGERY_USING"] = options.AuthenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty, ["AUTHORIZATION"] = options.AuthenticationEnabled ? "group.RequireAuthorization();" : string.Empty, ["ANTIFORGERY"] = options.AuthenticationEnabled ? ".WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty }))) } : Array.Empty<TemplateFile>()),
+            ..(options.StorageEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Storage.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/storage.template"), new TemplateContext(new Dictionary<string, string> { ["IDENTIFIER"] = identifier, ["ANTIFORGERY_USING"] = options.AuthenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;\nusing {identifier}.Api.Authorization;".Replace("{identifier}", identifier, StringComparison.Ordinal) : string.Empty, ["AUTHORIZATION"] = options.AuthenticationEnabled ? "group.RequireAuthorization();" : string.Empty, ["DELETE_AUTHORIZATION"] = options.AuthenticationEnabled ? ".RequireAuthorization(Permissions.StorageDelete)" : string.Empty, ["ANTIFORGERY"] = options.AuthenticationEnabled ? ".WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty }))) } : Array.Empty<TemplateFile>()),
             ..(options.CachingEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Caching.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/caching.template"), new TemplateContext(new Dictionary<string, string> { ["IDENTIFIER"] = identifier }))) } : Array.Empty<TemplateFile>()),
             ..(options.ImportsExportsEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/ImportsExports.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/imports-exports.template"), new TemplateContext(new Dictionary<string, string>
             {
                 ["IDENTIFIER"] = identifier,
-                ["AUTH_USING"] = options.AuthenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty,
+                ["AUTH_USING"] = options.AuthenticationEnabled ? $"using Microsoft.AspNetCore.Antiforgery;\nusing {identifier}.Api.Authorization;" : string.Empty,
                 ["TENANT_USING"] = options.MultiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty,
-                ["AUTHORIZATION"] = options.AuthenticationEnabled ? "group.RequireAuthorization();" : string.Empty,
+                ["AUTHORIZATION"] = options.AuthenticationEnabled ? "group.RequireAuthorization(Permissions.ImportExportManage);" : string.Empty,
                 ["ANTIFORGERY"] = options.AuthenticationEnabled ? ".WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty,
                 ["TENANT_PARAMETER"] = options.MultiTenancyEnabled ? ", ITenantContext tenantContext" : string.Empty,
                 ["TENANT_REQUIRE"] = options.MultiTenancyEnabled ? "tenantContext.RequireTenantId()" : "null",
@@ -160,7 +160,7 @@ internal static class TemplateFiles
                 ["AUTH_USING"] = options.AuthenticationEnabled ? $"using {identifier}.Api.Authorization;" : string.Empty,
                 ["WOLVERINE_USING"] = options.JobsEnabled ? "using Wolverine;" : string.Empty,
                 ["AUTHORIZATION"] = options.AuthenticationEnabled ? "group.RequireAuthorization();" : string.Empty,
-                ["AUTHORIZATION_REPLAY"] = options.AuthenticationEnabled ? ".RequireAuthorization(Permissions.AuthorizationManage)" : string.Empty,
+                ["AUTHORIZATION_REPLAY"] = options.AuthenticationEnabled ? ".RequireAuthorization(Permissions.WebhookReplay)" : string.Empty,
                 ["REPLAY_STATUS"] = options.JobsEnabled ? "\"queued\"" : "\"delivered\"",
                 ["DURABLE_SUPPORT"] = options.JobsEnabled ? TemplateRenderer.Render(TemplateCatalog.Select("static/webhooks-durable.template"), new TemplateContext(new Dictionary<string, string> { ["IDENTIFIER"] = identifier })) : string.Empty
             }))) } : Array.Empty<TemplateFile>()),

@@ -563,7 +563,7 @@ git commit -m "refactor: simplify generated application composition"
 
 - [ ] **Step 2: Protect sample job endpoints or omit them from authenticated production profiles**
 
-- [ ] **Step 3: Require feature permissions for role assignment, sending notifications to other users, storage deletion, import/export, and webhook replay**
+- [x] **Step 3: Require feature permissions for role assignment, sending notifications to other users, storage deletion, import/export, and webhook replay**
 
 - [ ] **Step 4: Replace scattered manual string checks with DTO validation and standard ValidationProblem responses**
 

@@ -314,10 +314,13 @@ public sealed class GoldenTemplateGeneratorTests
             var notifications = await File.ReadAllTextAsync(Path.Combine(integrations, "Notifications.cs"));
             Assert.Contains("EntityTypeBuilder<NotificationRecord>", notifications);
             Assert.Contains("RequireAntiforgeryTokenAttribute", notifications);
+            Assert.Contains("RequireAuthorization(Permissions.NotificationsSend)", notifications);
             Assert.Contains("Math.Clamp(pageSize ?? 25, 1, 100)", notifications);
             Assert.Contains("Skip(Math.Max(skip, 0))", notifications);
             Assert.Contains("IFileStorage", await File.ReadAllTextAsync(Path.Combine(integrations, "Storage.cs")));
-            Assert.Contains("LocalFileStorage", await File.ReadAllTextAsync(Path.Combine(integrations, "Storage.cs")));
+            var storage = await File.ReadAllTextAsync(Path.Combine(integrations, "Storage.cs"));
+            Assert.Contains("LocalFileStorage", storage);
+            Assert.Contains("RequireAuthorization(Permissions.StorageDelete)", storage);
             var caching = await File.ReadAllTextAsync(Path.Combine(integrations, "Caching.cs"));
             Assert.Contains("IDistributedApplicationCache", caching);
             Assert.Contains("LoggerMessage", caching);
@@ -334,6 +337,9 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("PayloadJson", await File.ReadAllTextAsync(Path.Combine(integrations, "Webhooks.cs")));
             Assert.Contains("delivery.Signature = signature", await File.ReadAllTextAsync(Path.Combine(integrations, "Webhooks.cs")));
             var imports = await File.ReadAllTextAsync(Path.Combine(integrations, "ImportsExports.cs"));
+            Assert.Contains("RequireAuthorization(Permissions.ImportExportManage)", imports);
+            Assert.Contains("using IntegrationApp.Api.Authorization;", imports);
+            Assert.Contains("RequireAuthorization(Permissions.WebhookReplay)", await File.ReadAllTextAsync(Path.Combine(integrations, "Webhooks.cs")));
             var dbContext = await File.ReadAllTextAsync(Path.Combine(output, "src", "IntegrationApp.Api", "Data", "AppDbContext.cs"));
             Assert.Contains("ImportRecord", imports);
             Assert.Contains("ImportRequestedHandler", imports);
@@ -658,7 +664,7 @@ public sealed class GoldenTemplateGeneratorTests
             var secondResult = await ResourceScaffolder.ScaffoldAsync(output, "Order", CancellationToken.None);
             Assert.True(secondResult.Success, secondResult.ErrorMessage);
             permissions = await File.ReadAllTextAsync(Path.Combine(output, "src", "AuthApp.Api", "Authorization", "Permissions.cs"));
-            Assert.Contains("[ProfileView, AuthorizationManage, CustomersView, CustomersCreate, CustomersUpdate, CustomersDelete, OrdersView, OrdersCreate, OrdersUpdate, OrdersDelete]", permissions);
+            Assert.Contains("[ProfileView, AuthorizationManage, NotificationsSend, ImportExportManage, StorageDelete, WebhookReplay, CustomersView, CustomersCreate, CustomersUpdate, CustomersDelete, OrdersView, OrdersCreate, OrdersUpdate, OrdersDelete]", permissions);
         }
         finally
         {
