@@ -314,6 +314,8 @@ public sealed class GoldenTemplateGeneratorTests
             var notifications = await File.ReadAllTextAsync(Path.Combine(integrations, "Notifications.cs"));
             Assert.Contains("EntityTypeBuilder<NotificationRecord>", notifications);
             Assert.Contains("RequireAntiforgeryTokenAttribute", notifications);
+            Assert.Contains("Math.Clamp(pageSize ?? 25, 1, 100)", notifications);
+            Assert.Contains("Skip(Math.Max(skip, 0))", notifications);
             Assert.Contains("IFileStorage", await File.ReadAllTextAsync(Path.Combine(integrations, "Storage.cs")));
             Assert.Contains("LocalFileStorage", await File.ReadAllTextAsync(Path.Combine(integrations, "Storage.cs")));
             var caching = await File.ReadAllTextAsync(Path.Combine(integrations, "Caching.cs"));
