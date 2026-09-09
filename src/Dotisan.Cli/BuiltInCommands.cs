@@ -76,7 +76,7 @@ internal abstract class WorkspaceCommand : IDotisanCommand
     }
 }
 
-internal sealed class DevCommand : WorkspaceCommand
+internal sealed class LegacyDevCommand : WorkspaceCommand
 {
     public override string Name => "dev";
     public override string Description => "Run the API and Vue development servers together.";
