@@ -1,8 +1,4 @@
 __DATABASE_SERVICES__
 __MAIL_SERVICE__
-dashboard:
-  image: mcr.microsoft.com/dotnet/aspire-dashboard:9.4
-  ports:
-    - "18888:18888"
-    - "4317:18889"
-    - "4318:18890"
+__DASHBOARD_SERVICE__
+__VOLUMES__

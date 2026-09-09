@@ -500,26 +500,20 @@ internal static class TemplateFiles
             _ => "services:\n"
         };
 
+        var volumeMarker = compose.IndexOf("\nvolumes:", StringComparison.Ordinal);
+        var databaseServices = volumeMarker >= 0 ? compose[..volumeMarker] : compose;
+        var volumes = volumeMarker >= 0 ? compose[volumeMarker..].TrimStart('\n') : string.Empty;
         var mailService = mailProvider == MailProvider.Mailpit
-            ? $$"""
-
-              mailpit:
-                image: axllent/mailpit:v1.21.8
-                ports:
-                  - "1025:1025"
-                  - "8025:8025"
-                healthcheck:
-                  test: ["CMD", "wget", "--spider", "-q", "http://localhost:8025/api/v1/info"]
-                  interval: 5s
-                  timeout: 5s
-                  retries: 20
-            """
+            ? "  mailpit:\n    image: axllent/mailpit:v1.21.8\n    ports:\n      - \"1025:1025\"\n      - \"8025:8025\"\n    healthcheck:\n      test: [\"CMD\", \"wget\", \"--spider\", \"-q\", \"http://localhost:8025/api/v1/info\"]\n      interval: 5s\n      timeout: 5s\n      retries: 20"
             : string.Empty;
+        var dashboardService = "  dashboard:\n    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.4\n    ports:\n      - \"18888:18888\"\n      - \"4317:18889\"\n      - \"4318:18890\"";
 
         return TemplateRenderer.Render(TemplateCatalog.Select("static/compose.template"), new TemplateContext(new Dictionary<string, string>
         {
-            ["DATABASE_SERVICES"] = compose,
-            ["MAIL_SERVICE"] = mailService
+            ["DATABASE_SERVICES"] = databaseServices.TrimEnd(),
+            ["MAIL_SERVICE"] = mailService.Trim('\r', '\n'),
+            ["DASHBOARD_SERVICE"] = dashboardService,
+            ["VOLUMES"] = volumes
         }));
     }
 
