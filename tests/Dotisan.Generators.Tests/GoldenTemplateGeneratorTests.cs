@@ -931,6 +931,30 @@ public sealed class GoldenTemplateGeneratorTests
     }
 
     [Fact]
+    public async Task Generated_build_inputs_are_pinned_and_use_frozen_package_installs()
+    {
+        var output = Path.Combine(Path.GetTempPath(), "dotisan-reproducibility-test-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var result = await new GoldenTemplateGenerator().GenerateAsync(
+                ProjectOptions.Quick("ReproApp", output) with { PackageManager = PackageManager.Npm, ObservabilityEnabled = true }, CancellationToken.None);
+            Assert.True(result.Success, result.ErrorMessage);
+            var globalJson = await File.ReadAllTextAsync(Path.Combine(output, "global.json"));
+            var dockerfile = await File.ReadAllTextAsync(Path.Combine(output, "Dockerfile"));
+            var compose = await File.ReadAllTextAsync(Path.Combine(output, "compose.yaml"));
+            Assert.Contains("\"rollForward\": \"latestFeature\"", globalJson);
+            Assert.Contains("npm ci", dockerfile);
+            Assert.DoesNotContain("npm install", dockerfile);
+            Assert.Contains("aspire-dashboard:9.4", compose);
+            Assert.DoesNotContain("aspire-dashboard:latest", compose);
+        }
+        finally
+        {
+            if (Directory.Exists(output)) Directory.Delete(output, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task Generation_is_reproducible_for_the_same_feature_matrix()
     {
         var first = Path.Combine(Path.GetTempPath(), "dotisan-repro-first-" + Guid.NewGuid().ToString("N"));
