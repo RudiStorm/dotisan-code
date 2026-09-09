@@ -4,6 +4,8 @@
 
 The acceptance checklist below is verified on `master`. Task 7's generated-project source migration is complete: selected API, integration, frontend, and test outputs now render from normalized physical embedded templates, while `TemplateFiles.cs` remains only as the orchestration/scaffolding implementation. Interaction-level frontend coverage (Task 12, Step 4) is verified for login errors, antiforgery propagation, session revocation, notifications, imports/exports, and webhooks. The release matrix has been exercised with minimal/npm, identity/pnpm, saas/npm, and maximal/pnpm profiles. A packed-tool clean-machine smoke test and `.nupkg`/`.snupkg` inspection also pass, including locally prepared `0.9.0-beta.1` artifacts. Publishing a prerelease package remains an external release action and has not been performed.
 
+Subsequent hardening on `master` also keeps generated `Program.cs` below the host-composition boundary, enforces bounded import streaming, adds bounded notification pagination, derives the generated frontend version from the shared MSBuild assembly version, and runs the complete release matrix through `scripts/Test-Release.ps1`. The latest release-gate run passed all repository, generated-profile, frontend, audit, and package-inspection checks.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make Dotisan's documented project-generation workflow reliable, idiomatic for .NET developers, secure by default, reproducible, and credible as a public developer tool.
