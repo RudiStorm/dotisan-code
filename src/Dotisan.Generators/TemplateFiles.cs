@@ -157,10 +157,10 @@ internal static class TemplateFiles
             ..(options.WebhooksEnabled ? new[] { new TemplateFile($"src/{options.Name}.Api/Integrations/Webhooks.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/webhooks.template"), new TemplateContext(new Dictionary<string, string>
             {
                 ["IDENTIFIER"] = identifier,
-                ["AUTH_USING"] = options.AuthenticationEnabled ? $"using {identifier}.Api.Authorization;" : string.Empty,
+                ["AUTH_USING"] = options.AuthenticationEnabled ? $"using {identifier}.Api.Authorization;\nusing Microsoft.AspNetCore.Antiforgery;" : string.Empty,
                 ["WOLVERINE_USING"] = options.JobsEnabled ? "using Wolverine;" : string.Empty,
                 ["AUTHORIZATION"] = options.AuthenticationEnabled ? "group.RequireAuthorization();" : string.Empty,
-                ["AUTHORIZATION_REPLAY"] = options.AuthenticationEnabled ? ".RequireAuthorization(Permissions.WebhookReplay)" : string.Empty,
+                ["AUTHORIZATION_REPLAY"] = options.AuthenticationEnabled ? ".RequireAuthorization(Permissions.WebhookReplay).WithMetadata(new RequireAntiforgeryTokenAttribute(true))" : string.Empty,
                 ["REPLAY_STATUS"] = options.JobsEnabled ? "\"queued\"" : "\"delivered\"",
                 ["DURABLE_SUPPORT"] = options.JobsEnabled ? TemplateRenderer.Render(TemplateCatalog.Select("static/webhooks-durable.template"), new TemplateContext(new Dictionary<string, string> { ["IDENTIFIER"] = identifier })) : string.Empty
             }))) } : Array.Empty<TemplateFile>()),
