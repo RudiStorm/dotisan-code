@@ -340,6 +340,9 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("RequireAuthorization(Permissions.ImportExportManage)", imports);
             Assert.Contains("using IntegrationApp.Api.Authorization;", imports);
             Assert.Contains("RequireAuthorization(Permissions.WebhookReplay)", await File.ReadAllTextAsync(Path.Combine(integrations, "Webhooks.cs")));
+            var webhooks = await File.ReadAllTextAsync(Path.Combine(integrations, "Webhooks.cs"));
+            Assert.Contains("LastError", webhooks);
+            Assert.Contains("HMACSHA256.HashData", webhooks);
             var dbContext = await File.ReadAllTextAsync(Path.Combine(output, "src", "IntegrationApp.Api", "Data", "AppDbContext.cs"));
             Assert.Contains("ImportRecord", imports);
             Assert.Contains("ImportRequestedHandler", imports);

@@ -22,7 +22,10 @@ public sealed class DurableWebhookDispatcher(AppDbContext db, IMessageBus bus, I
     {
         var delivery = await db.WebhookDeliveries.SingleOrDefaultAsync(item => item.Id == deliveryId, cancellationToken);
         if (delivery is null) return false;
+        var secret = configuration["Webhooks:SigningSecret"] ?? throw new InvalidOperationException("Webhooks:SigningSecret must be configured.");
+        delivery.Signature = Convert.ToHexString(HMACSHA256.HashData(Encoding.UTF8.GetBytes(secret), Encoding.UTF8.GetBytes(delivery.PayloadJson)));
         delivery.Status = "queued";
+        delivery.LastError = null;
         await db.SaveChangesAsync(cancellationToken);
         await bus.PublishAsync(new WebhookDispatchRequested(delivery.Id));
         return true;
@@ -45,11 +48,13 @@ public sealed class WebhookDispatchHandler(AppDbContext db, IHttpClientFactory c
                 request.Headers.Add("X-Dotisan-Signature", delivery.Signature);
                 using var response = await clients.CreateClient("webhooks").SendAsync(request, cancellationToken);
                 delivery.Status = response.IsSuccessStatusCode ? "delivered" : "failed";
+                delivery.LastError = response.IsSuccessStatusCode ? null : $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}"[..Math.Min(500, $"HTTP {(int)response.StatusCode} {response.ReasonPhrase}".Length)];
                 if (response.IsSuccessStatusCode) break;
             }
-            catch (HttpRequestException)
+            catch (HttpRequestException exception)
             {
                 delivery.Status = "failed";
+                delivery.LastError = exception.Message[..Math.Min(500, exception.Message.Length)];
             }
             if (attempt < maxAttempts)
             {
@@ -60,5 +65,3 @@ public sealed class WebhookDispatchHandler(AppDbContext db, IHttpClientFactory c
         await db.SaveChangesAsync(cancellationToken);
     }
 }
-
-

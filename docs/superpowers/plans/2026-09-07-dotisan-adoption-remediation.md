@@ -588,7 +588,7 @@ git commit -m "fix: secure generated mutation endpoints by default"
 - Readiness labels: `production-foundation`, `development-adapter`, `example-only`.
 - CLI output must print the label and required follow-up work for each selected integration.
 
-- [ ] **Step 1: Create the readiness matrix with explicit behavior**
+- [x] **Step 1: Create the readiness matrix with explicit behavior**
 
 ```markdown
 | Capability | Required behavior before production-foundation |
@@ -600,15 +600,15 @@ git commit -m "fix: secure generated mutation endpoints by default"
 | Caching | distributed implementation guidance, namespaced keys, invalidation example |
 ```
 
-- [ ] **Step 2: Imports: add upload limits, durable status persistence, an `ImportRequested` handler, format validation, and tenant ownership**
+- [x] **Step 2: Imports: add upload limits, durable status persistence, an `ImportRequested` handler, format validation, and tenant ownership**
 
 - [ ] **Step 3: Storage: remove the throwing S3 class unless a working adapter is selected; stream without relying on `Stream.Length`; persist content type and owner**
 
-- [ ] **Step 4: Webhooks: dispatch through Wolverine, configure `HttpClient.Timeout`, validate configured destinations, record terminal error details safely, and recompute signatures during replay**
+- [x] **Step 4: Webhooks: dispatch through Wolverine, configure `HttpClient.Timeout`, validate configured destinations, record terminal error details safely, and recompute signatures during replay**
 
-- [ ] **Step 5: Notifications: add `IUserIdProvider`, pagination, permission checks, SignalR authorization, and delivery tests**
+- [x] **Step 5: Notifications: add `IUserIdProvider`, pagination, permission checks, SignalR authorization, and delivery tests**
 
-- [ ] **Step 6: Mark any capability failing its row as `example-only` and remove production-readiness language from CLI and README**
+- [x] **Step 6: Mark any capability failing its row as `example-only` and remove production-readiness language from CLI and README**
 
 - [ ] **Step 7: Commit each capability separately after its tests pass**
 
