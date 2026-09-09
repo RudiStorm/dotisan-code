@@ -655,6 +655,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("Permissions.CustomersCreate", endpoints);
             Assert.Contains("Permissions.CustomersUpdate", endpoints);
             Assert.Contains("Permissions.CustomersDelete", endpoints);
+            Assert.Contains("RequireAntiforgeryTokenAttribute", endpoints);
             Assert.Contains("MapPut", endpoints);
             Assert.Contains("MapDelete", endpoints);
             Assert.Contains("IAuditWriter", endpoints);

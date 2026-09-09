@@ -175,6 +175,7 @@ public sealed class ResourceScaffolder
     using {{identifier}}.Api.Data;
     {{(authenticationEnabled ? $"using {identifier}.Api.Authorization;\n    using {identifier}.Api.Auditing;" : string.Empty)}}
     using Microsoft.AspNetCore.Http;
+    {{(authenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty)}}
     using Microsoft.AspNetCore.Routing;
     using Microsoft.EntityFrameworkCore;
 
@@ -205,7 +206,7 @@ public sealed class ResourceScaffolder
                 {{(authenticationEnabled ? "await audit.RecordAsync(httpContext, \"" + resourceName + "\", entity.Id.ToString(), \"create\", new Dictionary<string, object?> { [\"Name\"] = entity.Name }, cancellationToken);" : string.Empty)}}
                 return Results.Created($"/api/{{featureName.ToLowerInvariant()}}/{entity.Id}", entity);
             }).WithName("Create{{resourceName}}").WithTags("{{resourceName}}");
-            {{(authenticationEnabled ? "create.RequireAuthorization(Permissions." + featureName + "Create);" : string.Empty)}}
+            {{(authenticationEnabled ? "create.RequireAuthorization(Permissions." + featureName + "Create).WithMetadata(new RequireAntiforgeryTokenAttribute(true));" : string.Empty)}}
 
             {{(authenticationEnabled ? $$"""
             var read = endpoints.MapGet("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, AppDbContext db, {{(multiTenancyEnabled ? "ITenantContext tenantContext, " : string.Empty)}}HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) =>
@@ -240,7 +241,7 @@ public sealed class ResourceScaffolder
                 await audit.RecordAsync(httpContext, "{{resourceName}}", entity.Id.ToString(), "update", new Dictionary<string, object?> { ["Name"] = new { old = oldName, @new = entity.Name } }, cancellationToken);
                 return Results.Ok(entity);
             }).WithName("Update{{resourceName}}").WithTags("{{resourceName}}");
-            update.RequireAuthorization(Permissions.{{featureName}}Update);
+            update.RequireAuthorization(Permissions.{{featureName}}Update).WithMetadata(new RequireAntiforgeryTokenAttribute(true));
 
             var delete = endpoints.MapDelete("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, AppDbContext db, {{(multiTenancyEnabled ? "ITenantContext tenantContext, " : string.Empty)}}HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) =>
             {
@@ -255,7 +256,7 @@ public sealed class ResourceScaffolder
                 await audit.RecordAsync(httpContext, "{{resourceName}}", entity.Id.ToString(), "delete", new Dictionary<string, object?>(), cancellationToken);
                 return Results.NoContent();
             }).WithName("Delete{{resourceName}}").WithTags("{{resourceName}}");
-            delete.RequireAuthorization(Permissions.{{featureName}}Delete);
+            delete.RequireAuthorization(Permissions.{{featureName}}Delete).WithMetadata(new RequireAntiforgeryTokenAttribute(true));
             """ : string.Empty)}}
         }
 
