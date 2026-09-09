@@ -10,10 +10,18 @@ foreach ($file in $requiredFiles) {
 git diff --check
 dotnet test Dotisan.sln -c Release --no-restore --filter 'FullyQualifiedName!~GoldenPathTests' --verbosity minimal
 
-# Validate the user-facing artifact in a fresh temporary workspace before packing.
+# Validate every supported user-facing profile in fresh temporary workspaces before packing.
 $acceptanceScript = Join-Path $PSScriptRoot 'Test-GeneratedProject.ps1'
-& powershell -NoProfile -ExecutionPolicy Bypass -File $acceptanceScript -Profile minimal -PackageManager npm
-if ($LASTEXITCODE -ne 0) { throw "Generated minimal-project acceptance failed with exit code $LASTEXITCODE." }
+$matrix = @(
+    @{ Profile = 'minimal'; PackageManager = 'npm' },
+    @{ Profile = 'identity'; PackageManager = 'pnpm' },
+    @{ Profile = 'saas'; PackageManager = 'npm' },
+    @{ Profile = 'maximal'; PackageManager = 'pnpm' }
+)
+foreach ($entry in $matrix) {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $acceptanceScript -Profile $entry.Profile -PackageManager $entry.PackageManager
+    if ($LASTEXITCODE -ne 0) { throw "Generated $($entry.Profile)/$($entry.PackageManager) acceptance failed with exit code $LASTEXITCODE." }
+}
 
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 dotnet pack src/Dotisan.Cli/Dotisan.Cli.csproj -c Release --no-restore --output $OutputDirectory --include-symbols
