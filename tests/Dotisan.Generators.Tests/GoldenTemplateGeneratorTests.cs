@@ -63,6 +63,10 @@ public sealed class GoldenTemplateGeneratorTests
             var mainTs = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "src", "main.ts"));
             Assert.Contains("VueQueryPlugin", mainTs);
             var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs"));
+            Assert.InRange(program.Split('\n').Length, 1, 80);
+            Assert.DoesNotContain("AddDbContext", program);
+            Assert.DoesNotContain("AddIdentityCore", program);
+            Assert.DoesNotContain("AddSignalR", program);
             Assert.DoesNotContain("DOTISAN_CONTRACT_FALLBACK", program);
             Assert.Contains("\"version\": \"0.8.6\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Auditing", "AuditEntry.cs")));
