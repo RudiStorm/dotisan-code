@@ -3,7 +3,19 @@
     const wrapper = mount(WebhooksPage);
     await flushPromises();
     requestMock.mockResolvedValueOnce(undefined);
+    requestMock.mockResolvedValueOnce([{ id: 'd1', eventType: 'CustomerCreated', endpoint: 'https://example.test', status: 'queued', attempts: 1 }]);
     await wrapper.get('button').trigger('click');
     await flushPromises();
     expect(requestMock).toHaveBeenLastCalledWith('/api/webhooks/deliveries/d1/replay', { method: 'POST' });
+    expect(wrapper.text()).toContain('Webhook replay queued.');
+  });
+
+  it('reports a replay failure', async () => {
+    requestMock.mockResolvedValueOnce([{ id: 'd1', eventType: 'CustomerCreated', endpoint: 'https://example.test', status: 'failed', attempts: 1 }]);
+    const wrapper = mount(WebhooksPage);
+    await flushPromises();
+    requestMock.mockRejectedValueOnce(new Error('request failed'));
+    await wrapper.get('button').trigger('click');
+    await flushPromises();
+    expect(wrapper.text()).toContain('Could not replay this webhook.');
   });

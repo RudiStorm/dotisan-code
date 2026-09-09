@@ -634,15 +634,15 @@ git commit -m "feat: harden generated notifications"
 
 - [ ] **Step 1: Replace direct page-level `fetch` calls with generated services or a single typed client**
 
-- [ ] **Step 2: Add pending-state disabling, error messages, success confirmation, and retry behavior to imports, notifications, webhooks, sessions, and authorization pages**
+- [x] **Step 2: Add pending-state disabling, error messages, success confirmation, and retry behavior to imports, notifications, webhooks, sessions, and authorization pages**
 
 - [ ] **Step 3: Add accessible labels, table captions, focus styles, status announcements, and confirmation for destructive session actions**
 
 - [x] **Step 4: Add Vitest tests for login errors, antiforgery propagation, session revocation, imports, notifications, and webhook replay**
 
-- [ ] **Step 5: Expand Playwright from a shell-heading check to registration, login, navigation, failed request, and protected-route flows**
+- [x] **Step 5: Expand Playwright from a shell-heading check to registration, login, navigation, failed request, and protected-route flows**
 
-- [ ] **Step 6: Add `PRODUCT.md` and `DESIGN.md` for Dotisan's own generated portal baseline, while clearly documenting that applications should customize them**
+- [x] **Step 6: Add `PRODUCT.md` and `DESIGN.md` for Dotisan's own generated portal baseline, while clearly documenting that applications should customize them**
 
 - [ ] **Step 7: Run frontend verification**
 
