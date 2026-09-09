@@ -559,7 +559,7 @@ git commit -m "refactor: simplify generated application composition"
 - Uses: .NET 10 `AddValidation()` for request DTO validation.
 - Requires: explicit permission policies for administrative and cross-user operations.
 
-- [ ] **Step 1: Add integration tests proving every cookie-authenticated POST, PUT, PATCH, and DELETE rejects a missing or invalid antiforgery token**
+- [x] **Step 1: Add integration tests proving every cookie-authenticated POST, PUT, PATCH, and DELETE rejects a missing or invalid antiforgery token**
 
 - [x] **Step 2: Protect sample job endpoints or omit them from authenticated production profiles**
 
