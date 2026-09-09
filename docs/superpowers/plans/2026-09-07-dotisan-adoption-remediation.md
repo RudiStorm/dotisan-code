@@ -799,7 +799,7 @@ Install the packed global tool into an empty tool path, generate a project outsi
 
 Publish `0.9.0-beta.1`, collect external feedback using the issue templates, and promote only after the golden-path and clean-machine gates pass unchanged.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```powershell
 git add LICENSE CHANGELOG.md CONTRIBUTING.md SECURITY.md SUPPORT.md .github README.md src/Dotisan.Cli
