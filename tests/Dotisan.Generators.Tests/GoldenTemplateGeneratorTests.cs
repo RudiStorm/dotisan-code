@@ -337,6 +337,8 @@ public sealed class GoldenTemplateGeneratorTests
             var dbContext = await File.ReadAllTextAsync(Path.Combine(output, "src", "IntegrationApp.Api", "Data", "AppDbContext.cs"));
             Assert.Contains("ImportRecord", imports);
             Assert.Contains("ImportRequestedHandler", imports);
+            Assert.Contains("var buffer = new byte[64 * 1024]", imports);
+            Assert.Contains("if (total > maxBytes)", imports);
             Assert.Contains("ImportRecords", dbContext);
         }
         finally
