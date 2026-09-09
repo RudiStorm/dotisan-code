@@ -320,6 +320,10 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("IFileStorage", await File.ReadAllTextAsync(Path.Combine(integrations, "Storage.cs")));
             var storage = await File.ReadAllTextAsync(Path.Combine(integrations, "Storage.cs"));
             Assert.Contains("LocalFileStorage", storage);
+            Assert.Contains("string? OwnerId", storage);
+            Assert.Contains(".metadata.json", storage);
+            Assert.Contains("OpenReadAsync(string key, string? ownerId", storage);
+            Assert.Contains("DeleteAsync(string key, string? ownerId", storage);
             Assert.Contains("RequireAuthorization(Permissions.StorageDelete)", storage);
             var caching = await File.ReadAllTextAsync(Path.Combine(integrations, "Caching.cs"));
             Assert.Contains("IDistributedApplicationCache", caching);
