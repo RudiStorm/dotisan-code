@@ -22,3 +22,8 @@ else
   npm --prefix "$web" run build
   npm --prefix "$web" test
 fi
+if [[ "$package_manager" == "pnpm" ]]; then
+  [[ -f "$web/pnpm-lock.yaml" ]] || { echo "Selected pnpm lockfile is missing" >&2; exit 1; }
+else
+  [[ -f "$web/package-lock.json" ]] || { echo "Selected npm lockfile is missing" >&2; exit 1; }
+fi

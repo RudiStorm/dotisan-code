@@ -40,6 +40,10 @@ try {
         Invoke-Checked { npm --prefix $web.FullName run build } 'npm build'
         Invoke-Checked { npm --prefix $web.FullName test } 'npm test'
     }
+    $lockfileName = if ($PackageManager -eq 'pnpm') { 'pnpm-lock.yaml' } else { 'package-lock.json' }
+    if (-not (Test-Path -LiteralPath (Join-Path $web.FullName $lockfileName))) {
+        throw "Generated frontend did not produce the selected package-manager lockfile: $lockfileName"
+    }
 } finally {
     if ($createdRoot -and (Test-Path -LiteralPath $ProjectRoot)) {
         Remove-Item -LiteralPath $ProjectRoot -Recurse -Force -ErrorAction SilentlyContinue
