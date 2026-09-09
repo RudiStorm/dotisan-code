@@ -253,7 +253,7 @@ internal sealed class LegacyDevCommand : WorkspaceCommand
     }
 }
 
-internal sealed class NewCommand : IDotisanCommand
+internal sealed class LegacyNewCommand : IDotisanCommand
 {
     public string Name => "new";
     public string Description => "Create a new Dotisan application.";
