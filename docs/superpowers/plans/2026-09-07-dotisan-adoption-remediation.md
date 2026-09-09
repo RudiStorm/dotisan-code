@@ -530,17 +530,17 @@ git commit -m "refactor: align CLI commands with dotnet conventions"
 - Produces: `UseApplicationPipeline()`.
 - Produces: `MapApplicationEndpoints()`.
 
-- [ ] **Step 1: Add generated-project assertions that `Program.cs` remains below 80 lines and contains no feature-specific registrations**
+- [x] **Step 1: Add generated-project assertions that `Program.cs` remains below 80 lines and contains no feature-specific registrations**
 
-- [ ] **Step 2: Extract configuration, OpenTelemetry, EF Core, Identity, jobs, and optional features into focused registration methods**
+- [x] **Step 2: Extract configuration, OpenTelemetry, EF Core, Identity, jobs, and optional features into focused registration methods**
 
-- [ ] **Step 3: Remove duplicate `AddHttpClient()` calls and preserve deliberate middleware ordering**
+- [x] **Step 3: Remove duplicate `AddHttpClient()` calls and preserve deliberate middleware ordering**
 
-- [ ] **Step 4: Add HSTS outside Development and keep forwarded headers before redirects, authentication, and link generation**
+- [x] **Step 4: Add HSTS outside Development and keep forwarded headers before redirects, authentication, and link generation**
 
-- [ ] **Step 5: Run generated integration tests behind forwarded HTTPS headers**
+- [x] **Step 5: Run generated integration tests behind forwarded HTTPS headers**
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```powershell
 git add src/Dotisan.Generators/Templates tests
@@ -709,15 +709,15 @@ git commit -m "fix: make migration workflow explicit and consistent"
 - Docker builds use `npm ci` or `pnpm install --frozen-lockfile`.
 - Container images use an explicit version or digest, never `latest`.
 
-- [ ] **Step 1: Add golden assertions for SDK roll-forward, lockfiles, frozen installs, and pinned Compose images**
+- [x] **Step 1: Add golden assertions for SDK roll-forward, lockfiles, frozen installs, and pinned Compose images**
 
 - [ ] **Step 2: Decide lockfile production inside the generator and produce the selected package manager's lockfile before reporting successful project creation**
 
-- [ ] **Step 3: Update Dockerfile templates to copy the exact lockfile and use frozen installation**
+- [x] **Step 3: Update Dockerfile templates to copy the exact lockfile and use frozen installation**
 
-- [ ] **Step 4: Replace `mcr.microsoft.com/dotnet/aspire-dashboard:latest` with a reviewed version or digest**
+- [x] **Step 4: Replace `mcr.microsoft.com/dotnet/aspire-dashboard:latest` with a reviewed version or digest**
 
-- [ ] **Step 5: Derive CLI, NuGet, frontend-template, and release versions from one MSBuild property**
+- [x] **Step 5: Derive CLI, NuGet, frontend-template, and release versions from one MSBuild property**
 
 ```xml
 <PropertyGroup>
@@ -730,9 +730,9 @@ git commit -m "fix: make migration workflow explicit and consistent"
 </PropertyGroup>
 ```
 
-- [ ] **Step 6: Make the release job derive the `.nupkg` path from the tag/version and reject mismatches**
+- [x] **Step 6: Make the release job derive the `.nupkg` path from the tag/version and reject mismatches**
 
-- [ ] **Step 7: Run pack and inspect both `.nupkg` and `.snupkg`**
+- [x] **Step 7: Run pack and inspect both `.nupkg` and `.snupkg`**
 
 ```powershell
 dotnet pack src\Dotisan.Cli\Dotisan.Cli.csproj -c Release -o artifacts
