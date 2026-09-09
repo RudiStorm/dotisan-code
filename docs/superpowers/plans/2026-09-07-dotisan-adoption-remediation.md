@@ -567,7 +567,7 @@ git commit -m "refactor: simplify generated application composition"
 
 - [ ] **Step 4: Replace scattered manual string checks with DTO validation and standard ValidationProblem responses**
 
-- [ ] **Step 5: Add tests for 401, 403, 400, valid token success, and tenant isolation**
+- [x] **Step 5: Add tests for 401, 403, 400, valid token success, and tenant isolation**
 
 - [x] **Step 6: Commit**
 
