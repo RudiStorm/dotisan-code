@@ -9,6 +9,7 @@ public sealed class DocumentationConsistencyTests
         var files = new[]
         {
             "README.md",
+            "project.md",
             Path.Combine("docs", "quickstart.md"),
             Path.Combine("docs", "jobs-and-scheduling.md"),
             Path.Combine("src", "Dotisan.Generators", "TemplateFiles.cs")

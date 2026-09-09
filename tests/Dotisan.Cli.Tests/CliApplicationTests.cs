@@ -338,6 +338,8 @@ public sealed class CliApplicationTests
         Assert.Equal(["install"], services.RunRequests[4].Arguments);
         Assert.Equal(Path.Combine(outputDirectory, "src", "TodoApp.Web"), services.RunRequests[4].WorkingDirectory);
         Assert.DoesNotContain(services.RunRequests, request => request.Arguments.Contains("migrations", StringComparer.Ordinal));
+        Assert.DoesNotContain(services.RunRequests, request => request.Arguments.Contains("database", StringComparer.Ordinal));
+        Assert.DoesNotContain(services.RunRequests, request => request.FileName == "docker" && request.Arguments.Contains("up", StringComparer.Ordinal));
     }
 
     [Fact]
@@ -354,6 +356,7 @@ public sealed class CliApplicationTests
         Assert.Contains("dotnet ef migrations add InitialIdentity", console.Output);
         Assert.Contains($"--project {Path.Combine("src", "AccountsApp.Api")}", console.Output);
         Assert.Contains("dotisan migrate", console.Output);
+        Assert.Contains("Database provider: SQLite", console.Output);
         Assert.Contains("Then run: dotisan dev", console.Output);
     }
 
@@ -369,6 +372,8 @@ public sealed class CliApplicationTests
 
         Assert.Equal(DotisanExitCode.Success, exitCode);
         Assert.DoesNotContain(services.RunRequests, request => request.Arguments.Contains("migrations", StringComparer.Ordinal));
+        Assert.DoesNotContain(services.RunRequests, request => request.Arguments.Contains("database", StringComparer.Ordinal));
+        Assert.DoesNotContain(services.RunRequests, request => request.FileName == "docker" && request.Arguments.Contains("up", StringComparer.Ordinal));
         Assert.Contains("dotnet ef migrations add InitialIdentity", console.Output);
     }
 
@@ -514,6 +519,22 @@ public sealed class CliApplicationTests
         Assert.Equal("dotnet", services.StartFileName);
         Assert.Contains("watch", services.StartArguments);
         Assert.Contains("UAT", services.StartArguments);
+    }
+
+    [Fact]
+    public async Task New_external_database_prints_provider_specific_schema_steps()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices { FailPrerequisite = "docker" };
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "dotisan-new-provider-guidance-" + Guid.NewGuid().ToString("N"));
+
+        var exitCode = await app.RunAsync(["new", "TodoApp", "--yes", "--database", "postgresql", "--no-restore", "--output", outputDirectory]);
+
+        Assert.Equal(DotisanExitCode.Success, exitCode);
+        Assert.Contains("Database provider: PostgreSQL", console.Output);
+        Assert.Contains("dotisan dev  # starts the local database service", console.Output);
+        Assert.Contains("dotisan migrate  # applies reviewed, committed migrations", console.Output);
     }
 
     [Fact]

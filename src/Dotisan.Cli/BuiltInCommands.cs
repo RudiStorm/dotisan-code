@@ -866,7 +866,6 @@ internal sealed class NewCommand : IDotisanCommand
         }
 
         context.Console.WriteLine($"Created {options.Name} in {result.OutputDirectory}.");
-        var migrationName = options.AuthenticationEnabled ? "InitialIdentity" : "InitialCreate";
         var apiProjectPath = Path.Combine("src", $"{options.Name}.Api");
         if (context.Services is not null)
         {
@@ -941,11 +940,29 @@ internal sealed class NewCommand : IDotisanCommand
         }
 
         context.Console.WriteLine($"Next: cd {Path.GetRelativePath(Directory.GetCurrentDirectory(), result.OutputDirectory)}");
-        context.Console.WriteLine("Before development, create and apply the initial database migration:");
-        context.Console.WriteLine($"  dotnet ef migrations add {migrationName} --project {apiProjectPath}");
-        context.Console.WriteLine("  dotisan migrate");
+        WriteMigrationGuidance(context.Console, options, apiProjectPath);
         context.Console.WriteLine("Then run: dotisan dev");
         return DotisanExitCode.Success;
+    }
+
+    private static void WriteMigrationGuidance(IConsole console, ProjectOptions options, string apiProjectPath)
+    {
+        var migrationName = options.AuthenticationEnabled ? "InitialIdentity" : "InitialCreate";
+        var providerName = options.Database switch
+        {
+            DatabaseProvider.SQLite => "SQLite",
+            DatabaseProvider.SqlServer => "SQL Server",
+            DatabaseProvider.PostgreSQL => "PostgreSQL",
+            DatabaseProvider.MySQL => "MySQL",
+            _ => options.Database.ToString()
+        };
+
+        console.WriteLine($"Database provider: {providerName}.");
+        console.WriteLine("Schema steps are explicit; dotisan new does not create or apply migrations:");
+        console.WriteLine($"  dotnet ef migrations add {migrationName} --project {apiProjectPath}");
+        if (options.Database is DatabaseProvider.SqlServer or DatabaseProvider.PostgreSQL or DatabaseProvider.MySQL)
+            console.WriteLine("  dotisan dev  # starts the local database service");
+        console.WriteLine("  dotisan migrate  # applies reviewed, committed migrations");
     }
 
     private static DotisanExitCode UsageError(CommandContext context, string message)

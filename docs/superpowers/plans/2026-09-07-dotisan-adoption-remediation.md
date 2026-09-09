@@ -679,15 +679,15 @@ git commit -m "test: cover generated portal workflows"
 - `dotisan migrate` applies committed migrations only.
 - Native `dotnet ef migrations add` remains the authoring command.
 
-- [ ] **Step 1: Add tests proving `new` never calls `docker compose up`, `dotnet ef migrations add`, or `dotnet ef database update`**
+- [x] **Step 1: Add tests proving `new` never calls `docker compose up`, `dotnet ef migrations add`, or `dotnet ef database update`**
 
-- [ ] **Step 2: Remove migration creation/application from `NewCommand`**
+- [x] **Step 2: Remove migration creation/application from `NewCommand`**
 
-- [ ] **Step 3: Print provider-specific native next steps after generation**
+- [x] **Step 3: Print provider-specific native next steps after generation**
 
-- [ ] **Step 4: Make every migration statement in the four documentation sources identical in meaning**
+- [x] **Step 4: Make every migration statement in the four documentation sources identical in meaning**
 
-- [ ] **Step 5: Add a documentation test that fails on the retired claims `creates and applies the initial migration` and `creates and applies the initial Identity schema`**
+- [x] **Step 5: Add a documentation test that fails on the retired claims `creates and applies the initial migration` and `creates and applies the initial Identity schema`**
 
 - [ ] **Step 6: Commit**
 
