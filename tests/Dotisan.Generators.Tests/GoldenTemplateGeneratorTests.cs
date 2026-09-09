@@ -80,18 +80,19 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("DbSet<AuditEntry> AuditEntries", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Data", "AppDbContext.cs")));
             Assert.Contains("\"Audit\":", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
             Assert.Contains("\"Enabled\": true", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
-            Assert.Contains("AddScoped<IAuditWriter, AuditWriter>", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
-            Assert.Contains("UseSqlite", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
+            var services = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Infrastructure", "ServiceCollectionExtensions.cs"));
+            Assert.Contains("AddScoped<IAuditWriter, AuditWriter>", services);
+            Assert.Contains("UseSqlite", services);
             Assert.Contains("Microsoft.AspNetCore.OpenApi", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "TodoApp.Api.csproj")));
             var apiProject = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "TodoApp.Api.csproj"));
             Assert.DoesNotContain("<PackageReference Include=\"Microsoft.OpenApi\"", apiProject);
             Assert.DoesNotContain("<PackageReference Include=\"SQLitePCLRaw.lib.e_sqlite3\"", apiProject);
-            Assert.Contains("AddOpenApi", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
+            Assert.Contains("AddOpenApi", services);
             Assert.Contains("MapOpenApi", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
             Assert.DoesNotContain("OpenTelemetry.Extensions.Hosting", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "TodoApp.Api.csproj")));
             Assert.DoesNotContain("OpenTelemetry.Exporter.OpenTelemetryProtocol", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "TodoApp.Api.csproj")));
-            Assert.DoesNotContain("AddAspNetCoreInstrumentation", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
-            Assert.DoesNotContain("AddHttpClientInstrumentation", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
+            Assert.DoesNotContain("AddAspNetCoreInstrumentation", services);
+            Assert.DoesNotContain("AddHttpClientInstrumentation", services);
             Assert.Contains("\"OpenTelemetry\"", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "JobRegistration.cs")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Api", "Jobs", "SampleJob.cs")));
@@ -119,7 +120,7 @@ public sealed class GoldenTemplateGeneratorTests
             var generatedPaths = Directory.GetFiles(output, "*", SearchOption.AllDirectories)
                 .Select(path => Path.GetRelativePath(output, path).Replace(Path.DirectorySeparatorChar, '/'));
             Assert.DoesNotContain("src/TodoApp.Api/Jobs/JobEndpoints.cs", generatedPaths);
-            Assert.Contains("UseWolverine", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Program.cs")));
+            Assert.Contains("UseWolverine", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "Infrastructure", "ServiceCollectionExtensions.cs")));
             Assert.Contains("\"Jobs\":", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
             Assert.Contains("Data Source=Data/TodoApp.db", await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.json")));
             var config = await File.ReadAllTextAsync(Path.Combine(output, "dotisan.config"));
@@ -181,7 +182,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(generated.Success, generated.ErrorMessage);
 
             var tenancy = await File.ReadAllTextAsync(Path.Combine(output, "src", "TenantApp.Api", "Tenancy", "TenantContext.cs"));
-            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "TenantApp.Api", "Program.cs"));
+            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "TenantApp.Api", "Infrastructure", "ServiceCollectionExtensions.cs"));
             Assert.Contains("interface ITenantContext", tenancy);
             Assert.Contains("X-Tenant-ID", tenancy);
             Assert.Contains("AddHttpContextAccessor", program);
@@ -366,7 +367,7 @@ public sealed class GoldenTemplateGeneratorTests
         {
             var generated = await new GoldenTemplateGenerator().GenerateAsync(ProjectOptions.Quick("SqliteApp", output), CancellationToken.None);
             Assert.True(generated.Success, generated.ErrorMessage);
-            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "SqliteApp.Api", "Program.cs"));
+            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "SqliteApp.Api", "Infrastructure", "ServiceCollectionExtensions.cs"));
             Assert.Contains("Path.Combine(contentRoot, dataSource)", program);
             Assert.Contains("builder.Environment.ContentRootPath", program);
         }
@@ -385,7 +386,7 @@ public sealed class GoldenTemplateGeneratorTests
         {
             var generated = await new GoldenTemplateGenerator().GenerateAsync(ProjectOptions.Quick("ObservabilityApp", output), CancellationToken.None);
             Assert.True(generated.Success, generated.ErrorMessage);
-            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "ObservabilityApp.Api", "Program.cs"));
+            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "ObservabilityApp.Api", "Infrastructure", "ServiceCollectionExtensions.cs"));
             var compose = await File.ReadAllTextAsync(Path.Combine(output, "compose.yaml"));
             Assert.DoesNotContain("AddEntityFrameworkCoreInstrumentation", program);
             Assert.DoesNotContain("AddOpenTelemetry(logging", program);
@@ -409,7 +410,7 @@ public sealed class GoldenTemplateGeneratorTests
                 ProjectOptions.Quick("ObservabilityEnabledApp", output) with { ObservabilityEnabled = true },
                 CancellationToken.None);
             Assert.True(generated.Success, generated.ErrorMessage);
-            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "ObservabilityEnabledApp.Api", "Program.cs"));
+            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "ObservabilityEnabledApp.Api", "Infrastructure", "ServiceCollectionExtensions.cs"));
             var project = await File.ReadAllTextAsync(Path.Combine(output, "src", "ObservabilityEnabledApp.Api", "ObservabilityEnabledApp.Api.csproj"));
             var config = await File.ReadAllTextAsync(Path.Combine(output, "dotisan.config"));
             Assert.Contains("AddEntityFrameworkCoreInstrumentation", program);
@@ -468,7 +469,7 @@ public sealed class GoldenTemplateGeneratorTests
 
             Assert.True(result.Success, result.ErrorMessage);
             var apiProject = await File.ReadAllTextAsync(Path.Combine(output, "src", "DataApp.Api", "DataApp.Api.csproj"));
-            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "DataApp.Api", "Program.cs"));
+            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "DataApp.Api", "Infrastructure", "ServiceCollectionExtensions.cs"));
             var appsettings = await File.ReadAllTextAsync(Path.Combine(output, "src", "DataApp.Api", "appsettings.json"));
             var readme = await File.ReadAllTextAsync(Path.Combine(output, "README.md"));
 
@@ -691,7 +692,7 @@ public sealed class GoldenTemplateGeneratorTests
                 .ToArray();
             var dbContext = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Data", "AppDbContext.cs"));
             var user = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Identity", "ApplicationUser.cs"));
-            var authenticatedProgram = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Program.cs"));
+            var authenticatedProgram = (await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Program.cs"))) + "\n" + await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Infrastructure", "ServiceCollectionExtensions.cs"));
             var applicationPipeline = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Infrastructure", "ApplicationBuilderExtensions.cs"));
             var productionConfiguration = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Infrastructure", "DotisanProductionConfiguration.cs"));
             Assert.Contains("X-Correlation-ID", applicationPipeline);
@@ -709,7 +710,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.DoesNotContain("Database.Migrate()", authenticatedProgram);
             Assert.Contains("/health/live", await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Features", "Health", "HealthEndpoints.cs")));
             Assert.Contains("/health/ready", await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Features", "Health", "HealthEndpoints.cs")));
-            var plainProgram = await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Api", "Program.cs"));
+            var plainProgram = await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Api", "Infrastructure", "ServiceCollectionExtensions.cs"));
             var authenticatedEndpointRegistry = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Api", "Infrastructure", "DotisanEndpointExtensions.cs"));
             var plainEndpointRegistry = await File.ReadAllTextAsync(Path.Combine(plainOutput, "src", "PlainApp.Api", "Infrastructure", "DotisanEndpointExtensions.cs"));
             var authenticatedReadme = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "README.md"));
@@ -864,7 +865,7 @@ public sealed class GoldenTemplateGeneratorTests
 
             Assert.True(result.Success, result.ErrorMessage);
             var project = await File.ReadAllTextAsync(Path.Combine(output, "src", "NoJobsApp.Api", "NoJobsApp.Api.csproj"));
-            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "NoJobsApp.Api", "Program.cs"));
+            var program = await File.ReadAllTextAsync(Path.Combine(output, "src", "NoJobsApp.Api", "Infrastructure", "ServiceCollectionExtensions.cs"));
             var endpoints = await File.ReadAllTextAsync(Path.Combine(output, "src", "NoJobsApp.Api", "Infrastructure", "DotisanEndpointExtensions.cs"));
             Assert.DoesNotContain("Wolverine", project);
             Assert.DoesNotContain("UseWolverine", program);

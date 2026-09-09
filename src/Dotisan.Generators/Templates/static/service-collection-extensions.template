@@ -1,0 +1,67 @@
+using __IDENTIFIER__.Api.Auditing;
+using __IDENTIFIER__.Api.Data;
+using __IDENTIFIER__.Api.Features.Health;
+using __IDENTIFIER__.Api.Infrastructure;
+__AUTH_USING__
+__IDENTITY_USING__
+__TENANT_USING__
+__INTEGRATIONS_USING__
+__JOBS_USING__
+__WOLVERINE_USING__
+__OTEL_USINGS__
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Builder;
+using System.Security.Claims;
+using System.Net;
+
+namespace __IDENTIFIER__.Api.Infrastructure;
+
+public static class ServiceCollectionExtensions
+{
+    public static WebApplicationBuilder AddApplicationServices(this WebApplicationBuilder builder)
+    {
+        builder.Services.AddOptions<DotisanSecurityOptions>().BindConfiguration("Dotisan:Security").ValidateDataAnnotations().ValidateOnStart();
+        builder.Services.Configure<ForwardedHeadersOptions>(options =>
+        {
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            foreach (var value in builder.Configuration.GetSection("Dotisan:Security:KnownProxies").Get<string[]>() ?? [])
+                if (IPAddress.TryParse(value, out var address)) options.KnownProxies.Add(address);
+        });
+        builder.Services.AddCors(options => options.AddPolicy("frontend", policy =>
+        {
+            var frontendUrl = builder.Environment.IsDevelopment() ? builder.Configuration["FrontendUrl"] : builder.Configuration["Dotisan:Security:FrontendUrl"] ?? builder.Configuration["FrontendUrl"];
+            if (Uri.TryCreate(frontendUrl, UriKind.Absolute, out var origin)) policy.WithOrigins(origin.GetLeftPart(UriPartial.Authority)).AllowAnyHeader().AllowAnyMethod().AllowCredentials();
+        }));
+        builder.Services.AddOpenApi();
+        builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context => context.ProblemDetails.Extensions["correlationId"] = context.HttpContext.Request.Headers["X-Correlation-ID"].FirstOrDefault() ?? context.HttpContext.TraceIdentifier);
+__OTEL_SERVICES__
+        var connectionString = ResolveConnectionString(builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' is required."), builder.Environment.ContentRootPath);
+        builder.Services.AddDbContext<AppDbContext>(options => __DATABASE_REGISTRATION__);
+        builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
+        if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing")) DotisanProductionConfiguration.Validate(builder.Configuration, builder.Environment.EnvironmentName, emailConfirmationEnabled: __EMAIL_CONFIRMATION_ENABLED__, dataProtectionEnabled: __DATA_PROTECTION_ENABLED__);
+        builder.Services.AddScoped<IAuditWriter, AuditWriter>();
+__NOTIFICATIONS_SERVICES__
+__STORAGE_SERVICES__
+__CACHING_SERVICES__
+__IMPORTS_SERVICES__
+__WEBHOOK_SERVICES__
+__TENANT_SERVICES__
+__JOBS_SERVICES__
+__AUTH_SERVICES__
+        return builder;
+    }
+
+    private static string ResolveConnectionString(string configured, string contentRoot)
+    {
+        if (!configured.StartsWith("Data Source=", StringComparison.OrdinalIgnoreCase)) return configured;
+        var parts = configured.Split(';');
+        var dataSource = parts[0]["Data Source=".Length..].Trim();
+        if (Path.IsPathRooted(dataSource) || dataSource.Contains('|')) return configured;
+        var resolvedPath = Path.Combine(contentRoot, dataSource);
+        Directory.CreateDirectory(Path.GetDirectoryName(resolvedPath)!);
+        parts[0] = $"Data Source={resolvedPath}";
+        return string.Join(';', parts);
+    }
+}

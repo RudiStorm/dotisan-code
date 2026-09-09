@@ -55,42 +55,33 @@ internal static class TemplateFiles
                 ["AUTH_PACKAGE"] = options.AuthenticationEnabled ? "    <PackageReference Include=\"Microsoft.AspNetCore.Identity.EntityFrameworkCore\" />" : string.Empty
                 ,["OTEL_PACKAGES"] = options.ObservabilityEnabled ? "    <PackageReference Include=\"OpenTelemetry.Extensions.Hosting\" />\n    <PackageReference Include=\"OpenTelemetry.Instrumentation.AspNetCore\" />\n    <PackageReference Include=\"OpenTelemetry.Instrumentation.EntityFrameworkCore\" />\n    <PackageReference Include=\"OpenTelemetry.Instrumentation.Http\" />\n    <PackageReference Include=\"OpenTelemetry.Exporter.OpenTelemetryProtocol\" />" : string.Empty
             }))),
-            new($"src/{options.Name}.Api/Program.cs", options.AuthenticationEnabled
-                ? TemplateRenderer.Render(TemplateCatalog.Select("static/program-auth.template"), new TemplateContext(new Dictionary<string, string>
-                {
-                    ["IDENTIFIER"] = identifier,
-                    ["TENANT_USING"] = options.MultiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty,
-                    ["JOBS_USING"] = options.JobsEnabled ? $"using {identifier}.Api.Jobs;" : string.Empty,
-                    ["WOLVERINE_USING"] = options.JobsEnabled ? "using Wolverine;" : string.Empty,
-                    ["OTEL_USINGS"] = options.ObservabilityEnabled ? "using OpenTelemetry;\nusing OpenTelemetry.Metrics;\nusing OpenTelemetry.Trace;\nusing OpenTelemetry.Logs;" : string.Empty,
-                    ["OTEL_SERVICES"] = ObservabilityServices(options.ObservabilityEnabled),
-                    ["DATABASE_REGISTRATION"] = DatabaseRegistration(options.Database),
-                    ["NOTIFICATIONS_SERVICES"] = options.NotificationsEnabled ? "builder.Services.AddSignalR();\nbuilder.Services.AddSingleton<IUserIdProvider, NotificationUserIdProvider>();\nbuilder.Services.AddScoped<INotificationStore, EfNotificationStore>();" : string.Empty,
-                    ["STORAGE_SERVICES"] = options.StorageEnabled ? "builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();" : string.Empty,
-                    ["CACHING_SERVICES"] = options.CachingEnabled ? "builder.Services.AddMemoryCache();\nbuilder.Services.AddSingleton<IDistributedApplicationCache, MemoryApplicationCache>();\nbuilder.Services.AddSingleton<IApplicationCache>(services => services.GetRequiredService<IDistributedApplicationCache>());" : string.Empty,
-                    ["IMPORTS_SERVICES"] = options.ImportsExportsEnabled ? "builder.Services.AddScoped<IDataExchangeService, DataExchangeService>();" : string.Empty,
-                    ["WEBHOOK_SERVICES"] = options.WebhooksEnabled ? $"builder.Services.AddHttpClient(\"webhooks\", client => client.Timeout = TimeSpan.FromSeconds(30));\nbuilder.Services.AddScoped<IWebhookDispatcher, {(options.JobsEnabled ? "DurableWebhookDispatcher" : "HmacWebhookDispatcher")}>();" : string.Empty,
-                    ["TENANT_SERVICES"] = options.MultiTenancyEnabled ? "builder.Services.AddHttpContextAccessor();\nbuilder.Services.AddScoped<ITenantContext, TenantContext>();" : string.Empty,
-                    ["JOBS_SERVICES"] = options.JobsEnabled ? "builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));" : string.Empty
-                }))
-                : TemplateRenderer.Render(TemplateCatalog.Select("static/program-plain.template"), new TemplateContext(new Dictionary<string, string>
-                {
-                    ["IDENTIFIER"] = identifier,
-                    ["TENANT_USING"] = options.MultiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty,
-                    ["JOBS_USING"] = options.JobsEnabled ? $"using {identifier}.Api.Jobs;" : string.Empty,
-                    ["INTEGRATIONS_USING"] = options.NotificationsEnabled || options.StorageEnabled || options.CachingEnabled || options.ImportsExportsEnabled || options.WebhooksEnabled ? $"using {identifier}.Api.Integrations;" : string.Empty,
-                    ["WOLVERINE_USING"] = options.JobsEnabled ? "using Wolverine;" : string.Empty,
-                    ["OTEL_USINGS"] = options.ObservabilityEnabled ? "using OpenTelemetry;\nusing OpenTelemetry.Metrics;\nusing OpenTelemetry.Trace;\nusing OpenTelemetry.Logs;" : string.Empty,
-                    ["OTEL_SERVICES"] = ObservabilityServices(options.ObservabilityEnabled),
-                    ["DATABASE_REGISTRATION"] = DatabaseRegistration(options.Database),
-                    ["NOTIFICATIONS_SERVICES"] = options.NotificationsEnabled ? "builder.Services.AddSignalR();\nbuilder.Services.AddSingleton<IUserIdProvider, NotificationUserIdProvider>();\nbuilder.Services.AddScoped<INotificationStore, EfNotificationStore>();" : string.Empty,
-                    ["STORAGE_SERVICES"] = options.StorageEnabled ? "builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();" : string.Empty,
-                    ["CACHING_SERVICES"] = options.CachingEnabled ? "builder.Services.AddMemoryCache();\nbuilder.Services.AddSingleton<IDistributedApplicationCache, MemoryApplicationCache>();\nbuilder.Services.AddSingleton<IApplicationCache>(services => services.GetRequiredService<IDistributedApplicationCache>());" : string.Empty,
-                    ["IMPORTS_SERVICES"] = options.ImportsExportsEnabled ? "builder.Services.AddScoped<IDataExchangeService, DataExchangeService>();" : string.Empty,
-                    ["WEBHOOK_SERVICES"] = options.WebhooksEnabled ? $"builder.Services.AddHttpClient(\"webhooks\", client => client.Timeout = TimeSpan.FromSeconds(30));\nbuilder.Services.AddScoped<IWebhookDispatcher, {(options.JobsEnabled ? "DurableWebhookDispatcher" : "HmacWebhookDispatcher")}>();" : string.Empty,
-                    ["TENANT_SERVICES"] = options.MultiTenancyEnabled ? "builder.Services.AddHttpContextAccessor();\nbuilder.Services.AddScoped<ITenantContext, TenantContext>();" : string.Empty,
-                    ["JOBS_SERVICES"] = options.JobsEnabled ? "builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));" : string.Empty
-                }))),
+            new($"src/{options.Name}.Api/Program.cs", TemplateRenderer.Render(TemplateCatalog.Select(options.AuthenticationEnabled ? "static/program-auth.template" : "static/program-plain.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["IDENTIFIER"] = identifier
+            }))),
+            new($"src/{options.Name}.Api/Infrastructure/ServiceCollectionExtensions.cs", TemplateRenderer.Render(TemplateCatalog.Select("static/service-collection-extensions.template"), new TemplateContext(new Dictionary<string, string>
+            {
+                ["IDENTIFIER"] = identifier,
+                ["AUTH_USING"] = options.AuthenticationEnabled ? $"using {identifier}.Api.Authorization;\nusing Microsoft.AspNetCore.Authentication.Cookies;\nusing Microsoft.AspNetCore.Identity;\nusing Microsoft.AspNetCore.RateLimiting;\nusing System.Threading.RateLimiting;" : string.Empty,
+                ["IDENTITY_USING"] = options.AuthenticationEnabled ? $"using {identifier}.Api.Identity;" : string.Empty,
+                ["TENANT_USING"] = options.MultiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty,
+                ["INTEGRATIONS_USING"] = options.AuthenticationEnabled || options.NotificationsEnabled || options.StorageEnabled || options.CachingEnabled || options.ImportsExportsEnabled || options.WebhooksEnabled ? $"using {identifier}.Api.Integrations;" : string.Empty,
+                ["JOBS_USING"] = options.JobsEnabled ? $"using {identifier}.Api.Jobs;" : string.Empty,
+                ["WOLVERINE_USING"] = options.JobsEnabled ? "using Wolverine;" : string.Empty,
+                ["OTEL_USINGS"] = options.ObservabilityEnabled ? "using OpenTelemetry;\nusing OpenTelemetry.Metrics;\nusing OpenTelemetry.Trace;\nusing OpenTelemetry.Logs;" : string.Empty,
+                ["OTEL_SERVICES"] = ObservabilityServices(options.ObservabilityEnabled),
+                ["DATABASE_REGISTRATION"] = DatabaseRegistration(options.Database),
+                ["EMAIL_CONFIRMATION_ENABLED"] = options.AuthenticationEnabled ? "true" : "false",
+                ["DATA_PROTECTION_ENABLED"] = options.AuthenticationEnabled ? "true" : "false",
+                ["NOTIFICATIONS_SERVICES"] = options.NotificationsEnabled ? "        builder.Services.AddSignalR();\n        builder.Services.AddSingleton<IUserIdProvider, NotificationUserIdProvider>();\n        builder.Services.AddScoped<INotificationStore, EfNotificationStore>();" : string.Empty,
+                ["STORAGE_SERVICES"] = options.StorageEnabled ? "        builder.Services.AddSingleton<IFileStorage, LocalFileStorage>();" : string.Empty,
+                ["CACHING_SERVICES"] = options.CachingEnabled ? "        builder.Services.AddMemoryCache();\n        builder.Services.AddSingleton<IDistributedApplicationCache, MemoryApplicationCache>();\n        builder.Services.AddSingleton<IApplicationCache>(services => services.GetRequiredService<IDistributedApplicationCache>());" : string.Empty,
+                ["IMPORTS_SERVICES"] = options.ImportsExportsEnabled ? "        builder.Services.AddScoped<IDataExchangeService, DataExchangeService>();" : string.Empty,
+                ["WEBHOOK_SERVICES"] = options.WebhooksEnabled ? $"        builder.Services.AddHttpClient(\"webhooks\", client => client.Timeout = TimeSpan.FromSeconds(30));\n        builder.Services.AddScoped<IWebhookDispatcher, {(options.JobsEnabled ? "DurableWebhookDispatcher" : "HmacWebhookDispatcher")}>();" : string.Empty,
+                ["TENANT_SERVICES"] = options.MultiTenancyEnabled ? "        builder.Services.AddHttpContextAccessor();\n        builder.Services.AddScoped<ITenantContext, TenantContext>();" : string.Empty,
+                ["JOBS_SERVICES"] = options.JobsEnabled ? "        builder.Host.UseWolverine(opts => JobRegistration.Configure(opts, connectionString, builder.Configuration));" : string.Empty,
+                ["AUTH_SERVICES"] = options.AuthenticationEnabled ? AuthenticationServices() : string.Empty
+            }))),
             new($"src/{options.Name}.Api/Data/AppDbContext.cs", TemplateRenderer.Render(TemplateCatalog.Select(options.AuthenticationEnabled ? "static/db-context-identity.template" : "static/db-context-plain.template"), new TemplateContext(new Dictionary<string, string>
             {
                 ["IDENTIFIER"] = identifier,
@@ -604,5 +595,53 @@ internal static class TemplateFiles
     private static int DevelopmentApiPort(string name) => 5000 + Math.Abs(name.Aggregate(17, (hash, character) => unchecked(hash * 31 + character))) % 1000;
 
     private static int DevelopmentWebPort(string name) => 5173 + Math.Abs(name.Aggregate(23, (hash, character) => unchecked(hash * 31 + character))) % 1000;
+
+    private static string AuthenticationServices() => """
+        builder.Services.AddIdentityCore<ApplicationUser>(options =>
+        {
+            options.User.RequireUniqueEmail = true;
+            options.Password.RequiredLength = 8;
+            options.Lockout.MaxFailedAccessAttempts = 5;
+        })
+        .AddRoles<IdentityRole>()
+        .AddSignInManager()
+        .AddDefaultTokenProviders()
+        .AddEntityFrameworkStores<AppDbContext>();
+        builder.Services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.Zero);
+        builder.Services.AddHttpClient();
+        builder.Services.AddSingleton<IExternalLoginStateStore, ExternalLoginStateStore>();
+        var mailProvider = builder.Configuration["Mail:Provider"]?.ToLowerInvariant() ?? "console";
+        if (mailProvider == "mailpit" && !builder.Environment.IsDevelopment()) throw new InvalidOperationException("Mailpit is only supported in the Development environment. Select smtp for staging or production.");
+        if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing") && mailProvider == "console") throw new InvalidOperationException("Mail:Provider must be smtp or a custom provider outside Development.");
+        builder.Services.AddSingleton<IEmailProvider>(services => mailProvider switch
+        {
+            "mailpit" => new MailpitEmailSender(services.GetRequiredService<IHttpClientFactory>(), services.GetRequiredService<IConfiguration>()),
+            "smtp" => new SmtpEmailSender(services.GetRequiredService<IConfiguration>()),
+            _ => new ConsoleEmailSender()
+        });
+        builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme).AddCookie(IdentityConstants.ApplicationScheme, options =>
+        {
+            options.Cookie.HttpOnly = true;
+            options.Cookie.SameSite = SameSiteMode.Lax;
+            options.Cookie.SecurePolicy = builder.Environment.IsDevelopment() || builder.Environment.IsEnvironment("Testing") ? CookieSecurePolicy.SameAsRequest : CookieSecurePolicy.Always;
+            options.Events.OnRedirectToLogin = context => { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; };
+            options.Events.OnRedirectToAccessDenied = context => { context.Response.StatusCode = StatusCodes.Status403Forbidden; return Task.CompletedTask; };
+            options.Events.OnValidatePrincipal = async context =>
+            {
+                var value = context.Principal?.FindFirstValue("dotisan_session_id");
+                if (!Guid.TryParse(value, out var sessionId)) return;
+                var db = context.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+                var session = await db.ApplicationSessions.SingleOrDefaultAsync(item => item.Id == sessionId);
+                var now = DateTimeOffset.UtcNow;
+                if (session is null || session.RevokedAt is not null || session.ExpiresAt <= now) { context.RejectPrincipal(); return; }
+                if (session.LastSeenAt < now.AddMinutes(-5)) { session.LastSeenAt = now; await db.SaveChangesAsync(); }
+            };
+        })
+        .AddCookie(IdentityConstants.TwoFactorUserIdScheme)
+        .AddCookie(IdentityConstants.TwoFactorRememberMeScheme);
+        builder.Services.AddAuthorization(options => { foreach (var permission in Permissions.All) options.AddPolicy(permission, policy => policy.RequireClaim(Permissions.ClaimType, permission)); });
+        builder.Services.AddAntiforgery(options => options.HeaderName = "X-XSRF-TOKEN");
+        builder.Services.AddRateLimiter(options => options.AddPolicy("account", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = 60, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 })));
+        """;
 
 }
