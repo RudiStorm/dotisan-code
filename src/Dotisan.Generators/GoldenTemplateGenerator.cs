@@ -174,6 +174,7 @@ public sealed class ResourceScaffolder
     {{(multiTenancyEnabled ? $"using {identifier}.Api.Tenancy;" : string.Empty)}}
     using {{identifier}}.Api.Data;
     {{(authenticationEnabled ? $"using {identifier}.Api.Authorization;\n    using {identifier}.Api.Auditing;" : string.Empty)}}
+    using System.ComponentModel.DataAnnotations;
     using Microsoft.AspNetCore.Http;
     {{(authenticationEnabled ? "using Microsoft.AspNetCore.Antiforgery;" : string.Empty)}}
     using Microsoft.AspNetCore.Routing;
@@ -195,12 +196,12 @@ public sealed class ResourceScaffolder
 
             var create = endpoints.MapPost("/api/{{featureName.ToLowerInvariant()}}", async (Create{{resourceName}}Request request, AppDbContext db, {{(multiTenancyEnabled ? "ITenantContext tenantContext, " : string.Empty)}}{{(authenticationEnabled ? "HttpContext httpContext, IAuditWriter audit, " : string.Empty)}}CancellationToken cancellationToken) =>
             {
-                if (string.IsNullOrWhiteSpace(request.Name))
+                if (!TryValidate(request, out var validationErrors))
                 {
-                    return Results.ValidationProblem(new Dictionary<string, string[]> { [nameof(request.Name)] = ["Name is required."] });
+                    return Results.ValidationProblem(validationErrors);
                 }
 
-                var entity = new {{resourceName}} { Name = request.Name.Trim(){{(multiTenancyEnabled ? ", TenantId = tenantContext.RequireTenantId()" : string.Empty)}} };
+                var entity = new {{resourceName}} { Name = request.Name!.Trim(){{(multiTenancyEnabled ? ", TenantId = tenantContext.RequireTenantId()" : string.Empty)}} };
                 db.{{featureName}}.Add(entity);
                 await db.SaveChangesAsync(cancellationToken);
                 {{(authenticationEnabled ? "await audit.RecordAsync(httpContext, \"" + resourceName + "\", entity.Id.ToString(), \"create\", new Dictionary<string, object?> { [\"Name\"] = entity.Name }, cancellationToken);" : string.Empty)}}
@@ -224,9 +225,9 @@ public sealed class ResourceScaffolder
 
             var update = endpoints.MapPut("/api/{{featureName.ToLowerInvariant()}}/{id:guid}", async (Guid id, Update{{resourceName}}Request request, AppDbContext db, {{(multiTenancyEnabled ? "ITenantContext tenantContext, " : string.Empty)}}HttpContext httpContext, IAuditWriter audit, CancellationToken cancellationToken) =>
             {
-                if (string.IsNullOrWhiteSpace(request.Name))
+                if (!TryValidate(request, out var validationErrors))
                 {
-                    return Results.ValidationProblem(new Dictionary<string, string[]> { [nameof(request.Name)] = ["Name is required."] });
+                    return Results.ValidationProblem(validationErrors);
                 }
 
                 var entity = await db.{{featureName}}.FirstOrDefaultAsync(item => item.Id == id{{(multiTenancyEnabled ? " && item.TenantId == tenantContext.TenantId" : string.Empty)}}, cancellationToken);
@@ -236,7 +237,7 @@ public sealed class ResourceScaffolder
                 }
 
                 var oldName = entity.Name;
-                entity.Name = request.Name.Trim();
+                entity.Name = request.Name!.Trim();
                 await db.SaveChangesAsync(cancellationToken);
                 await audit.RecordAsync(httpContext, "{{resourceName}}", entity.Id.ToString(), "update", new Dictionary<string, object?> { ["Name"] = new { old = oldName, @new = entity.Name } }, cancellationToken);
                 return Results.Ok(entity);
@@ -260,8 +261,19 @@ public sealed class ResourceScaffolder
             """ : string.Empty)}}
         }
 
-        public sealed record Create{{resourceName}}Request(string Name);
-        {{(authenticationEnabled ? "public sealed record Update" + resourceName + "Request(string Name);" : string.Empty)}}
+        private static bool TryValidate<T>(T request, out Dictionary<string, string[]> errors)
+        {
+            var results = new List<ValidationResult>();
+            var valid = Validator.TryValidateObject(request!, new ValidationContext(request!), results, validateAllProperties: true);
+            errors = results
+                .SelectMany(result => result.MemberNames.DefaultIfEmpty(string.Empty).Select(member => new { member, message = result.ErrorMessage ?? "The value is invalid." }))
+                .GroupBy(item => item.member, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(group => group.Key, group => group.Select(item => item.message).Distinct(StringComparer.Ordinal).ToArray(), StringComparer.OrdinalIgnoreCase);
+            return valid;
+        }
+
+        public sealed record Create{{resourceName}}Request([property: Required, StringLength(200)] string? Name);
+        {{(authenticationEnabled ? "public sealed record Update" + resourceName + "Request([property: Required, StringLength(200)] string? Name);" : string.Empty)}}
     }
     """;
 

@@ -565,7 +565,7 @@ git commit -m "refactor: simplify generated application composition"
 
 - [x] **Step 3: Require feature permissions for role assignment, sending notifications to other users, storage deletion, import/export, and webhook replay**
 
-- [ ] **Step 4: Replace scattered manual string checks with DTO validation and standard ValidationProblem responses**
+- [x] **Step 4: Replace scattered manual string checks with DTO validation and standard ValidationProblem responses**
 
 - [x] **Step 5: Add tests for 401, 403, 400, valid token success, and tenant isolation**
 
