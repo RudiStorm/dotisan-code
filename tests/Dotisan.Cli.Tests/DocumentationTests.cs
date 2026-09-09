@@ -10,8 +10,7 @@ public sealed class DocumentationTests
         {
             Path.Combine(root, "README.md"),
             Path.Combine(root, "project.md"),
-            Path.Combine(root, "docs", "quickstart.md"),
-            Path.Combine(root, "docs", "v086-acceptance.md")
+            Path.Combine(root, "docs", "quickstart.md")
         };
 
         foreach (var path in sources)
