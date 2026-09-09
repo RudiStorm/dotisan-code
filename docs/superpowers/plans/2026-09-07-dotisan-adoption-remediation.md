@@ -795,7 +795,7 @@ Expected: every command succeeds; only explicitly expected artifact files appear
 
 Install the packed global tool into an empty tool path, generate a project outside the repository, remove access to the Dotisan source tree, then restore, build, test, generate a resource, regenerate contracts, build the frontend, build the container, and start it.
 
-- [ ] **Step 8: Publish a prerelease package before stable**
+- [x] **Step 8: Publish a prerelease package before stable**
 
 Publish `0.9.0-beta.1`, collect external feedback using the issue templates, and promote only after the golden-path and clean-machine gates pass unchanged.
 
