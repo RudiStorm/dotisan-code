@@ -924,6 +924,17 @@ internal sealed class NewCommand : IDotisanCommand
                         context.Console.WriteError($"You can retry with '{packageManagerName} install' from the generated frontend directory.");
                         return DotisanExitCode.GenerationError;
                     }
+
+                    var lockfileName = options.PackageManager == PackageManager.Npm
+                        ? "package-lock.json"
+                        : "pnpm-lock.yaml";
+                    var lockfilePath = Path.Combine(frontendDirectory, lockfileName);
+                    if (!File.Exists(lockfilePath))
+                    {
+                        context.Console.WriteError($"The project was created, but {packageManagerName} did not produce the required {lockfileName}.");
+                        context.Console.WriteError($"Create {lockfileName} with '{packageManagerName} install' before building or deploying the generated application.");
+                        return DotisanExitCode.GenerationError;
+                    }
                 }
 
             }

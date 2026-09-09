@@ -711,7 +711,7 @@ git commit -m "fix: make migration workflow explicit and consistent"
 
 - [x] **Step 1: Add golden assertions for SDK roll-forward, lockfiles, frozen installs, and pinned Compose images**
 
-- [ ] **Step 2: Decide lockfile production inside the generator and produce the selected package manager's lockfile before reporting successful project creation**
+- [x] **Step 2: Decide lockfile production inside the generator and produce the selected package manager's lockfile before reporting successful project creation**
 
 - [x] **Step 3: Update Dockerfile templates to copy the exact lockfile and use frozen installation**
 
@@ -739,7 +739,7 @@ dotnet pack src\Dotisan.Cli\Dotisan.Cli.csproj -c Release -o artifacts
 tar -tf artifacts\Dotisan.*.nupkg
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```powershell
 git add src Directory.Build.props .github

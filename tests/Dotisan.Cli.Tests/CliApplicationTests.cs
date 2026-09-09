@@ -517,6 +517,20 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task New_rejects_successful_install_when_selected_lockfile_is_missing()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices { SuppressLockfile = true };
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        var outputDirectory = Path.Combine(Path.GetTempPath(), "dotisan-new-missing-lockfile-" + Guid.NewGuid().ToString("N"));
+
+        var exitCode = await app.RunAsync(["new", "TodoApp", "--yes", "--package-manager", "npm", "--output", outputDirectory]);
+
+        Assert.Equal(DotisanExitCode.GenerationError, exitCode);
+        Assert.Contains("did not produce the required package-lock.json", console.ErrorOutput);
+    }
+
+    [Fact]
     public async Task Dev_observability_passes_the_generated_observability_switch_to_the_api()
     {
         var console = new MemoryConsole();
@@ -699,6 +713,7 @@ public sealed class CliApplicationTests
         public IReadOnlyList<string> Arguments { get; private set; } = [];
         public List<(string FileName, IReadOnlyList<string> Arguments, string WorkingDirectory)> RunRequests { get; } = [];
         public bool FailFrontendInstall { get; init; }
+        public bool SuppressLockfile { get; init; }
         public string? FailPrerequisite { get; init; }
         public bool BlockProcesses { get; init; }
         public bool BlockDatabaseStart { get; init; }
@@ -744,6 +759,14 @@ public sealed class CliApplicationTests
                 return DotisanOperationResult.Failed("Docker daemon is not running.");
             if (FailFrontendInstall && arguments.SequenceEqual(["install"], StringComparer.Ordinal))
                 return DotisanOperationResult.Failed("npm exited with code 1.");
+            if (!SuppressLockfile && arguments.SequenceEqual(["install"], StringComparer.Ordinal))
+            {
+                Directory.CreateDirectory(workingDirectory);
+                var lockfileName = fileName.StartsWith("pnpm", StringComparison.OrdinalIgnoreCase)
+                    ? "pnpm-lock.yaml"
+                    : "package-lock.json";
+                File.WriteAllText(Path.Combine(workingDirectory, lockfileName), "# test lockfile\n");
+            }
             return DotisanOperationResult.Succeeded();
         }
 
