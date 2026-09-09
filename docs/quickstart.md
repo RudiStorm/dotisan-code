@@ -100,11 +100,11 @@ PostgreSQL: Host=localhost;Database=todoapp;Username=postgres;Password=postgres
 MySQL:      Server=localhost;Database=todoapp;User=root;Password=root
 ~~~
 
-The API uses `UseSqlite`, `UseSqlServer`, `UseNpgsql`, or `UseMySql` according to the wizard choice. `dotisan new` does not create or apply migrations. Author, review, and apply migrations explicitly with the standard EF Core CLI:
+The API uses `UseSqlite`, `UseSqlServer`, `UseNpgsql`, or `UseMySql` according to the wizard choice. `dotisan new` does not create or apply migrations. Author and review migrations with the standard EF Core CLI, then apply committed migrations with `dotisan migrate`:
 
 ~~~powershell
 dotnet ef migrations add InitialCreate --project src\TodoApp.Api
-dotnet ef database update --project src\TodoApp.Api
+dotisan migrate
 ~~~
 
 ## Build and run
@@ -155,7 +155,7 @@ The generated app is ordinary ASP.NET Core + EF Core + Vue/Vite source. You can 
 
 ~~~powershell
 dotnet ef migrations add InitialCreate --project src\TodoApp.Api
-dotnet ef database update --project src\TodoApp.Api
+dotisan migrate
 dotnet watch --project src\TodoApp.Api
 ~~~
 
@@ -191,7 +191,7 @@ Generated projects include `Auditing/AuditEntry.cs`, `Auditing/IAuditWriter.cs`,
 
 ~~~powershell
 dotnet ef migrations add InitialAudit --project src\TodoApp.Api
-dotnet ef database update --project src\TodoApp.Api
+dotisan migrate
 $env:Audit__Enabled = "false" # optional local/deployment override
 ~~~
 
@@ -203,7 +203,7 @@ For an authenticated project, `dotisan new` does not create or apply migrations.
 
 ~~~powershell
 dotnet ef migrations add InitialIdentity --project src\AuthApp.Api
-dotnet ef database update --project src\AuthApp.Api
+dotisan migrate
 dotisan migrate
 ~~~
 
