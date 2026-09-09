@@ -497,7 +497,7 @@ git commit -m "feat: add focused project profiles and lightweight defaults"
 
 - [x] **Step 1: Add parser tests for nested commands, aliases, help, unknown options, missing values, cancellation, and exit codes**
 
-- [ ] **Step 2: Move each command into a focused file without changing behavior**
+- [x] **Step 2: Move each command into a focused file without changing behavior**
 
 - [x] **Step 3: Add canonical space-separated commands and deprecation warnings for aliases**
 
