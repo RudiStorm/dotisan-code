@@ -409,6 +409,8 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.DoesNotContain("AddOpenTelemetry(logging", program);
             Assert.Contains("aspire-dashboard", compose);
             Assert.Contains("18888:18888", compose);
+            Assert.Contains("services:", compose, StringComparison.Ordinal);
+            Assert.Contains("\n  dashboard:", compose, StringComparison.Ordinal);
         }
         finally
         {
