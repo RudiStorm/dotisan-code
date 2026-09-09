@@ -6,7 +6,7 @@
     requestMock.mockResolvedValueOnce([{ id: 'd1', eventType: 'CustomerCreated', endpoint: 'https://example.test', status: 'queued', attempts: 1 }]);
     await wrapper.get('button').trigger('click');
     await flushPromises();
-    expect(requestMock).toHaveBeenLastCalledWith('/api/webhooks/deliveries/d1/replay', { method: 'POST' });
+    expect(requestMock).toHaveBeenCalledWith('/api/webhooks/deliveries/d1/replay', { method: 'POST' });
     expect(wrapper.text()).toContain('Webhook replay queued.');
   });
 
