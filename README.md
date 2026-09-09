@@ -110,7 +110,7 @@ Common options include:
 --no-restore                  generate files without restoring the solution
 ```
 
-`dotisan new` restores the generated .NET solution, installs frontend dependencies, and creates/applies the initial EF Core migration when the required tools are available. Use `--no-restore` to skip setup and run the printed migration commands manually.
+`dotisan new` restores the generated .NET solution and installs frontend dependencies when requested. It never creates or applies EF Core migrations. Author migrations with `dotnet ef migrations add`, review and commit them, then apply committed migrations with `dotisan migrate`. Use `--no-restore` for intentional offline generation; run `dotnet restore` and the selected package manager install yourself before building. The generated Dockerfiles require the corresponding lockfile (`package-lock.json` for npm or `pnpm-lock.yaml` for pnpm) and use frozen installs.
 
 ### Development and build
 
