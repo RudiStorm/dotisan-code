@@ -18,6 +18,9 @@ public static class TemplateCatalog
         if (stream is null)
             throw new InvalidOperationException($"Embedded template '{normalized}' was not found.");
         using var reader = new StreamReader(stream);
-        return new TemplateResource(normalized, reader.ReadToEnd());
+        var content = reader.ReadToEnd()
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+        return new TemplateResource(normalized, content);
     }
 }
