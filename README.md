@@ -2,7 +2,7 @@
 
 Dotisan is a .NET 10 application scaffolding CLI for building ordinary ASP.NET Core and Vue applications. It gives you a working API, frontend, database wiring, typed frontend contracts, optional authentication, resource scaffolding, and durable background jobs without hiding the generated source code behind a proprietary runtime.
 
-The current release is v0.8.6.
+The current prerelease is v0.9.0-beta.1. It is intended for evaluation and early adopter feedback; production users should wait for the stable 0.9.0 release.
 
 ## What you get
 
@@ -25,20 +25,20 @@ Dotisan owns the initial scaffold. After that, the generated application is your
 Install the .NET tool from NuGet:
 
 ```powershell
-dotnet tool install --global Dotisan --version 0.8.6
+dotnet tool install --global Dotisan --version 0.9.0-beta.1
 dotisan --version
 ```
 
 For a locally built package:
 
 ```powershell
-dotnet tool install --global Dotisan --add-source .\artifacts --version 0.8.6
+dotnet tool install --global Dotisan --add-source .\artifacts --version 0.9.0-beta.1
 ```
 
 Upgrade an existing installation with:
 
 ```powershell
-dotnet tool update --global Dotisan --version 0.8.6
+dotnet tool update --global Dotisan --version 0.9.0-beta.1
 ```
 
 ## Create and run an application
@@ -325,4 +325,8 @@ The package is a .NET global tool with the command name `dotisan` and is license
 
 ### NuGet signing
 
-The v0.8.6 package is currently unsigned. NuGet signing is not required for the v0.8.6 build or artifact validation, and no signing certificate or publishing secret is included in this repository. If the project adopts a signed-package policy for public releases, configure certificate-based signing in the protected publishing workflow; never commit the certificate or its password to source control.
+The v0.9.0-beta.1 package is currently unsigned. NuGet signing is not required for this prerelease build or artifact validation, and no signing certificate or publishing secret is included in this repository. If the project adopts a signed-package policy for public releases, configure certificate-based signing in the protected publishing workflow; never commit the certificate or its password to source control.
+
+### Beta feedback and promotion
+
+Please use the GitHub issue templates to report installation, generation, or runtime problems against the `0.9.0-beta.1` package. The stable 0.9.0 release will follow only after the published-package clean-machine smoke test and generated-project release gates pass unchanged with beta feedback addressed.
