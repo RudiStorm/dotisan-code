@@ -110,7 +110,7 @@ Common options include:
 --no-restore                  generate files without restoring the solution
 ```
 
-`dotisan new` restores the generated .NET solution and installs frontend dependencies when requested. It never creates or applies EF Core migrations. Author migrations with `dotnet ef migrations add`, review and commit them, then apply committed migrations with `dotisan migrate`. Use `--no-restore` for intentional offline generation; run `dotnet restore` and the selected package manager install yourself before building. The generated Dockerfiles require the corresponding lockfile (`package-lock.json` for npm or `pnpm-lock.yaml` for pnpm) and use frozen installs.
+`dotisan new` restores the generated .NET solution and installs frontend dependencies when requested. `dotisan dev` creates an `InitialCreate` migration when a generated project has none and applies local development migrations automatically. Production migrations remain explicit: author and review them with `dotnet ef migrations add`, then apply committed migrations with `dotisan migrate`. Use `--no-restore` for intentional offline generation; run `dotnet restore` and the selected package manager install yourself before building. The generated Dockerfiles require the corresponding lockfile (`package-lock.json` for npm or `pnpm-lock.yaml` for pnpm) and use frozen installs.
 
 ### Development and build
 
@@ -155,7 +155,7 @@ dotisan migrate status
 dotisan migrate --production
 ```
 
-`dotisan migrate` applies existing EF Core migrations. `dotisan new` does not create or apply migrations; migration authoring and review remain explicit developer actions:
+`dotisan migrate` applies existing EF Core migrations and is the explicit production schema boundary. Migration authoring and review remain explicit developer actions:
 
 ```powershell
 dotnet ef migrations add InitialCreate --project src\MyApp.Api
@@ -306,7 +306,7 @@ Common fixes:
 - If frontend dependencies are missing, run `npm install` or `pnpm install` from `src/<Name>.Web`.
 - If generated contract files are stale, run `dotisan generate`.
 - If an external database is unhealthy, inspect it with `docker compose ps` and `docker compose logs database --tail 100`.
-- If registration fails with `SQLite Error 1: 'no such table: AspNetUsers'`, the Identity migration has not been applied. Run `dotnet ef migrations add InitialIdentity --project src\<Name>.Api`, then `dotisan migrate`.
+- If registration fails with `SQLite Error 1: 'no such table: AspNetUsers'`, stop the API and run `dotisan dev` once so the initial development migration is created and applied.
 - If migrations are missing, author them explicitly with `dotnet ef migrations add <Name>` before running `dotisan migrate`.
 - If durable jobs fail during startup, confirm the connection string is valid and the Wolverine storage schema has been provisioned.
 

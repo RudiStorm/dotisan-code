@@ -17,15 +17,14 @@ The Vue portal includes ready-to-edit login, registration, forgot-password, and 
 
 ## Database and migrations
 
-`dotisan new` does not create or apply migrations. Author and apply the initial Identity migration manually:
+`dotisan dev` creates the `InitialCreate` migration when the project has none and applies all local development migrations before starting the API. This handles the first-run Identity schema automatically.
 
 ~~~powershell
-dotnet ef migrations add InitialIdentity --project src\__PROJECT_NAME__.Api
-dotnet ef database update --project src\__PROJECT_NAME__.Api
+dotisan dev
 dotisan migrate
 ~~~
 
-`dotisan migrate` applies existing migrations. It does not create migrations. Review generated models and migrations before applying them in each environment.
+`dotisan migrate` applies existing migrations and remains the explicit production command. For production, author and review migrations with `dotnet ef migrations add` before applying them; `dotisan dev` never runs production migrations.
 
 ## Production configuration
 

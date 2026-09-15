@@ -331,8 +331,9 @@ internal sealed class NewCommand : IDotisanCommand
         };
 
         console.WriteLine($"Database provider: {providerName}.");
-        console.WriteLine("Schema steps are explicit; dotisan new does not create or apply migrations:");
-        console.WriteLine($"  dotnet ef migrations add {migrationName} --project {apiProjectPath}");
+        console.WriteLine("Development schema setup is automatic; dotisan dev creates the initial migration when needed and applies it:");
+        console.WriteLine("  dotisan dev");
+        console.WriteLine($"For production, author and review a migration with: dotnet ef migrations add {migrationName} --project {apiProjectPath}");
         if (options.Database is DatabaseProvider.SqlServer or DatabaseProvider.PostgreSQL or DatabaseProvider.MySQL)
             console.WriteLine("  dotisan dev  # starts the local database service");
         console.WriteLine("  dotisan migrate  # applies reviewed, committed migrations");

@@ -100,7 +100,7 @@ PostgreSQL: Host=localhost;Database=todoapp;Username=postgres;Password=postgres
 MySQL:      Server=localhost;Database=todoapp;User=root;Password=root
 ~~~
 
-The API uses `UseSqlite`, `UseSqlServer`, `UseNpgsql`, or `UseMySql` according to the wizard choice. `dotisan new` does not create or apply migrations. Author and review migrations with the standard EF Core CLI, then apply committed migrations with `dotisan migrate`:
+The API uses `UseSqlite`, `UseSqlServer`, `UseNpgsql`, or `UseMySql` according to the wizard choice. `dotisan dev` creates the initial development migration when needed and applies local migrations before starting the API. Author and review production migrations with the standard EF Core CLI, then apply committed migrations with `dotisan migrate`:
 
 ~~~powershell
 dotnet ef migrations add InitialCreate --project src\TodoApp.Api
@@ -159,7 +159,7 @@ dotisan migrate
 dotnet watch --project src\TodoApp.Api
 ~~~
 
-`dotisan migrate` applies existing EF Core migrations. `dotisan migrate status` lists migrations. Migration authoring and rollback remain available through standard `dotnet ef` commands.
+`dotisan migrate` applies existing EF Core migrations. `dotisan migrate status` lists migrations. Migration authoring and rollback remain available through standard `dotnet ef` commands; `dotisan dev` is the convenient first-run development path.
 
 Before deployment, run the read-only production readiness checks:
 
@@ -171,7 +171,7 @@ For staging and production, set `Dotisan__Security__FrontendUrl` to the deployed
 
 The command reports `PASS`, `WARNING`, and `BLOCKING` results for the generated workspace, migrations, health endpoint, Dockerfile, frontend, and provider configuration.
 
-Use `dotisan migrate --dry-run` to list committed migrations without changing the database. `dotisan migrate` is the explicit schema-application boundary; generated application startup does not apply migrations automatically.
+Use `dotisan migrate --dry-run` to list committed migrations without changing the database. `dotisan migrate` is the explicit production schema-application boundary; only the `dotisan dev` orchestration command applies migrations automatically, and only for the Development environment.
 
 ## Observability
 
@@ -199,13 +199,12 @@ Generated resource operations and authenticated security operations record actor
 
 ## Authentication projects
 
-For an authenticated project, `dotisan new` does not create or apply migrations. Author and apply the initial Identity schema manually:
+For an authenticated project, `dotisan dev` creates and applies the initial Identity schema automatically when no migrations exist:
 
 ~~~powershell
-dotnet ef migrations add InitialIdentity --project src\AuthApp.Api
-dotisan migrate
+dotisan dev
 dotisan migrate
 ~~~
 
-`dotnet ef migrations add InitialIdentity --project src\AuthApp.Api` creates the Identity schema. `dotisan migrate` applies existing migrations; it does not create migrations. Keep production secrets and data-protection keys outside source control, use HTTPS, and configure a durable key ring for multi-instance deployments through normal ASP.NET Core configuration. Authenticated projects include email-confirmation and password-reset endpoints plus a selectable mail provider. Unconfirmed users cannot complete password login until they confirm their email. Choose `--mail-provider mailpit` for local development; the generated Compose file exposes Mailpit SMTP on `localhost:1025` and its inbox UI on `http://localhost:8025`, and `dotisan dev` manages the service. Choose `smtp` for staging/production and provide `Mail__Smtp__Host`, `Mail__Smtp__Port`, `Mail__Smtp__Username`, `Mail__Smtp__Password`, and `Mail__Smtp__From` through deployment configuration. TOTP MFA enrollment, recovery-code generation, and login challenge endpoints are generated with `/security/mfa` and `/auth/mfa-challenge` screens. Active sessions are recorded and managed from `/security/sessions`; revoking a session invalidates its cookie, while revoke-all also rotates the Identity security stamp. `Integrations/IntegrationExamples.cs` includes optional SendGrid, Mailgun, and configuration-driven OAuth2 examples. External login registration, linking, callback, and unlinking use the provider-neutral `IExternalLoginProvider` boundary in `Integrations`; register an adapter in `Program.cs` without placing provider secrets in source. Edit `src\AuthApp.Api\Authorization\Permissions.cs` for permission constants; assign those permission claims to standard `IdentityRole` instances with `RoleManager<IdentityRole>`. The generated `/admin/authorization` screen uses the protected `authorization.manage` APIs to list users and assign roles. Protected APIs return `401` for unauthenticated callers and `403` without the required permission claim.
+`dotisan migrate` applies existing migrations and is the explicit production command. Keep production secrets and data-protection keys outside source control, use HTTPS, and configure a durable key ring for multi-instance deployments through normal ASP.NET Core configuration. Authenticated projects include email-confirmation and password-reset endpoints plus a selectable mail provider. Unconfirmed users cannot complete password login until they confirm their email. Choose `--mail-provider mailpit` for local development; the generated Compose file exposes Mailpit SMTP on `localhost:1025` and its inbox UI on `http://localhost:8025`, and `dotisan dev` manages the service. Choose `smtp` for staging/production and provide `Mail__Smtp__Host`, `Mail__Smtp__Port`, `Mail__Smtp__Username`, `Mail__Smtp__Password`, and `Mail__Smtp__From` through deployment configuration. TOTP MFA enrollment, recovery-code generation, and login challenge endpoints are generated with `/security/mfa` and `/auth/mfa-challenge` screens. Active sessions are recorded and managed from `/security/sessions`; revoking a session invalidates its cookie, while revoke-all also rotates the Identity security stamp. `Integrations/IntegrationExamples.cs` includes optional SendGrid, Mailgun, and configuration-driven OAuth2 examples. External login registration, linking, callback, and unlinking use the provider-neutral `IExternalLoginProvider` boundary in `Integrations`; register an adapter in `Program.cs` without placing provider secrets in source. Edit `src\AuthApp.Api\Authorization\Permissions.cs` for permission constants; assign those permission claims to standard `IdentityRole` instances with `RoleManager<IdentityRole>`. The generated `/admin/authorization` screen uses the protected `authorization.manage` APIs to list users and assign roles. Protected APIs return `401` for unauthenticated callers and `403` without the required permission claim.
 Use `dotisan mail` to print the Mailpit URL or `dotisan mail --open` to launch it. Mailpit is rejected by generated APIs outside Development; do not use it for staging or production.

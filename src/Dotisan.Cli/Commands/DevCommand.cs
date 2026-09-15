@@ -72,6 +72,13 @@ internal sealed class DevCommand : WorkspaceCommand
                 databaseStarted = true;
             }
 
+            if (environment.Equals("Development", StringComparison.OrdinalIgnoreCase))
+            {
+                var migrationResult = await EnsureDevelopmentDatabaseAsync(services, context.Console, cancellationToken);
+                if (!migrationResult.Success)
+                    return Fail(context.Console, migrationResult.ErrorMessage ?? "Could not initialize the development database.");
+            }
+
             var mailpitExplicit = arguments.Contains("--mailpit", StringComparer.OrdinalIgnoreCase);
             if (services.MailProvider == MailProvider.Mailpit && (environment.Equals("Development", StringComparison.OrdinalIgnoreCase) || mailpitExplicit))
             {
@@ -182,6 +189,41 @@ internal sealed class DevCommand : WorkspaceCommand
         {
             return DotisanOperationResult.Failed($"Could not update {viteConfigPath}: {exception.Message}");
         }
+    }
+
+    private static async Task<DotisanOperationResult> EnsureDevelopmentDatabaseAsync(
+        IDotisanServices services,
+        IConsole console,
+        CancellationToken cancellationToken)
+    {
+        var apiProjectPath = services.ApiProjectPath!;
+        var apiDirectory = Path.GetDirectoryName(services.ApiProjectPath);
+        var hasMigrations = apiDirectory is not null && Directory.Exists(Path.Combine(apiDirectory, "Migrations")) &&
+            Directory.EnumerateFiles(Path.Combine(apiDirectory, "Migrations"), "*.cs", SearchOption.AllDirectories).Any();
+
+        if (!hasMigrations)
+        {
+            console.WriteLine("No EF Core migrations found; creating the InitialCreate development migration...");
+            var addResult = await services.RunAsync(
+                "dotnet",
+                ["ef", "migrations", "add", "InitialCreate", "--project", apiProjectPath, "--", "--environment", "Development"],
+                services.WorkingDirectory,
+                console,
+                cancellationToken);
+            if (!addResult.Success)
+                return DotisanOperationResult.Failed($"Could not create the initial development migration. {addResult.ErrorMessage}");
+        }
+
+        console.WriteLine("Applying EF Core migrations to the development database...");
+        var updateResult = await services.RunAsync(
+            "dotnet",
+            ["ef", "database", "update", "--project", apiProjectPath, "--", "--environment", "Development"],
+            services.WorkingDirectory,
+            console,
+            cancellationToken);
+        return updateResult.Success
+            ? DotisanOperationResult.Succeeded()
+            : DotisanOperationResult.Failed($"Could not apply development database migrations. {updateResult.ErrorMessage}");
     }
 }
 

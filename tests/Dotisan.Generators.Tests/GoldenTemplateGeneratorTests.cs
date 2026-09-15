@@ -860,9 +860,9 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("TraceId", authenticationTests);
             Assert.Contains("Audit:Enabled", authenticationTests);
             Assert.Contains("--auth yes", authenticatedReadme);
-            Assert.Contains("InitialIdentity", authenticatedReadme);
+            Assert.Contains("InitialCreate", authenticatedReadme);
             Assert.Contains("dotisan migrate", authenticatedReadme);
-            Assert.Contains("does not create or apply migrations", authenticatedReadme);
+            Assert.Contains("creates the `InitialCreate` migration", authenticatedReadme);
             Assert.Contains("RequireAuthorization", authenticatedReadme);
             Assert.Contains("RoleManager<IdentityRole>", authenticatedReadme);
             Assert.Contains("403", authenticatedReadme);

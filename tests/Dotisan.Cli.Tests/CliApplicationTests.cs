@@ -522,6 +522,25 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task Dev_development_creates_and_applies_initial_migration_before_starting_api()
+    {
+        var console = new MemoryConsole();
+        var services = new RecordingServices { BlockProcesses = true };
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        using var cancellation = new CancellationTokenSource();
+
+        var runTask = app.RunAsync(["dev"], cancellation.Token);
+        await services.BothProcessesStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        cancellation.Cancel();
+        await runTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+        var migrationAdd = Assert.Single(services.RunRequests, request => request.Arguments.Contains("migrations", StringComparer.Ordinal) && request.Arguments.Contains("add", StringComparer.Ordinal));
+        Assert.Equal("dotnet", migrationAdd.FileName);
+        Assert.Equal(["ef", "migrations", "add", "InitialCreate", "--project", services.ApiProjectPath!, "--", "--environment", "Development"], migrationAdd.Arguments);
+        Assert.Contains(services.RunRequests, request => request.Arguments.SequenceEqual(["ef", "database", "update", "--project", services.ApiProjectPath!, "--", "--environment", "Development"]));
+    }
+
+    [Fact]
     public async Task New_external_database_prints_provider_specific_schema_steps()
     {
         var console = new MemoryConsole();
