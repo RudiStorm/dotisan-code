@@ -311,6 +311,7 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.Contains("api_port:", config);
             Assert.Contains("web_port:", config);
             Assert.Contains("\"FrontendUrl\": \"http://localhost:", await File.ReadAllTextAsync(Path.Combine(output, "src", "IntegrationApp.Api", "appsettings.json")));
+            Assert.Contains("\"Security\": { \"FrontendUrl\": \"http://localhost:", await File.ReadAllTextAsync(Path.Combine(output, "src", "IntegrationApp.Api", "appsettings.Development.json")));
             var notifications = await File.ReadAllTextAsync(Path.Combine(integrations, "Notifications.cs"));
             Assert.Contains("EntityTypeBuilder<NotificationRecord>", notifications);
             Assert.Contains("RequireAntiforgeryTokenAttribute", notifications);

@@ -1,5 +1,8 @@
 {
-  "Dotisan": { "Jobs": { "Enabled": false } },
+  "Dotisan": {
+    "Security": { "FrontendUrl": "http://localhost:__WEB_PORT__" },
+    "Jobs": { "Enabled": false }
+  },
   "Mail": {
     "Provider": "__MAIL_PROVIDER__",
     "Mailpit": { "BaseUrl": "http://localhost:8025/api/v1", "From": "no-reply@localhost" },
