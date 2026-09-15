@@ -6,9 +6,12 @@ namespace Dotisan.TypeScript;
 public static class TanStackQueryGenerator
 {
     public static GeneratedTypeScriptFile Generate(ContractManifest manifest)
+        => Generate(manifest, "queries.ts", "./services");
+
+    internal static GeneratedTypeScriptFile Generate(ContractManifest manifest, string path, string servicesImport)
     {
         ArgumentNullException.ThrowIfNull(manifest);
-        var builder = new StringBuilder("import { useMutation, useQuery } from \"@tanstack/vue-query\";\nimport * as services from \"./services\";\n\n");
+        var builder = new StringBuilder("import { useMutation, useQuery } from \"@tanstack/vue-query\";\nimport * as services from \"").Append(servicesImport).Append("\";\n\n");
         foreach (var endpoint in manifest.Endpoints.OrderBy(endpoint => endpoint.Id, StringComparer.Ordinal).ThenBy(endpoint => endpoint.Method, StringComparer.Ordinal))
         {
             var functionName = ToCamelCase(endpoint.Name);
@@ -30,7 +33,7 @@ public static class TanStackQueryGenerator
             }
         }
 
-        return new GeneratedTypeScriptFile("queries.ts", builder.ToString());
+        return new GeneratedTypeScriptFile(path, builder.ToString());
     }
 
     private static string ToCamelCase(string value) => string.IsNullOrEmpty(value) ? "request" : char.ToLowerInvariant(value[0]) + value[1..];

@@ -3,7 +3,7 @@ namespace Dotisan.Cli.Tests;
 public sealed class DocumentationTests
 {
     [Fact]
-    public void Migration_guidance_never_claims_that_new_creates_or_applies_schema()
+    public void Migration_guidance_distinguishes_development_from_production_schema_setup()
     {
         var root = FindRepositoryRoot();
         var sources = new[]
@@ -16,8 +16,7 @@ public sealed class DocumentationTests
         foreach (var path in sources)
         {
             var content = File.ReadAllText(path);
-            Assert.DoesNotContain("creates and applies the initial migration", content, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("creates and applies the initial Identity schema", content, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("dotisan new does not create or apply", content, StringComparison.OrdinalIgnoreCase);
         }
     }
 

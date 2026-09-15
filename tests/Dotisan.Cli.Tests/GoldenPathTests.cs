@@ -41,10 +41,10 @@ public sealed class GoldenPathTests
         Assert.True(generation.Success, generation.ErrorMessage);
 
         var generatedServices = await File.ReadAllTextAsync(
-            Path.Combine(root, "src", "GoldenApp.Web", "src", "dotisan", "services.ts"));
+            Path.Combine(root, "src", "GoldenApp.Web", "src", "dotisan", "features", "customers", "services.ts"));
         Assert.Contains("listCustomers", generatedServices, StringComparison.Ordinal);
         var generatedModels = await File.ReadAllTextAsync(
-            Path.Combine(root, "src", "GoldenApp.Web", "src", "dotisan", "models.ts"));
+            Path.Combine(root, "src", "GoldenApp.Web", "src", "dotisan", "features", "customers", "models.ts"));
         Assert.Contains("customerId", generatedModels, StringComparison.Ordinal);
     }
 

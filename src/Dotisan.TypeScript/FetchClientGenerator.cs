@@ -6,12 +6,15 @@ namespace Dotisan.TypeScript;
 public static class FetchClientGenerator
 {
     public static GeneratedTypeScriptFile Generate(ContractManifest manifest)
+        => Generate(manifest, "services.ts", "./models");
+
+    internal static GeneratedTypeScriptFile Generate(ContractManifest manifest, string path, string modelsImport)
     {
         ArgumentNullException.ThrowIfNull(manifest);
         var builder = new StringBuilder();
         var models = manifest.Models.Select(model => model.Name).OrderBy(name => name, StringComparer.Ordinal).ToArray();
         if (models.Length > 0)
-            builder.Append("import type { ").Append(string.Join(", ", models)).AppendLine(" } from \"./models\";\n");
+            builder.Append("import type { ").Append(string.Join(", ", models)).Append(" } from \"").Append(modelsImport).AppendLine("\";\n");
         builder.AppendLine("export type ApiFieldErrors = Record<string, string[]>;");
         builder.AppendLine("export type ProblemDetails = { type?: string; title?: string; status?: number; detail?: string; instance?: string; code?: string; correlationId?: string; errors?: ApiFieldErrors; };\n");
         builder.AppendLine("function normalizeFieldErrors(errors: ApiFieldErrors | undefined): ApiFieldErrors {");
@@ -85,7 +88,7 @@ public static class FetchClientGenerator
             builder.AppendLine("}").AppendLine();
         }
 
-        return new GeneratedTypeScriptFile("services.ts", builder.ToString());
+        return new GeneratedTypeScriptFile(path, builder.ToString());
     }
 
     private static string BuildUrl(string route, IReadOnlyList<EndpointParameterMetadata> pathParameters, IReadOnlyList<EndpointParameterMetadata> queryParameters)

@@ -6,6 +6,9 @@ namespace Dotisan.TypeScript;
 public static class ZodSchemaGenerator
 {
     public static GeneratedTypeScriptFile Generate(ContractManifest manifest)
+        => Generate(manifest, "schemas.ts");
+
+    internal static GeneratedTypeScriptFile Generate(ContractManifest manifest, string path)
     {
         ArgumentNullException.ThrowIfNull(manifest);
         var builder = new StringBuilder("import { z } from \"zod\";").AppendLine().AppendLine();
@@ -38,7 +41,7 @@ public static class ZodSchemaGenerator
             builder.AppendLine();
         }
 
-        return new GeneratedTypeScriptFile("schemas.ts", builder.ToString());
+        return new GeneratedTypeScriptFile(path, builder.ToString());
     }
 
     private static string SchemaType(ContractTypeDescriptor type)

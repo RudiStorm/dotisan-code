@@ -19,7 +19,7 @@ var files = TypeScriptContractGenerator.Generate(DotisanGeneratedEndpointExtensi
 File.WriteAllText(Path.Combine("src", "generated", files[0].Path), files[0].Content);
 ~~~
 
-`dotisan new` invokes the renderer while scaffolding and writes the initial deterministic `models.ts`, `schemas.ts`, `services.ts`, and `queries.ts` files. A new project has no endpoint contracts yet, so these files contain only their empty-module output.
+`dotisan new` invokes the renderer while scaffolding and writes deterministic feature contract files under `src/<Name>.Web/src/dotisan/features`. The root `models.ts`, `schemas.ts`, `services.ts`, and `queries.ts` files are compatibility barrels. A new project has no endpoint contracts yet, so these files contain only their empty-module output.
 
 After changing contract metadata, run `dotisan generate` from the project root. It builds the solution, reads `dotisan.contract.json`, and refreshes generated files. `dotisan generate --check` verifies that generated output is current without changing files.
 

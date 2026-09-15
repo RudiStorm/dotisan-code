@@ -5,7 +5,7 @@ namespace Dotisan.AspNetCore.Tests;
 
 public sealed class TypeScriptTypeMapperTests
 {
-    private static readonly string[] GeneratedFileNames = ["models.ts", "schemas.ts", "services.ts", "queries.ts"];
+    private static readonly string[] GeneratedFileNames = ["features/profiles/models.ts", "features/profiles/schemas.ts", "features/profiles/services.ts", "features/profiles/queries.ts", "features/profiles/index.ts", "models.ts", "schemas.ts", "services.ts", "queries.ts"];
     private static readonly string[] StableFileNames = ["models.ts", "queries.ts"];
 
     [Fact]
@@ -30,10 +30,11 @@ public sealed class TypeScriptTypeMapperTests
         var files = TypeScriptContractGenerator.GenerateAll(manifest);
 
         Assert.Equal(GeneratedFileNames, files.Select(file => file.Path).ToArray());
-        Assert.Contains("export const ProfileSchema = z.object", files.Single(file => file.Path == "schemas.ts").Content);
-        Assert.Contains("export async function listProfiles", files.Single(file => file.Path == "services.ts").Content);
-        Assert.Contains("useListProfilesQuery", files.Single(file => file.Path == "queries.ts").Content);
-        Assert.Contains("import type { Profile } from \"./models\";", files.Single(file => file.Path == "services.ts").Content);
+        Assert.Contains("export const ProfileSchema = z.object", files.Single(file => file.Path == "features/profiles/schemas.ts").Content);
+        Assert.Contains("export async function listProfiles", files.Single(file => file.Path == "features/profiles/services.ts").Content);
+        Assert.Contains("useListProfilesQuery", files.Single(file => file.Path == "features/profiles/queries.ts").Content);
+        Assert.Contains("import type { Profile } from \"./models\";", files.Single(file => file.Path == "features/profiles/services.ts").Content);
+        Assert.Contains("./features/profiles/services", files.Single(file => file.Path == "services.ts").Content);
     }
 
     [Fact]
@@ -45,12 +46,38 @@ public sealed class TypeScriptTypeMapperTests
             [new ContractModel("Profile", "global::Profile", [new ContractProperty("name", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], [])],
             [new EndpointContractMetadata(null, [], [], 201, ["Profiles"], new EndpointValidationMetadata(true, []))]);
 
-        var output = TypeScriptContractGenerator.GenerateAll(manifest).Single(file => file.Path == "queries.ts").Content;
-        var services = TypeScriptContractGenerator.GenerateAll(manifest).Single(file => file.Path == "services.ts").Content;
+        var output = TypeScriptContractGenerator.GenerateAll(manifest).Single(file => file.Path == "features/profiles/queries.ts").Content;
+        var services = TypeScriptContractGenerator.GenerateAll(manifest).Single(file => file.Path == "features/profiles/services.ts").Content;
 
         Assert.Contains("mutationFn: (args: Parameters<typeof services.createProfile>) => services.createProfile(...args)", output);
         Assert.Contains("headers: { \"Content-Type\": \"application/json\" },", services);
         Assert.Contains("...(init.body ? { \"Content-Type\": \"application/json\" } : {}), ...init.headers", services);
+    }
+
+    [Fact]
+    public void Groups_contracts_by_feature_and_keeps_models_in_their_feature_files()
+    {
+        var manifest = new ContractManifest(
+            1,
+            [
+                new EndpointManifestEntry("account.me", "Account", "Me", "GET", "/api/account/me", "void", "CurrentUser", true, null, null, ["Account"], false, false),
+                new EndpointManifestEntry("orders.list", "Orders", "ListOrders", "GET", "/api/orders", "void", "Order[]", true, null, null, ["Orders"], false, false)
+            ],
+            [
+                new ContractModel("CurrentUser", "global::CurrentUser", [new ContractProperty("email", new ContractTypeDescriptor(ContractTypeKind.String), false, false)], []),
+                new ContractModel("Order", "global::Order", [new ContractProperty("id", new ContractTypeDescriptor(ContractTypeKind.Integer), false, false)], [])
+            ]);
+
+        var files = TypeScriptContractGenerator.GenerateAll(manifest);
+
+        Assert.Contains(files, file => file.Path == "features/auth/services.ts");
+        Assert.Contains(files, file => file.Path == "features/orders/services.ts");
+        var authModels = files.Single(file => file.Path == "features/auth/models.ts").Content;
+        var orderModels = files.Single(file => file.Path == "features/orders/models.ts").Content;
+        Assert.Contains("CurrentUser", authModels);
+        Assert.DoesNotContain("Order", authModels);
+        Assert.Contains("Order", orderModels);
+        Assert.DoesNotContain("CurrentUser", orderModels);
     }
 
     [Fact]
@@ -62,7 +89,7 @@ public sealed class TypeScriptTypeMapperTests
             [],
             [new EndpointContractMetadata(null, [new EndpointParameterMetadata("id", new ContractTypeDescriptor(ContractTypeKind.Guid), false, false)], [], 204, ["Sessions"], new EndpointValidationMetadata(false, []))]);
 
-        var services = TypeScriptContractGenerator.GenerateAll(manifest).Single(file => file.Path == "services.ts").Content;
+        var services = TypeScriptContractGenerator.GenerateAll(manifest).Single(file => file.Path == "features/sessions/services.ts").Content;
 
         Assert.Contains("`/api/sessions/${encodeURIComponent(String(id))}`", services);
     }
@@ -76,7 +103,7 @@ public sealed class TypeScriptTypeMapperTests
             [],
             [new EndpointContractMetadata(null, [], [], 204, ["Account"], new EndpointValidationMetadata(true, []))]);
 
-        var services = TypeScriptContractGenerator.GenerateAll(manifest).Single(file => file.Path == "services.ts").Content;
+        var services = TypeScriptContractGenerator.GenerateAll(manifest).Single(file => file.Path == "features/auth/services.ts").Content;
 
         Assert.Contains("export type ApiFieldErrors = Record<string, string[]>;", services);
         Assert.Contains("fieldErrors: ApiFieldErrors", services);

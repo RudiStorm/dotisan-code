@@ -701,7 +701,7 @@ public sealed class GoldenTemplateGeneratorTests
 
             Assert.True(authenticated.Success, authenticated.ErrorMessage);
             Assert.True(plain.Success, plain.ErrorMessage);
-            var authServices = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Web", "src", "dotisan", "services.ts"));
+            var authServices = await File.ReadAllTextAsync(Path.Combine(authenticatedOutput, "src", "AuthApp.Web", "src", "dotisan", "features", "auth", "services.ts"));
             Assert.Contains("login", authServices);
             Assert.Contains("register", authServices);
             Assert.Contains("logout", authServices);

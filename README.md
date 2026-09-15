@@ -138,14 +138,14 @@ dotisan generate --no-openapi
 `dotisan generate` builds the solution, reads the generated endpoint contract, and refreshes these files:
 
 ```text
-src/<Name>.Web/src/dotisan/models.ts
-src/<Name>.Web/src/dotisan/schemas.ts
-src/<Name>.Web/src/dotisan/services.ts
-src/<Name>.Web/src/dotisan/queries.ts
+src/<Name>.Web/src/dotisan/features/<feature>/models.ts
+src/<Name>.Web/src/dotisan/features/<feature>/schemas.ts
+src/<Name>.Web/src/dotisan/features/<feature>/services.ts
+src/<Name>.Web/src/dotisan/features/<feature>/queries.ts
 src/<Name>.Web/src/dotisan/openapi.json
 ```
 
-Use `dotisan generate --check` in CI to detect stale generated output. Use `--no-openapi` when only the TypeScript contract files are needed.
+Each feature also has an `index.ts`, and the root `models.ts`, `schemas.ts`, `services.ts`, and `queries.ts` files are compatibility barrels. Use `dotisan generate --check` in CI to detect stale generated output. Use `--no-openapi` when only the TypeScript contract files are needed.
 
 ### Database migrations
 
