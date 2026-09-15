@@ -233,7 +233,8 @@ internal static class TemplateFiles
             }))),
             new($"src/{options.Name}.Api/appsettings.Development.json", TemplateRenderer.Render(TemplateCatalog.Select("static/appsettings-development.template"), new TemplateContext(new Dictionary<string, string>
             {
-                ["MAIL_PROVIDER"] = options.MailProvider.ToString().ToLowerInvariant()
+                ["MAIL_PROVIDER"] = options.MailProvider.ToString().ToLowerInvariant(),
+                ["WEB_PORT"] = DevelopmentWebPort(options.Name).ToString(System.Globalization.CultureInfo.InvariantCulture)
             }))),
             new($"src/{options.Name}.Web/package.json", TemplateRenderer.Render(TemplateCatalog.Select("static/web-package.json.template"), new TemplateContext(new Dictionary<string, string>
             {

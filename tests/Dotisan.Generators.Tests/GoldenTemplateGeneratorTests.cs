@@ -48,6 +48,9 @@ public sealed class GoldenTemplateGeneratorTests
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "package.json")));
             var generatedModels = Path.Combine(output, "src", "TodoApp.Web", "src", "dotisan", "models.ts");
             Assert.True(File.Exists(generatedModels));
+            var developmentSettings = await File.ReadAllTextAsync(Path.Combine(output, "src", "TodoApp.Api", "appsettings.Development.json"));
+            Assert.DoesNotContain("__WEB_PORT__", developmentSettings);
+            Assert.Contains("http://localhost:", developmentSettings);
             Assert.Equal(Environment.NewLine, await File.ReadAllTextAsync(generatedModels));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "dotisan", "schemas.ts")));
             Assert.True(File.Exists(Path.Combine(output, "src", "TodoApp.Web", "src", "dotisan", "services.ts")));
