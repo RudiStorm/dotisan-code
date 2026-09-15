@@ -541,6 +541,39 @@ public sealed class CliApplicationTests
     }
 
     [Fact]
+    public async Task Dev_development_creates_follow_up_migration_when_model_changes_are_pending()
+    {
+        var apiDirectory = Path.Combine(Path.GetTempPath(), "dotisan-pending-migration-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(apiDirectory, "Migrations"));
+        await File.WriteAllTextAsync(Path.Combine(apiDirectory, "Migrations", "20260101000000_InitialCreate.cs"), "// migration\n");
+        var console = new MemoryConsole();
+        var services = new RecordingServices
+        {
+            ApiProjectPath = Path.Combine(apiDirectory, "App.Api.csproj"),
+            BlockProcesses = true,
+            PendingModelChanges = true
+        };
+        var app = DotisanApplication.CreateDefault(console, services: services);
+        using var cancellation = new CancellationTokenSource();
+
+        try
+        {
+            var runTask = app.RunAsync(["dev"], cancellation.Token);
+            await services.BothProcessesStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            cancellation.Cancel();
+            await runTask.WaitAsync(TimeSpan.FromSeconds(2));
+
+            Assert.Contains(services.RunRequests, request => request.Arguments.Contains("has-pending-model-changes", StringComparer.Ordinal));
+            Assert.Contains(services.RunRequests, request => request.Arguments.Contains("migrations", StringComparer.Ordinal) && request.Arguments.Contains("add", StringComparer.Ordinal) && request.Arguments.Any(argument => argument.StartsWith("DevelopmentSync_", StringComparison.Ordinal)));
+        }
+        finally
+        {
+            if (Directory.Exists(apiDirectory))
+                Directory.Delete(apiDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task New_external_database_prints_provider_specific_schema_steps()
     {
         var console = new MemoryConsole();
@@ -746,7 +779,7 @@ public sealed class CliApplicationTests
         public int ApiPort { get; init; } = 5000;
         public int WebPort { get; init; } = 5173;
         public string? SolutionPath => "C:\\work\\App.sln";
-        public string? ApiProjectPath => "C:\\work\\src\\App.Api\\App.Api.csproj";
+        public string? ApiProjectPath { get; init; } = "C:\\work\\src\\App.Api\\App.Api.csproj";
         public string? FrontendDirectory { get; init; } = "C:\\work\\src\\App.Web";
         public string? ResourceName { get; private set; }
         public string? FileName { get; private set; }
@@ -757,6 +790,7 @@ public sealed class CliApplicationTests
         public string? FailPrerequisite { get; init; }
         public bool BlockProcesses { get; init; }
         public bool BlockDatabaseStart { get; init; }
+        public bool PendingModelChanges { get; init; }
         public List<BlockingProcess> BlockingProcesses { get; } = [];
         public TaskCompletionSource BothProcessesStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource DatabaseStartRequested { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -799,6 +833,8 @@ public sealed class CliApplicationTests
                 return DotisanOperationResult.Failed("Docker daemon is not running.");
             if (FailFrontendInstall && arguments.SequenceEqual(["install"], StringComparer.Ordinal))
                 return DotisanOperationResult.Failed("npm exited with code 1.");
+            if (PendingModelChanges && arguments.Contains("has-pending-model-changes", StringComparer.Ordinal))
+                return DotisanOperationResult.Failed("Pending model changes detected.");
             if (!SuppressLockfile && arguments.SequenceEqual(["install"], StringComparer.Ordinal))
             {
                 Directory.CreateDirectory(workingDirectory);

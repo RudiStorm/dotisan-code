@@ -204,14 +204,26 @@ internal sealed class DevCommand : WorkspaceCommand
         if (!hasMigrations)
         {
             console.WriteLine("No EF Core migrations found; creating the InitialCreate development migration...");
-            var addResult = await services.RunAsync(
+            var addResult = await AddDevelopmentMigrationAsync(services, console, "InitialCreate", cancellationToken);
+            if (!addResult.Success)
+                return DotisanOperationResult.Failed($"Could not create the initial development migration. {addResult.ErrorMessage}");
+        }
+        else
+        {
+            var pendingResult = await services.RunAsync(
                 "dotnet",
-                ["ef", "migrations", "add", "InitialCreate", "--project", apiProjectPath, "--", "--environment", "Development"],
+                ["ef", "migrations", "has-pending-model-changes", "--project", apiProjectPath, "--", "--environment", "Development"],
                 services.WorkingDirectory,
                 console,
                 cancellationToken);
-            if (!addResult.Success)
-                return DotisanOperationResult.Failed($"Could not create the initial development migration. {addResult.ErrorMessage}");
+            if (!pendingResult.Success)
+            {
+                var migrationName = $"DevelopmentSync_{DateTime.UtcNow:yyyyMMddHHmmss}";
+                console.WriteLine($"Pending EF Core model changes found; creating the {migrationName} development migration...");
+                var addResult = await AddDevelopmentMigrationAsync(services, console, migrationName, cancellationToken);
+                if (!addResult.Success)
+                    return DotisanOperationResult.Failed($"Could not create a development migration for pending model changes. {addResult.ErrorMessage}");
+            }
         }
 
         console.WriteLine("Applying EF Core migrations to the development database...");
@@ -225,5 +237,16 @@ internal sealed class DevCommand : WorkspaceCommand
             ? DotisanOperationResult.Succeeded()
             : DotisanOperationResult.Failed($"Could not apply development database migrations. {updateResult.ErrorMessage}");
     }
+
+    private static Task<DotisanOperationResult> AddDevelopmentMigrationAsync(
+        IDotisanServices services,
+        IConsole console,
+        string migrationName,
+        CancellationToken cancellationToken) => services.RunAsync(
+            "dotnet",
+            ["ef", "migrations", "add", migrationName, "--project", services.ApiProjectPath!, "--", "--environment", "Development"],
+            services.WorkingDirectory,
+            console,
+            cancellationToken);
 }
 
